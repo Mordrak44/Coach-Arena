@@ -42,8 +42,20 @@ portraits du roster qu'après accord explicite de l'utilisateur.
 - [ ] Onboarding permissions micro/caméra (fallback clavier si refus)
 - [ ] Tests unitaires du moteur de combat (vitest)
 
-## v1
+## v1 — Mode Cinématique (voir GAME_DESIGN.md §7)
 
+Le match devient un épisode d'anime : scènes Kling générées en asynchrone
+entre les phases de coaching. Le mode arcade actuel reste le fallback.
+
+- [ ] Refonte du flow de match en « scènes » : entrée → coaching → assaut
+      (résolution + commentaire) → coaching → … → montage final
+- [ ] Commentateur shōnen : résolution de round → texte narratif immédiat
+      (templates locaux d'abord, API Claude ensuite)
+- [ ] File de génération asynchrone (jobs Kling en arrière-plan, affichage
+      quand prêt, fallback arcade si échec/retard)
+- [ ] Portrait de référence par perso (Kling image) — ⚠️ crédits, accord requis
+- [ ] Scènes image-to-video : entrée dans l'arène, moment fort du round, KO
+- [ ] Montage final du match (concat des clips + habillage) exportable 9:16
 - [ ] Génération de perso via API Claude (stats + lore + nom du spécial)
 - [ ] Émotions MediaPipe FaceLandmarker (sourire/cri/colère → bonus distincts)
 - [ ] Export mp4 (transcodage) + partage natif (Web Share API)

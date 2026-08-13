@@ -96,7 +96,50 @@ ailleurs.
 - v1+ : API Claude pour la génération de persos par prompt ; multijoueur
   (WebRTC ou serveur) ensuite.
 
-## 7. Jalons
+## 7. Mode Cinématique (vision cible, décidée le 2026-08-13)
+
+Le match comme un **épisode d'anime généré**, entrecoupé de phases de
+coaching interactives. Deux modes coexistent :
+
+- **Mode Arcade** (la v0 actuelle) : combat temps réel sur canvas, gratuit,
+  instantané — sert d'entraînement et de fallback.
+- **Mode Cinématique** : les scènes de combat sont des vidéos générées
+  (Kling), le gameplay est concentré dans les phases de coaching.
+
+### Boucle cinématique
+
+1. **Création** : prompt joueur → Claude génère stats/lore/technique ;
+   Kling génère le **portrait de référence** (une image canonique du perso,
+   réutilisée en image-to-video pour garantir la cohérence visuelle d'une
+   scène à l'autre).
+2. **Entrée dans l'arène** (scène Kling) : arrivée du perso, foule,
+   acclamations, staredown / coup de pression visuel. Générée pendant les
+   réglages / le matchmaking.
+3. **Coin du ring** (gameplay temps réel) : facecam + micro, discussion des
+   coachs, choix tactique, discours. Pendant ce temps la scène du round
+   précédent se génère en arrière-plan.
+4. **Assaut** : le moteur de combat résout le round à partir des consignes →
+   **commentaire textuel immédiat** façon commentateur shōnen (Claude) ;
+   le moment fort du round part en génération Kling.
+5. Retour au coin du ring → boucle jusqu'à la victoire.
+6. **Fin de match** : montage entrée + moments forts + KO = mini-épisode
+   anime du match, exportable 9:16 pour TikTok.
+
+### Règle d'or : jamais d'attente
+
+Kling met 1-3 min par clip → **pipeline asynchrone** : le texte du
+commentateur arrive instantanément, chaque vidéo se génère pendant la phase
+de jeu suivante et s'affiche quand elle est prête. Si une génération échoue
+ou tarde : fallback sur le rendu arcade + illustration statique.
+
+### Économie
+
+~5-6 clips par match → coût réel en crédits par partie. Mode arcade
+gratuit / mode cinématique premium. Optimisations possibles : ne générer en
+vidéo que LE moment fort du match (1 clip), images statiques + FX caméra
+pour le reste.
+
+## 8. Jalons
 
 - **v0 (prototype jouable)** : roster + création par mots-clés, combat BO3
   vs IA, coaching vocal par commandes, Hype, facecam overlay + énergie,
