@@ -33,8 +33,10 @@ portraits du roster qu'après accord explicite de l'utilisateur.
 
 ## v0.5 — Polish & profondeur
 
-- [ ] Carnet du Coach : cartes jouables au coin du ring (3 familles :
+- [x] Carnet du Coach : cartes jouables au coin du ring (3 familles :
       directes, armées, conditionnelles) — voir GAME_DESIGN.md §4 bis
+      (v0 : pool de 6 cartes, sélection de 3 avant match, 1 par coin du
+      ring ; l'IA adverse ne joue pas encore de cartes)
 - [ ] Traits d'écoute des persos (Sanguin, Cérébral, Têtu, Fusionnel) :
       le volume vocal module l'effet du coaching selon le trait
 - [ ] Lien coach-perso (persistance localStorage) : paliers → +HRT,
@@ -83,3 +85,8 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
   (cible v0.5 : ~80-85 % pour un coach parfait). Les bonus atk/def des
   plans tactiques (PLAN_EFFECTS) ne sont pas encore appliqués dans
   resolveAttack — à câbler pendant l'équilibrage.
+- 2026-08-13 (routine h+1) : Carnet du Coach implémenté (6 cartes, deck de
+  3, jeu au coin du ring, hooks moteur pour les 6 effets, UI sélection +
+  main en phase tactique, FX). Sim déplacée dans scripts/sim.ts : cartes
+  déclenchées 60/60 matchs, tout se termine. L'IA adverse sans cartes ni
+  la limite « coach parfait 100 % » ne sont pas traités (→ équilibrage).

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { Character } from '../game/types'
+import type { CardId, Character } from '../game/types'
 import { ROSTER, createFromPrompt } from '../game/characters'
+import { CARD_POOL, DEFAULT_DECK, FAMILY_LABEL } from '../game/cards'
 
 function StatBar({ label, value, color }: { label: string; value: number; color: string }) {
   return (
@@ -39,11 +40,18 @@ export function CharCard({
 export default function CharacterSelect({
   onConfirm,
 }: {
-  onConfirm: (char: Character) => void
+  onConfirm: (char: Character, deck: CardId[]) => void
 }) {
   const [selected, setSelected] = useState<Character | null>(null)
   const [prompt, setPrompt] = useState('')
   const [custom, setCustom] = useState<Character | null>(null)
+  const [deck, setDeck] = useState<CardId[]>(DEFAULT_DECK)
+
+  const toggleCard = (id: CardId) => {
+    setDeck(d =>
+      d.includes(id) ? d.filter(x => x !== id) : d.length < 3 ? [...d, id] : d,
+    )
+  }
 
   const forge = () => {
     if (prompt.trim().length < 3) return
@@ -77,8 +85,38 @@ export default function CharacterSelect({
         ))}
       </div>
 
-      <button className="btn" disabled={!selected} onClick={() => selected && onConfirm(selected)}>
-        {selected ? `Coacher ${selected.name} !` : 'Sélectionne un perso'}
+      <h2 style={{ fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--accent)' }}>
+        🃏 Ton Carnet du Coach ({deck.length}/3)
+      </h2>
+      <p className="permNote">
+        3 cartes, jouables une par une au coin du ring entre les rounds.
+      </p>
+      <div className="roster">
+        {CARD_POOL.map(c => (
+          <button
+            key={c.id}
+            className={`charCard${deck.includes(c.id) ? ' selected' : ''}`}
+            onClick={() => toggleCard(c.id)}
+          >
+            <div className="cname">
+              {c.icon} {c.name}
+            </div>
+            <div className="ctitle">{FAMILY_LABEL[c.family]}</div>
+            <div style={{ fontSize: '0.7rem', marginTop: 4, color: 'var(--muted)' }}>{c.desc}</div>
+          </button>
+        ))}
+      </div>
+
+      <button
+        className="btn"
+        disabled={!selected || deck.length !== 3}
+        onClick={() => selected && onConfirm(selected, deck)}
+      >
+        {!selected
+          ? 'Sélectionne un perso'
+          : deck.length !== 3
+            ? `Choisis ${3 - deck.length} carte(s)`
+            : `Coacher ${selected.name} !`}
       </button>
     </div>
   )

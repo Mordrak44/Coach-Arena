@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { Character } from './game/types'
+import type { CardId, Character } from './game/types'
 import { pickOpponent } from './game/characters'
+import { DEFAULT_DECK } from './game/cards'
 import TitleScreen from './ui/TitleScreen'
 import CharacterSelect from './ui/CharacterSelect'
 import ArenaScreen, { type MatchOutcome } from './ui/ArenaScreen'
@@ -14,8 +15,10 @@ export default function App() {
   const [enemy, setEnemy] = useState<Character | null>(null)
   const [outcome, setOutcome] = useState<MatchOutcome | null>(null)
   const [matchKey, setMatchKey] = useState(0)
+  const [deck, setDeck] = useState<CardId[]>(DEFAULT_DECK)
 
-  const startMatch = (char: Character) => {
+  const startMatch = (char: Character, chosenDeck?: CardId[]) => {
+    if (chosenDeck) setDeck(chosenDeck)
     setPlayer(char)
     setEnemy(pickOpponent(char.id))
     setMatchKey(k => k + 1)
@@ -32,6 +35,7 @@ export default function App() {
             key={matchKey}
             player={player}
             enemy={enemy}
+            deck={deck}
             onFinish={o => {
               setOutcome(o)
               setScreen('results')

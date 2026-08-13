@@ -50,6 +50,36 @@ export type CoachCommand = 'attack' | 'defend' | 'dodge' | 'counter' | 'special'
 /** Plan tactique choisi entre les rounds */
 export type TacticPlan = 'pressure' | 'concrete' | 'counterplay' | 'coldblood'
 
+// --- Carnet du Coach -------------------------------------------------------
+
+export type CardFamily = 'direct' | 'armed' | 'conditional'
+
+export type CardId =
+  | 'secondWind' // direct : +20 % PV
+  | 'ironGuard' // direct : garde renforcée au prochain round
+  | 'perfectCounter' // armée : le prochain « contre ! » crié fait ×2 dégâts
+  | 'warCry' // armée : le prochain encouragement crié remplit fort la Hype
+  | 'lastChance' // conditionnelle : sous 15 % PV → Hype pleine (une fois)
+  | 'provocation' // conditionnelle : l'adversaire démarre le round agressif
+
+export interface CoachCard {
+  id: CardId
+  name: string
+  family: CardFamily
+  icon: string
+  desc: string
+}
+
+/** Effets de cartes en attente / actifs sur le perso du joueur */
+export interface CardMods {
+  perfectCounter: boolean
+  warCry: boolean
+  ironGuard: boolean
+  lastChance: boolean
+  /** l'ennemi est provoqué : posture agressive verrouillée jusqu'à ce t */
+  provokedUntil: number
+}
+
 export interface CoachInput {
   /** commande ponctuelle émise depuis le dernier tick (ou null) */
   command: CoachCommand | null
@@ -97,6 +127,12 @@ export interface MatchState {
   phaseUntil: number
   /** plan tactique actif du joueur pour le round courant */
   plan: TacticPlan | null
+  /** cartes encore en main (carnet de 3 au départ) */
+  hand: CardId[]
+  /** une seule carte jouable par coin du ring */
+  cardPlayedThisCorner: boolean
+  /** effets de cartes actifs côté joueur */
+  mods: CardMods
   events: CombatEvent[]
 }
 
@@ -111,3 +147,5 @@ export type CombatEvent =
   | { kind: 'matchEnd'; t: number; winner: 'player' | 'enemy' }
   | { kind: 'roundStart'; t: number; round: number }
   | { kind: 'hypeFull'; t: number; who: 'player' | 'enemy' }
+  | { kind: 'card'; t: number; name: string }
+  | { kind: 'cardProc'; t: number; text: string }

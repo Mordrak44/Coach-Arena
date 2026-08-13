@@ -82,6 +82,14 @@ export class ArenaRenderer {
         this.flash(now, '#fff', 0.16)
         this.shake(now, 22)
         break
+      case 'card':
+        this.floats.push({ text: `🃏 ${ev.name.toUpperCase()}`, x: CANVAS_W / 2, y: 520, t0: now, life: 1.4, size: 34, color: '#7ec8ff', angle: -0.05 })
+        break
+      case 'cardProc':
+        this.floats.push({ text: ev.text, x: CANVAS_W / 2, y: 480, t0: now, life: 1.3, size: 48, color: '#7ec8ff', angle: 0.06 })
+        this.flash(now, '#7ec8ff', 0.1)
+        this.shake(now, 10)
+        break
       case 'confused':
         this.floats.push({ text: '?? CONFUS ??', x: fx(ev.who), y: 400, t0: now, life: 1.2, size: 30, color: '#cc88ff', angle: 0 })
         break

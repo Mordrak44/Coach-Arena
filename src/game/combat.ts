@@ -1,4 +1,5 @@
 import type {
+  CardId,
   Character,
   CoachCommand,
   CoachInput,
@@ -8,6 +9,7 @@ import type {
   Stance,
   TacticPlan,
 } from './types'
+import { DEFAULT_DECK, getCard } from './cards'
 
 // ---------------------------------------------------------------------------
 // Constantes d'équilibrage
@@ -57,7 +59,11 @@ function makeFighter(char: Character, side: 'player' | 'enemy'): FighterState {
   }
 }
 
-export function createMatch(playerChar: Character, enemyChar: Character): MatchState {
+export function createMatch(
+  playerChar: Character,
+  enemyChar: Character,
+  deck: CardId[] = DEFAULT_DECK,
+): MatchState {
   return {
     player: makeFighter(playerChar, 'player'),
     enemy: makeFighter(enemyChar, 'enemy'),
@@ -68,8 +74,54 @@ export function createMatch(playerChar: Character, enemyChar: Character): MatchS
     t: 0,
     phaseUntil: INTRO_DURATION,
     plan: null,
+    hand: [...deck],
+    cardPlayedThisCorner: false,
+    mods: {
+      perfectCounter: false,
+      warCry: false,
+      ironGuard: false,
+      lastChance: false,
+      provokedUntil: 0,
+    },
     events: [{ kind: 'roundStart', t: 0, round: 1 }],
   }
+}
+
+// ---------------------------------------------------------------------------
+// Carnet du Coach
+// ---------------------------------------------------------------------------
+
+/** Joue une carte pendant la phase tactique. Une seule par coin du ring. */
+export function playCard(m: MatchState, id: CardId): boolean {
+  if (m.phase !== 'tactics' || m.cardPlayedThisCorner) return false
+  const idx = m.hand.indexOf(id)
+  if (idx === -1) return false
+  m.hand.splice(idx, 1)
+  m.cardPlayedThisCorner = true
+  m.events.push({ kind: 'card', t: m.t, name: getCard(id).name })
+
+  switch (id) {
+    case 'secondWind':
+      m.player.hp = Math.min(m.player.maxHp, m.player.hp + Math.round(m.player.maxHp * 0.2))
+      break
+    case 'ironGuard':
+      m.mods.ironGuard = true
+      break
+    case 'perfectCounter':
+      m.mods.perfectCounter = true
+      break
+    case 'warCry':
+      m.mods.warCry = true
+      break
+    case 'lastChance':
+      m.mods.lastChance = true
+      break
+    case 'provocation':
+      // Prend effet au démarrage du round suivant (voir startNextRound).
+      m.mods.provokedUntil = -1
+      break
+  }
+  return true
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +141,13 @@ function applyCommand(m: MatchState, cmd: CoachCommand): void {
   const hrtScale = 0.5 + f.char.stats.hrt / 12 // 0.66..1.5 : le Cœur amplifie tout
 
   if (cmd === 'cheer') {
-    f.hype = Math.min(HYPE_MAX, f.hype + 6 * hrtScale)
+    let gain = 6 * hrtScale
+    if (m.mods.warCry) {
+      m.mods.warCry = false
+      gain += 35
+      m.events.push({ kind: 'cardProc', t: m.t, text: 'CRI DE GUERRE !!' })
+    }
+    f.hype = Math.min(HYPE_MAX, f.hype + gain)
     return
   }
 
@@ -140,7 +198,13 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
   // Fenêtre de contre du défenseur : renvoie une frappe.
   if (m.t < d.counterUntil) {
     d.counterUntil = 0
-    const dmg = Math.round((6 + d.char.stats.atk * 1.6) * 1.3)
+    let counterMul = 1.3
+    if (defSide === 'player' && m.mods.perfectCounter) {
+      m.mods.perfectCounter = false
+      counterMul *= 2
+      m.events.push({ kind: 'cardProc', t: m.t, text: 'CONTRE PARFAIT !!' })
+    }
+    const dmg = Math.round((6 + d.char.stats.atk * 1.6) * counterMul)
     a.hp = Math.max(0, a.hp - dmg)
     a.anim = { kind: 'hurt', until: m.t + 0.4 }
     d.anim = { kind: 'attack', until: m.t + 0.35 }
@@ -164,6 +228,7 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
   const mitigation = 1 - Math.min(0.65, (d.char.stats.def * dMod.def) / 24)
   dmg *= mitigation
   if (m.t < a.confusedUntil) dmg *= 0.7
+  if (defSide === 'player' && m.mods.ironGuard) dmg *= 0.65 // Garde de Fer
 
   const blocked = d.stance === 'defensive' && Math.random() < 0.35
   if (blocked) {
@@ -215,6 +280,11 @@ function pick<T>(arr: T[]): T {
 
 function enemyCoachAI(m: MatchState): void {
   const e = m.enemy
+  // Provoqué : agressif verrouillé, n'écoute plus son coach.
+  if (m.t < m.mods.provokedUntil) {
+    e.stance = 'aggressive'
+    return
+  }
   if (e.hype >= HYPE_MAX && Math.random() < 0.02) {
     fireSpecial(m, 'enemy')
     return
@@ -252,6 +322,7 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
         } else {
           m.phase = 'tactics'
           m.phaseUntil = m.t + TACTICS_DURATION
+          m.cardPlayedThisCorner = false
         }
       }
       return
@@ -275,6 +346,14 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
     const wasFull = p.hype >= HYPE_MAX
     p.hype = Math.min(HYPE_MAX, p.hype + energy * 4 * hrtScale * dt * 10)
     if (!wasFull && p.hype >= HYPE_MAX) m.events.push({ kind: 'hypeFull', t: m.t, who: 'player' })
+  }
+
+  // Dernière Chance : sous 15 % PV, la Hype se remplit d'un coup (une fois).
+  if (m.mods.lastChance && p.hp > 0 && p.hp < p.maxHp * 0.15) {
+    m.mods.lastChance = false
+    p.hype = HYPE_MAX
+    m.events.push({ kind: 'cardProc', t: m.t, text: 'DERNIÈRE CHANCE !!' })
+    m.events.push({ kind: 'hypeFull', t: m.t, who: 'player' })
   }
 
   enemyCoachAI(m)
@@ -318,6 +397,11 @@ function endRound(m: MatchState, winner: 'player' | 'enemy'): void {
   else m.enemyWins++
   const loser = winner === 'player' ? m.enemy : m.player
   loser.anim = { kind: 'ko', until: m.t + ROUND_END_DURATION }
+  // Les effets « durée d'un round » expirent.
+  m.mods.ironGuard = false
+  m.mods.perfectCounter = false
+  m.mods.warCry = false
+  m.mods.lastChance = false
   m.phase = 'roundEnd'
   m.phaseUntil = m.t + ROUND_END_DURATION
   m.events.push({ kind: 'roundEnd', t: m.t, winner })
@@ -358,6 +442,12 @@ function startNextRound(m: MatchState, plan: TacticPlan): void {
   e.hype = Math.round(e.hype * 0.5)
   e.stance = 'neutral'
   e.anim = { kind: 'idle', until: 0 }
+
+  // Provocation jouée au coin du ring : prend effet maintenant.
+  if (m.mods.provokedUntil === -1) {
+    m.mods.provokedUntil = m.t + INTRO_DURATION + 10
+    e.stance = 'aggressive'
+  }
 
   m.plan = plan
   m.phase = 'intro'

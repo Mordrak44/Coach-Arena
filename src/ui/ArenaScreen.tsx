@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Character, CoachCommand, MatchState, TacticPlan } from '../game/types'
+import type { CardId, Character, CoachCommand, MatchState, TacticPlan } from '../game/types'
 import {
   ROUND_TIME_LIMIT,
   addSpeechHype,
   chooseTacticPlan,
   createMatch,
   forceRoundTimeout,
+  playCard,
   tick,
   HYPE_MAX,
 } from '../game/combat'
+import { FAMILY_LABEL, getCard } from '../game/cards'
 import { ArenaRenderer, CANVAS_H, CANVAS_W } from '../render/arenaRenderer'
 import { VoiceCoach } from '../systems/voice'
 import { FaceCoach } from '../systems/facecam'
@@ -38,15 +40,17 @@ const KEYMAP: Record<string, CoachCommand> = {
 export default function ArenaScreen({
   player,
   enemy,
+  deck,
   onFinish,
 }: {
   player: Character
   enemy: Character
+  deck: CardId[]
   onFinish: (outcome: MatchOutcome) => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const camRef = useRef<HTMLVideoElement>(null)
-  const matchRef = useRef<MatchState>(createMatch(player, enemy))
+  const matchRef = useRef<MatchState>(createMatch(player, enemy, deck))
   const pendingCmd = useRef<CoachCommand | null>(null)
 
   // Instances systèmes, stables pour toute la durée du composant.
@@ -72,6 +76,8 @@ export default function ArenaScreen({
   const [micOk, setMicOk] = useState<boolean | null>(null)
   const [camOk, setCamOk] = useState(false)
   const [plan, setPlan] = useState<TacticPlan | null>(null)
+  const [hand, setHand] = useState<CardId[]>(deck)
+  const [cardPlayed, setCardPlayed] = useState(false)
   const [tacticsLeft, setTacticsLeft] = useState(0)
   const [speechEnergy, setSpeechEnergy] = useState(0)
   const [specialReady, setSpecialReady] = useState(false)
@@ -148,7 +154,11 @@ export default function ArenaScreen({
 
       if (m.phase !== prevPhase) {
         setPhase(m.phase)
-        if (m.phase === 'tactics') setPlan(null)
+        if (m.phase === 'tactics') {
+          setPlan(null)
+          setHand([...m.hand])
+          setCardPlayed(false)
+        }
       }
       setSpecialReady(m.player.hype >= HYPE_MAX)
       setHeard(sys.voice.state.lastHeard)
@@ -201,6 +211,13 @@ export default function ArenaScreen({
     chooseTacticPlan(matchRef.current, p)
   }
 
+  const onPlayCard = (id: CardId) => {
+    if (playCard(matchRef.current, id)) {
+      setHand([...matchRef.current.hand])
+      setCardPlayed(true)
+    }
+  }
+
   return (
     <div className="arenaWrap">
       <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} />
@@ -248,6 +265,33 @@ export default function ArenaScreen({
               </button>
             ))}
           </div>
+          {hand.length > 0 && (
+            <>
+              <h2 style={{ fontSize: '0.95rem' }}>🃏 Carnet du Coach</h2>
+              <div className="planGrid">
+                {hand.map(id => {
+                  const c = getCard(id)
+                  return (
+                    <button
+                      key={id}
+                      className="planCard"
+                      disabled={cardPlayed}
+                      style={cardPlayed ? { opacity: 0.4 } : undefined}
+                      onClick={() => onPlayCard(id)}
+                    >
+                      <b>
+                        {c.icon} {c.name}
+                      </b>
+                      <span>
+                        [{FAMILY_LABEL[c.family]}] {c.desc}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+              {cardPlayed && <span className="permNote">Carte jouée — une seule par coin du ring.</span>}
+            </>
+          )}
           <div className="speechMeter">
             <i style={{ width: `${Math.round(speechEnergy * 100)}%` }} />
           </div>
