@@ -98,13 +98,16 @@ ailleurs.
 
 ## 7. Mode Cinématique (vision cible, décidée le 2026-08-13)
 
-Le match comme un **épisode d'anime généré**, entrecoupé de phases de
-coaching interactives. Deux modes coexistent :
+Deux couches distinctes — c'est le principe fondateur :
 
-- **Mode Arcade** (la v0 actuelle) : combat temps réel sur canvas, gratuit,
-  instantané — sert d'entraînement et de fallback.
-- **Mode Cinématique** : les scènes de combat sont des vidéos générées
-  (Kling), le gameplay est concentré dans les phases de coaching.
+- **Couche gameplay (le direct)** : le round se joue et se regarde TOUJOURS
+  sur le rendu arcade temps réel (moteur canvas v0). Le coach voit l'action
+  seconde par seconde et crie ses consignes en réaction à ce qui se passe.
+  Instantané, gratuit, jamais dépendant d'une génération.
+- **Couche spectacle (la diffusion TV)** : les scènes Kling ne servent
+  jamais à informer le coach, seulement à magnifier ce qui a déjà été vécu.
+  Si un clip est en retard ou échoue, il ne manque qu'au montage final,
+  jamais au gameplay.
 
 ### Boucle cinématique
 
@@ -112,25 +115,20 @@ coaching interactives. Deux modes coexistent :
    Kling génère le **portrait de référence** (une image canonique du perso,
    réutilisée en image-to-video pour garantir la cohérence visuelle d'une
    scène à l'autre).
-2. **Entrée dans l'arène** (scène Kling) : arrivée du perso, foule,
-   acclamations, staredown / coup de pression visuel. Générée pendant les
-   réglages / le matchmaking.
-3. **Coin du ring** (gameplay temps réel) : facecam + micro, discussion des
-   coachs, choix tactique, discours. Pendant ce temps la scène du round
-   précédent se génère en arrière-plan.
-4. **Assaut** : le moteur de combat résout le round à partir des consignes →
-   **commentaire textuel immédiat** façon commentateur shōnen (Claude) ;
-   le moment fort du round part en génération Kling.
-5. Retour au coin du ring → boucle jusqu'à la victoire.
-6. **Fin de match** : montage entrée + moments forts + KO = mini-épisode
-   anime du match, exportable 9:16 pour TikTok.
-
-### Règle d'or : jamais d'attente
-
-Kling met 1-3 min par clip → **pipeline asynchrone** : le texte du
-commentateur arrive instantanément, chaque vidéo se génère pendant la phase
-de jeu suivante et s'affiche quand elle est prête. Si une génération échoue
-ou tarde : fallback sur le rendu arcade + illustration statique.
+2. **Entrée dans l'arène** (scène Kling, couche spectacle) : arrivée du
+   perso, foule, acclamations, staredown / coup de pression visuel.
+   Générée pendant la sélection / le matchmaking.
+3. **Round en direct** (couche gameplay) : combat temps réel sur le rendu
+   arcade, coaching vocal + facecam pendant l'action — le cœur du jeu.
+   À la fin du round, le moment fort détecté part en génération Kling.
+4. **Coin du ring** (gameplay temps réel) : choix tactique + discours de
+   coach. En fond d'écran, si prêt : le **replay anime** du moment fort du
+   round précédent, façon ralenti TV entre deux rounds — on le revoit
+   sublimé, on ne le découvre pas.
+5. Boucle 3-4 jusqu'à la victoire.
+6. **Fin de match** : montage entrée + replays + KO = mini-épisode anime du
+   match, exportable 9:16 pour TikTok — idéalement mixé avec la facecam du
+   coach hurlant la consigne au moment du KO (le combo viral).
 
 ### Économie
 
