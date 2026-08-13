@@ -19,6 +19,18 @@ puis mettre à jour ce fichier.
 - [x] Écrans : titre, sélection/création, arène, tactique, résultats
 - [x] Export clip (MediaRecorder canvas 9:16 + micro) + bouton partage
 
+## Direction artistique (décidée le 2026-08-13)
+
+**2D illustrée animée**, façon Dokkan Battle / AFK Arena : illustrations de
+persos (générées via Kling pour le roster, via génération d'image pour les
+persos par prompt en v1+) mises en scène par la caméra — zooms brutaux,
+flashs, speed lines, cutscenes de spéciaux. Pas de 3D : trop coûteuse et
+incompatible avec la création de perso par prompt. La 3D (VRM + Mixamo,
+façon TFT) reste une piste v2 si le jeu décolle.
+
+⚠️ Les générations Kling consomment les crédits du compte : ne lancer les
+portraits du roster qu'après accord explicite de l'utilisateur.
+
 ## v0.5 — Polish
 
 - [ ] Équilibrage combat (durée de round cible 45–60 s, win-rate des postures)
