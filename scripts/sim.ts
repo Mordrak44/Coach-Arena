@@ -17,7 +17,11 @@ interface SimOptions {
 }
 
 function runMatch(opts: SimOptions): { winner: 'player' | 'enemy'; cardProcs: number } {
-  const m: MatchState = createMatch(ROSTER[0], ROSTER[1], opts.deck ?? [])
+  // Matchup aléatoire pour mesurer l'équilibrage global, pas un duel précis.
+  const pi = Math.floor(Math.random() * ROSTER.length)
+  let ei = Math.floor(Math.random() * ROSTER.length)
+  if (ei === pi) ei = (ei + 1) % ROSTER.length
+  const m: MatchState = createMatch(ROSTER[pi], ROSTER[ei], opts.deck ?? [])
   let roundStart = 0
   let prevPhase: string = m.phase
   let lastCmdAt = -10

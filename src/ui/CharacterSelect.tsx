@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CardId, Character } from '../game/types'
 import { ROSTER, TRAIT_INFO, createFromPrompt } from '../game/characters'
 import { CARD_POOL, DEFAULT_DECK, FAMILY_LABEL } from '../game/cards'
+import { bondLevel, bondTitle, getProgress, loadCustoms, saveCustom } from '../game/progression'
 
 function StatBar({ label, value, color }: { label: string; value: number; color: string }) {
   return (
@@ -37,7 +38,19 @@ export function CharCard({
         {TRAIT_INFO[char.trait].icon} <b>{TRAIT_INFO[char.trait].label}</b>
         <span style={{ color: 'var(--muted)' }}> — {TRAIT_INFO[char.trait].hint}</span>
       </div>
+      <BondLine charId={char.id} />
     </button>
+  )
+}
+
+function BondLine({ charId }: { charId: string }) {
+  const p = getProgress(charId)
+  const level = bondLevel(p.wins)
+  if (p.wins === 0 && p.losses === 0) return null
+  return (
+    <div style={{ fontSize: '0.66rem', marginTop: 3, color: '#fd79a8' }}>
+      💞 Lien niv. {level} · {bondTitle(level)} · {p.wins}V/{p.losses}D
+    </div>
   )
 }
 
@@ -48,7 +61,7 @@ export default function CharacterSelect({
 }) {
   const [selected, setSelected] = useState<Character | null>(null)
   const [prompt, setPrompt] = useState('')
-  const [custom, setCustom] = useState<Character | null>(null)
+  const [customs, setCustoms] = useState<Character[]>(() => loadCustoms())
   const [deck, setDeck] = useState<CardId[]>(DEFAULT_DECK)
 
   const toggleCard = (id: CardId) => {
@@ -60,7 +73,8 @@ export default function CharacterSelect({
   const forge = () => {
     if (prompt.trim().length < 3) return
     const c = createFromPrompt(prompt.trim())
-    setCustom(c)
+    saveCustom(c) // le perso survivra aux sessions (et gardera son Lien)
+    setCustoms(loadCustoms())
     setSelected(c)
   }
 
@@ -81,9 +95,9 @@ export default function CharacterSelect({
       </button>
 
       <div className="roster">
-        {custom && (
-          <CharCard char={custom} selected={selected?.id === custom.id} onClick={() => setSelected(custom)} />
-        )}
+        {customs.map(c => (
+          <CharCard key={c.id} char={c} selected={selected?.id === c.id} onClick={() => setSelected(c)} />
+        ))}
         {ROSTER.map(c => (
           <CharCard key={c.id} char={c} selected={selected?.id === c.id} onClick={() => setSelected(c)} />
         ))}

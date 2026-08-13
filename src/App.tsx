@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CardId, Character } from './game/types'
 import { pickOpponent } from './game/characters'
 import { DEFAULT_DECK } from './game/cards'
+import { applyBond, recordResult } from './game/progression'
 import TitleScreen from './ui/TitleScreen'
 import CharacterSelect from './ui/CharacterSelect'
 import ArenaScreen, { type MatchOutcome } from './ui/ArenaScreen'
@@ -19,7 +20,7 @@ export default function App() {
 
   const startMatch = (char: Character, chosenDeck?: CardId[]) => {
     if (chosenDeck) setDeck(chosenDeck)
-    setPlayer(char)
+    setPlayer(applyBond(char)) // le Lien booste le Cœur du perso
     setEnemy(pickOpponent(char.id))
     setMatchKey(k => k + 1)
     setScreen('arena')
@@ -37,6 +38,7 @@ export default function App() {
             enemy={enemy}
             deck={deck}
             onFinish={o => {
+              recordResult(player.id, o.winner === 'player')
               setOutcome(o)
               setScreen('results')
             }}

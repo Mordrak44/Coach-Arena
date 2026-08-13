@@ -306,8 +306,10 @@ function pick<T>(arr: T[]): T {
 // IA adverse : un « coach fantôme » simple pilote l'ennemi.
 // ---------------------------------------------------------------------------
 
-function enemyCoachAI(m: MatchState): void {
+function enemyCoachAI(m: MatchState, dt: number): void {
   const e = m.enemy
+  // Le coach fantôme encourage son poulain en continu (équivalent voix+visage).
+  e.hype = Math.min(HYPE_MAX, e.hype + 2.5 * dt * (0.5 + e.char.stats.hrt / 12))
   // Provoqué : agressif verrouillé, n'écoute plus son coach.
   if (m.t < m.mods.provokedUntil) {
     e.stance = 'aggressive'
@@ -317,12 +319,14 @@ function enemyCoachAI(m: MatchState): void {
     fireSpecial(m, 'enemy')
     return
   }
-  // Change de posture de temps en temps selon la situation.
-  if (Math.random() < 0.008) {
+  // Change de posture selon la situation (lecture du match).
+  if (Math.random() < 0.015) {
     const hpRatio = e.hp / e.maxHp
     const pHpRatio = m.player.hp / m.player.maxHp
     if (hpRatio < 0.3) e.stance = pick(['defensive', 'evasive', 'counter'])
     else if (pHpRatio < 0.35) e.stance = 'aggressive'
+    else if (m.player.stance === 'aggressive') e.stance = pick(['counter', 'defensive', 'evasive'])
+    else if (m.player.stance === 'defensive') e.stance = pick(['neutral', 'aggressive'])
     else e.stance = pick(['neutral', 'aggressive', 'defensive', 'evasive', 'counter'])
   }
 }
@@ -381,7 +385,8 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
   const energy = input.voiceEnergy * voiceW + input.faceEnergy * faceW
   if (energy > 0.15) {
     const wasFull = p.hype >= HYPE_MAX
-    p.hype = Math.min(HYPE_MAX, p.hype + energy * 4 * hrtScale * dt * 10)
+    // Une énergie soutenue (~0,65) remplit la jauge en ~20 s.
+    p.hype = Math.min(HYPE_MAX, p.hype + energy * 7 * hrtScale * dt)
     if (!wasFull && p.hype >= HYPE_MAX) m.events.push({ kind: 'hypeFull', t: m.t, who: 'player' })
   }
 
@@ -393,7 +398,7 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
     m.events.push({ kind: 'hypeFull', t: m.t, who: 'player' })
   }
 
-  enemyCoachAI(m)
+  enemyCoachAI(m, dt)
 
   // --- Actions des combattants ---
   for (const side of ['player', 'enemy'] as const) {

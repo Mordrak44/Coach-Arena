@@ -40,9 +40,14 @@ portraits du roster qu'après accord explicite de l'utilisateur.
 - [x] Traits d'écoute des persos (Sanguin, Cérébral, Têtu, Fusionnel) :
       le volume vocal module l'effet du coaching selon le trait
       (roster + déduction par prompt + effets moteur + affichage sélection)
-- [ ] Lien coach-perso (persistance localStorage) : paliers → +HRT,
-      déblocage des cartes signatures
-- [ ] Équilibrage combat (durée de round cible 45–60 s, win-rate des postures)
+- [x] Lien coach-perso (persistance localStorage) : paliers → +HRT
+      (5 paliers/titres, persos par prompt sauvegardés avec leur Lien ;
+      cartes signatures par perso encore à faire → v1)
+- [x] Équilibrage passe 1 : coach parfait 80 % (cible 80-85), coach absent
+      42 %, coach + carnet 93 %. Coach fantôme adverse renforcé (trickle de
+      Hype + lecture des postures). Durée de round pas encore mesurée.
+- [ ] Cartes signatures par perso (débloquées par paliers de Lien)
+- [ ] Mesurer/ajuster la durée moyenne des rounds (cible 45-60 s)
 - [ ] Sons : impacts, foule, gong de round (WebAudio, généré)
 - [ ] FX supplémentaires : zoom dramatique sur special, écran fissuré au KO
 - [ ] Replay du moment fort en fin de match (buffer des 8 dernières secondes)
@@ -99,3 +104,9 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
   dans resolveAttack. Micro-tests Têtu/Cérébral dans scripts/sim.ts.
   NOTE : test Kling suspendu — deux tentatives interrompues par
   l'utilisateur ; ne pas relancer sans confirmation explicite de sa part.
+- 2026-08-13 (routine h+3) : Lien coach-perso (localStorage, 5 paliers de
+  titres, +1..3 HRT, affiché à la sélection et aux résultats ; les persos
+  créés par prompt sont sauvegardés — max 4 — et gardent leur Lien).
+  Équilibrage passe 1 : Hype continue du joueur ~20 s pour remplir la
+  jauge (avant ~6 s), coach fantôme adverse avec trickle de Hype et
+  contre-postures → coach parfait 100 % → 80 %.
