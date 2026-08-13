@@ -28,6 +28,15 @@ export interface Special {
   onomatopoeia: string
 }
 
+/**
+ * Trait d'écoute : comment le perso réagit au STYLE de coaching.
+ * - sanguin : s'enflamme quand le coach crie (Hype boostée à fort volume)
+ * - cerebral : veut du calme et de la précision — hurler le stresse
+ * - tetu : ignore le premier ordre de posture de chaque round
+ * - fusionnel : l'expressivité facecam du coach compte double
+ */
+export type ListenTrait = 'sanguin' | 'cerebral' | 'tetu' | 'fusionnel'
+
 export interface Character {
   id: string
   name: string
@@ -38,6 +47,7 @@ export interface Character {
   color2: string
   stats: Stats
   special: Special
+  trait: ListenTrait
   lore: string
 }
 
@@ -104,6 +114,8 @@ export interface FighterState {
   nextActionAt: number
   /** dernier instant où le coach a donné un ordre (détection de spam) */
   lastOrderAt: number
+  /** nombre d'ordres de posture reçus ce round (trait Têtu) */
+  ordersThisRound: number
   /** position x normalisée 0..1 dans l'arène */
   x: number
   /** 1 = regarde à droite, -1 = à gauche */
@@ -149,3 +161,4 @@ export type CombatEvent =
   | { kind: 'hypeFull'; t: number; who: 'player' | 'enemy' }
   | { kind: 'card'; t: number; name: string }
   | { kind: 'cardProc'; t: number; text: string }
+  | { kind: 'trait'; t: number; text: string; color: string }

@@ -1,4 +1,4 @@
-import type { Character, Stats, Archetype } from './types'
+import type { Character, Stats, Archetype, ListenTrait } from './types'
 
 // Somme de stats plafonnée pour l'équilibrage : atk+def+spd+hrt ≈ 26, hp à part.
 
@@ -12,6 +12,7 @@ export const ROSTER: Character[] = [
     color2: '#ffd166',
     stats: { atk: 9, def: 6, spd: 4, hrt: 7, hp: 110 },
     special: { name: 'Poing du Volcan', power: 3.2, onomatopoeia: 'DOKAAN!!' },
+    trait: 'fusionnel',
     lore: "Frappe fort, pleure facilement. Un bon coach le rend inarrêtable.",
   },
   {
@@ -23,6 +24,7 @@ export const ROSTER: Character[] = [
     color2: '#a29bfe',
     stats: { atk: 8, def: 5, spd: 8, hrt: 5, hp: 95 },
     special: { name: 'Éclipse Fatale', power: 3.5, onomatopoeia: 'ZUKYUN!' },
+    trait: 'tetu',
     lore: "Talent pur, ego encore plus pur. N'écoute que les coachs qui crient juste.",
   },
   {
@@ -34,6 +36,7 @@ export const ROSTER: Character[] = [
     color2: '#81ecec',
     stats: { atk: 7, def: 6, spd: 7, hrt: 6, hp: 100 },
     special: { name: 'Mille Pétales', power: 2.8, onomatopoeia: 'SHUUIN!' },
+    trait: 'cerebral',
     lore: 'Technique parfaite, sang-froid glacial. Réagit à la précision, pas au volume.',
   },
   {
@@ -45,6 +48,7 @@ export const ROSTER: Character[] = [
     color2: '#b2bec3',
     stats: { atk: 6, def: 10, spd: 3, hrt: 7, hp: 125 },
     special: { name: 'Muraille Brisante', power: 2.6, onomatopoeia: 'GOGOGO…BAAM!' },
+    trait: 'cerebral',
     lore: "Vingt ans de ring. Encaisse tout, attend l'erreur, punit.",
   },
   {
@@ -56,6 +60,7 @@ export const ROSTER: Character[] = [
     color2: '#fab1a0',
     stats: { atk: 10, def: 3, spd: 8, hrt: 5, hp: 90 },
     special: { name: 'Crocs du Chaos', power: 3.8, onomatopoeia: 'GARURU!!' },
+    trait: 'sanguin',
     lore: 'Sauvage, imprévisible, fragile. Coacher Fang, c\'est tenir une tempête en laisse.',
   },
   {
@@ -67,6 +72,7 @@ export const ROSTER: Character[] = [
     color2: '#ffeaa7',
     stats: { atk: 6, def: 4, spd: 10, hrt: 6, hp: 92 },
     special: { name: 'Danse Miroir', power: 3.0, onomatopoeia: 'SUUU…PAF!' },
+    trait: 'tetu',
     lore: "Personne ne l'a jamais touchée deux fois de suite. Personne ne sait pourquoi elle sourit.",
   },
 ]
@@ -101,6 +107,29 @@ const RULES: KeywordRule[] = [
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v))
+}
+
+const TRAIT_RULES: Array<[RegExp, ListenTrait]> = [
+  [/calme|sage|maître|cérébral|précis|stratège|froid/i, 'cerebral'],
+  [/sauvage|bête|fauve|rage|colér|sanguin|furieux|démon/i, 'sanguin'],
+  [/loyal|fidèle|gentil|cœur|coeur|ami|chien/i, 'fusionnel'],
+  [/têtu|tetu|rebelle|fier|ego|rival|solitaire|ombre/i, 'tetu'],
+]
+
+const ARCHETYPE_TRAIT: Record<Archetype, ListenTrait> = {
+  brawler: 'sanguin',
+  rival: 'tetu',
+  prodigy: 'cerebral',
+  veteran: 'cerebral',
+  beast: 'sanguin',
+  trickster: 'tetu',
+}
+
+function deriveTrait(prompt: string, archetype: Archetype): ListenTrait {
+  for (const [re, trait] of TRAIT_RULES) {
+    if (re.test(prompt)) return trait
+  }
+  return ARCHETYPE_TRAIT[archetype]
 }
 
 /** Crée un personnage à partir d'une description libre (parseur mots-clés v0). */
@@ -146,6 +175,7 @@ export function createFromPrompt(prompt: string): Character {
     color2: color[1],
     stats,
     special: { name: specialName, power: 3.0, onomatopoeia: 'BAKOOM!!' },
+    trait: deriveTrait(prompt, archetype),
     lore: prompt.slice(0, 140),
   }
 }
@@ -159,6 +189,13 @@ function extractName(prompt: string): string {
   return (
     syll[Math.floor(Math.random() * syll.length)] + end[Math.floor(Math.random() * end.length)]
   )
+}
+
+export const TRAIT_INFO: Record<ListenTrait, { label: string; icon: string; hint: string }> = {
+  sanguin: { label: 'Sanguin', icon: '🔥', hint: 'Crie fort : ça l’enflamme.' },
+  cerebral: { label: 'Cérébral', icon: '🧊', hint: 'Parle calmement — hurler le stresse.' },
+  tetu: { label: 'Têtu', icon: '🪨', hint: 'Ignore ton premier ordre. Insiste.' },
+  fusionnel: { label: 'Fusionnel', icon: '💞', hint: 'Vis le match à la caméra : il le sent.' },
 }
 
 /** Adversaire IA choisi aléatoirement (différent du perso joueur si possible). */

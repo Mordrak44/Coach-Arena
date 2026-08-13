@@ -37,8 +37,9 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       directes, armées, conditionnelles) — voir GAME_DESIGN.md §4 bis
       (v0 : pool de 6 cartes, sélection de 3 avant match, 1 par coin du
       ring ; l'IA adverse ne joue pas encore de cartes)
-- [ ] Traits d'écoute des persos (Sanguin, Cérébral, Têtu, Fusionnel) :
+- [x] Traits d'écoute des persos (Sanguin, Cérébral, Têtu, Fusionnel) :
       le volume vocal module l'effet du coaching selon le trait
+      (roster + déduction par prompt + effets moteur + affichage sélection)
 - [ ] Lien coach-perso (persistance localStorage) : paliers → +HRT,
       déblocage des cartes signatures
 - [ ] Équilibrage combat (durée de round cible 45–60 s, win-rate des postures)
@@ -90,3 +91,11 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
   main en phase tactique, FX). Sim déplacée dans scripts/sim.ts : cartes
   déclenchées 60/60 matchs, tout se termine. L'IA adverse sans cartes ni
   la limite « coach parfait 100 % » ne sont pas traités (→ équilibrage).
+- 2026-08-13 (routine h+2) : Traits d'écoute implémentés — Sanguin (les
+  cris enflamment), Cérébral (hurler stresse, le calme transcende), Têtu
+  (premier ordre du round ignoré), Fusionnel (facecam comptée double).
+  Attribués au roster, déduits du prompt, affichés à la sélection, events
+  de feedback à l'écran. Bonus atk/def des plans tactiques enfin câblés
+  dans resolveAttack. Micro-tests Têtu/Cérébral dans scripts/sim.ts.
+  NOTE : test Kling suspendu — deux tentatives interrompues par
+  l'utilisateur ; ne pas relancer sans confirmation explicite de sa part.

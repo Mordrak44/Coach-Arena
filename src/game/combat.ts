@@ -53,6 +53,7 @@ function makeFighter(char: Character, side: 'player' | 'enemy'): FighterState {
     counterUntil: 0,
     nextActionAt: 0,
     lastOrderAt: -10,
+    ordersThisRound: 0,
     x: side === 'player' ? 0.28 : 0.72,
     facing: side === 'player' ? 1 : -1,
     anim: { kind: 'idle', until: 0 },
@@ -136,12 +137,18 @@ const COMMAND_STANCE: Partial<Record<CoachCommand, Stance>> = {
 }
 
 /** Applique une commande du coach au perso joueur. Retourne les events générés. */
-function applyCommand(m: MatchState, cmd: CoachCommand): void {
+function applyCommand(m: MatchState, cmd: CoachCommand, voiceEnergy: number): void {
   const f = m.player
   const hrtScale = 0.5 + f.char.stats.hrt / 12 // 0.66..1.5 : le Cœur amplifie tout
+  const trait = f.char.trait
+  const shouting = voiceEnergy > 0.55
+  const calm = voiceEnergy < 0.45
 
   if (cmd === 'cheer') {
     let gain = 6 * hrtScale
+    // Sanguin : les cris l'enflamment. Cérébral : hurler ne l'aide pas.
+    if (trait === 'sanguin' && shouting) gain *= 1.5
+    if (trait === 'cerebral' && shouting) gain *= 0.4
     if (m.mods.warCry) {
       m.mods.warCry = false
       gain += 35
@@ -171,9 +178,26 @@ function applyCommand(m: MatchState, cmd: CoachCommand): void {
 
   const stance = COMMAND_STANCE[cmd]
   if (stance) {
+    f.ordersThisRound++
+    // Têtu : le premier ordre de posture du round est superbement ignoré.
+    if (trait === 'tetu' && f.ordersThisRound === 1) {
+      m.events.push({ kind: 'trait', t: m.t, text: `${f.char.name.toUpperCase()} T'IGNORE…`, color: '#a29bfe' })
+      return
+    }
+    // Cérébral : un ordre hurlé le stresse (appliqué, mais sans élan).
+    let orderHype = 2 * hrtScale
+    if (trait === 'cerebral') {
+      if (shouting) {
+        orderHype = 0
+        f.hype = Math.max(0, f.hype - 4)
+        m.events.push({ kind: 'trait', t: m.t, text: 'TROP DE BRUIT…', color: '#81ecec' })
+      } else if (calm) {
+        orderHype = 5 * hrtScale // la précision le transcende
+      }
+    }
     f.stance = stance
     if (cmd === 'counter') f.counterUntil = m.t + 2.5
-    f.hype = Math.min(HYPE_MAX, f.hype + 2 * hrtScale)
+    f.hype = Math.min(HYPE_MAX, f.hype + orderHype)
   }
 }
 
@@ -222,10 +246,14 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
     return
   }
 
+  // Bonus du plan tactique du joueur (actif jusqu'à la fin du round)
+  const plan = m.plan ? PLAN_EFFECTS[m.plan] : null
   const base = 5 + a.char.stats.atk * 1.5
   const crit = Math.random() < 0.12 + (a.stance === 'aggressive' ? 0.08 : 0)
   let dmg = base * aMod.atk * (crit ? 1.7 : 1)
-  const mitigation = 1 - Math.min(0.65, (d.char.stats.def * dMod.def) / 24)
+  if (plan && atkSide === 'player') dmg *= plan.atk
+  const defPlanMul = plan && defSide === 'player' ? plan.def : 1
+  const mitigation = 1 - Math.min(0.65, (d.char.stats.def * dMod.def * defPlanMul) / 24)
   dmg *= mitigation
   if (m.t < a.confusedUntil) dmg *= 0.7
   if (defSide === 'player' && m.mods.ironGuard) dmg *= 0.65 // Garde de Fer
@@ -336,12 +364,21 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
   }
 
   // --- Coaching temps réel ---
-  if (input.command) applyCommand(m, input.command)
+  if (input.command) applyCommand(m, input.command, input.voiceEnergy)
 
   const p = m.player
   const hrtScale = 0.5 + p.char.stats.hrt / 12
   // L'énergie du coach (voix + visage) nourrit la Hype en continu.
-  const energy = input.voiceEnergy * 0.6 + input.faceEnergy * 0.4
+  // Fusionnel : la facecam compte double. Sanguin : la voix forte porte plus.
+  let voiceW = 0.6
+  let faceW = 0.4
+  if (p.char.trait === 'fusionnel') {
+    voiceW = 0.4
+    faceW = 0.8
+  } else if (p.char.trait === 'sanguin' && input.voiceEnergy > 0.55) {
+    voiceW = 0.9
+  }
+  const energy = input.voiceEnergy * voiceW + input.faceEnergy * faceW
   if (energy > 0.15) {
     const wasFull = p.hype >= HYPE_MAX
     p.hype = Math.min(HYPE_MAX, p.hype + energy * 4 * hrtScale * dt * 10)
@@ -435,6 +472,7 @@ function startNextRound(m: MatchState, plan: TacticPlan): void {
   p.stance = eff.stance
   p.confusedUntil = 0
   p.counterUntil = 0
+  p.ordersThisRound = 0
   p.anim = { kind: 'idle', until: 0 }
 
   const e = m.enemy

@@ -81,5 +81,49 @@ console.log(`Déclenchements de cartes armées/conditionnelles : ${totalProcs} s
 // Sanity création par prompt
 const c = createFromPrompt('un vieux maître cyborg ultra rapide mais fragile, appelé Zenko')
 if (c.name !== 'Zenko') throw new Error('extraction du nom KO')
-console.log(`Perso prompt OK : ${c.name} ${JSON.stringify(c.stats)}`)
+if (c.trait !== 'cerebral') throw new Error(`trait attendu cerebral, obtenu ${c.trait}`)
+console.log(`Perso prompt OK : ${c.name} ${JSON.stringify(c.stats)} trait=${c.trait}`)
+
+// --- Micro-tests des traits d'écoute --------------------------------------
+
+function makeFightingMatch(playerIdx: number): MatchState {
+  const m = createMatch(ROSTER[playerIdx], ROSTER[0], [])
+  // passe l'intro
+  while (m.phase === 'intro') tick(m, 1 / 60, { command: null, voiceEnergy: 0, faceEnergy: 0 })
+  // gèle les échanges de coups : on ne teste que le canal de coaching
+  m.player.nextActionAt = m.t + 1000
+  m.enemy.nextActionAt = m.t + 1000
+  return m
+}
+
+// Têtu (Rei, idx 1) : le premier ordre de posture est ignoré, le second écouté.
+{
+  const m = makeFightingMatch(1)
+  const before = m.player.stance
+  tick(m, 1 / 60, { command: 'defend', voiceEnergy: 0.3, faceEnergy: 0 })
+  if (m.player.stance !== before) throw new Error('têtu : le premier ordre aurait dû être ignoré')
+  // attend la fin de la fenêtre anti-spam avant le second ordre
+  while (m.t - m.player.lastOrderAt < 2.1 && m.phase === 'fighting')
+    tick(m, 1 / 60, { command: null, voiceEnergy: 0, faceEnergy: 0 })
+  tick(m, 1 / 60, { command: 'defend', voiceEnergy: 0.3, faceEnergy: 0 })
+  if (m.phase === 'fighting' && m.player.stance !== 'defensive')
+    throw new Error('têtu : le second ordre aurait dû passer')
+  console.log('Trait Têtu OK (premier ordre ignoré, second écouté)')
+}
+
+// Cérébral (Yuna, idx 2) : un ordre hurlé fait perdre de la Hype, un ordre calme en donne.
+{
+  const m = makeFightingMatch(2)
+  m.player.hype = 50
+  tick(m, 1 / 60, { command: 'defend', voiceEnergy: 0.9, faceEnergy: 0 })
+  if (m.player.hype >= 50) throw new Error('cérébral : hurler aurait dû coûter de la Hype')
+  const afterShout = m.player.hype
+  while (m.t - m.player.lastOrderAt < 2.1 && m.phase === 'fighting')
+    tick(m, 1 / 60, { command: null, voiceEnergy: 0, faceEnergy: 0 })
+  tick(m, 1 / 60, { command: 'attack', voiceEnergy: 0.2, faceEnergy: 0 })
+  if (m.phase === 'fighting' && m.player.hype <= afterShout)
+    throw new Error('cérébral : un ordre calme aurait dû donner de la Hype')
+  console.log('Trait Cérébral OK (hurler pénalise, le calme transcende)')
+}
+
 console.log('OK — tous les matchs se terminent.')

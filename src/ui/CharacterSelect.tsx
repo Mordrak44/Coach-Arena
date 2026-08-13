@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CardId, Character } from '../game/types'
-import { ROSTER, createFromPrompt } from '../game/characters'
+import { ROSTER, TRAIT_INFO, createFromPrompt } from '../game/characters'
 import { CARD_POOL, DEFAULT_DECK, FAMILY_LABEL } from '../game/cards'
 
 function StatBar({ label, value, color }: { label: string; value: number; color: string }) {
@@ -33,6 +33,10 @@ export function CharCard({
       <StatBar label="DEF" value={char.stats.def} color="#74b9ff" />
       <StatBar label="SPD" value={char.stats.spd} color="#ffd166" />
       <StatBar label="❤" value={char.stats.hrt} color="#fd79a8" />
+      <div style={{ fontSize: '0.68rem', marginTop: 5, color: 'var(--accent)' }}>
+        {TRAIT_INFO[char.trait].icon} <b>{TRAIT_INFO[char.trait].label}</b>
+        <span style={{ color: 'var(--muted)' }}> — {TRAIT_INFO[char.trait].hint}</span>
+      </div>
     </button>
   )
 }

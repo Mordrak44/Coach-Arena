@@ -90,6 +90,9 @@ export class ArenaRenderer {
         this.flash(now, '#7ec8ff', 0.1)
         this.shake(now, 10)
         break
+      case 'trait':
+        this.floats.push({ text: ev.text, x: m.player.x * CANVAS_W, y: 390, t0: now, life: 1.2, size: 26, color: ev.color, angle: -0.04 })
+        break
       case 'confused':
         this.floats.push({ text: '?? CONFUS ??', x: fx(ev.who), y: 400, t0: now, life: 1.2, size: 30, color: '#cc88ff', angle: 0 })
         break
