@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/game/characters.ts","./src/game/combat.ts","./src/game/types.ts","./src/render/arenaRenderer.ts","./src/systems/facecam.ts","./src/systems/recorder.ts","./src/systems/voice.ts","./src/ui/ArenaScreen.tsx","./src/ui/CharacterSelect.tsx","./src/ui/ResultsScreen.tsx","./src/ui/TitleScreen.tsx"],"version":"5.9.3"}
