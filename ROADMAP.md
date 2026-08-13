@@ -31,8 +31,14 @@ façon TFT) reste une piste v2 si le jeu décolle.
 ⚠️ Les générations Kling consomment les crédits du compte : ne lancer les
 portraits du roster qu'après accord explicite de l'utilisateur.
 
-## v0.5 — Polish
+## v0.5 — Polish & profondeur
 
+- [ ] Carnet du Coach : cartes jouables au coin du ring (3 familles :
+      directes, armées, conditionnelles) — voir GAME_DESIGN.md §4 bis
+- [ ] Traits d'écoute des persos (Sanguin, Cérébral, Têtu, Fusionnel) :
+      le volume vocal module l'effet du coaching selon le trait
+- [ ] Lien coach-perso (persistance localStorage) : paliers → +HRT,
+      déblocage des cartes signatures
 - [ ] Équilibrage combat (durée de round cible 45–60 s, win-rate des postures)
 - [ ] Sons : impacts, foule, gong de round (WebAudio, généré)
 - [ ] FX supplémentaires : zoom dramatique sur special, écran fissuré au KO

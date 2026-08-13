@@ -73,6 +73,45 @@ ailleurs.
 - Pleine → le coach peut appeler la **technique spéciale** (cinématique manga,
   gros dégâts). La crier au bon moment, c'est le skill du jeu.
 
+## 4 bis. Profondeur : instinct vs stratégie (décidé le 2026-08-13)
+
+Principe : **pendant le round = l'instinct** (voix, timing, réactif,
+effets courts) ; **entre les rounds = la stratégie** (choix posés, effets
+durables). Pas de cartes à jouer pendant l'action — la voix et le visage
+sont la manette, on ne la dilue pas.
+
+### Le Carnet du Coach (cartes, jouées au coin du ring)
+
+- Carnet de 3 cartes composé avant le match ; 1 carte jouable par coin du
+  ring.
+- Trois familles :
+  - **Directes** : effet immédiat simple (*Second Souffle* : +20 % PV).
+  - **Armées** : préparent un déclencheur vocal du prochain round —
+    préparation × exécution (*Contre Parfait* : le prochain « contre ! »
+    crié inflige des dégâts doublés).
+  - **Conditionnelles** : pari sur le scénario du round (*Dernière
+    Chance* : sous 15 % PV, Hype remplie d'un coup ; *Provocation* :
+    l'adversaire démarre agressif — tu sais ce qui arrive).
+
+### Traits d'écoute (personnalité des persos)
+
+Chaque perso réagit différemment au style de coaching — le volume et le
+rythme de la voix deviennent du gameplay :
+
+- **Sanguin** : s'enflamme quand le coach crie (Hype ×1,5 si volume fort).
+- **Cérébral** : veut du calme et de la précision — crier le stresse
+  (ordres plus efficaces à volume modéré, malus si hurlement).
+- **Têtu** : ignore le premier ordre d'un round, écoute ensuite.
+- **Fusionnel** : bonus fort si le coach est expressif à la facecam.
+
+### Le Lien coach-perso (progression)
+
+- Gagner des matchs avec un perso monte son **Lien** → son Cœur (HRT)
+  augmente par paliers.
+- Les paliers de Lien débloquent les **cartes signatures** du perso
+  (chaque perso a les siennes) → collection et rétention, sans rien
+  vendre qui touche l'équilibre du direct.
+
 ## 5. Viralité & partage
 
 - Tout le match est rendu en 9:16 avec la facecam incrustée → capture
