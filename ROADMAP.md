@@ -75,6 +75,18 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       du perso, fallback boutons/clavier assumé si refus
 - [ ] Tests unitaires du moteur de combat (vitest)
 
+## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
+
+- [x] Onboarding de création par 3 questions (style / tempérament /
+      univers + nom optionnel), mode expert conservé en second onglet
+- [ ] Humeur du perso (Radieux/Bien/Neutre/Boudeur) persistée, effets
+      légers en combat (Hype de départ, écoute du premier ordre)
+- [ ] Envies périodiques selon le trait + actions hors combat :
+      entraîner / loisir / repos (jamais punitif — tout est bonus)
+- [ ] Paliers de Lien : « choisis 1 carte parmi 2 » proposées par le
+      perso (les choix construisent des decks distincts par joueur)
+- [ ] L'entretien nourrit le Lien (pas seulement les victoires)
+
 ## v1 — Deck & collection (voir GAME_DESIGN.md §4 bis)
 
 - [ ] Deck-builder : collection, 2-3 copies max par carte, deck 30-60
@@ -187,6 +199,11 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
   Familles reformulées par timing : Coach / Instant·voix / Instant·pari.
   Équilibrage sain : le deck naïf n'est plus un auto-win (93 % vs 94 %
   sans cartes) — la valeur est dans le choix, plus dans la possession.
+- 2026-08-14 : Onboarding de création en 3 questions (style, tempérament,
+  univers, nom optionnel) composant le prompt automatiquement — fin de la
+  page blanche ; mode expert conservé. Design Vie d'Écurie gravé
+  (§4 quater) : humeur/envies/entraînement jamais punitifs, paliers de
+  Lien « choisis 1 parmi 2 ». Test sim du prompt guidé (Frimas) au vert.
 - 2026-08-14 : Jauge d'Ulti (demande utilisateur) — jauge de match
   conservée entre rounds, chargée par le combat (encaisser ×2, rounds
   perdus +15 : comeback), Ultime unique par perso (6 noms roster +

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import type { CardId, Character } from '../game/types'
 import { ROSTER, TRAIT_INFO, createFromPrompt } from '../game/characters'
 import {
@@ -69,6 +69,11 @@ export default function CharacterSelect({
   const [selected, setSelected] = useState<Character | null>(null)
   const [prompt, setPrompt] = useState('')
   const [customs, setCustoms] = useState<Character[]>(() => loadCustoms())
+  const [creationMode, setCreationMode] = useState<'guided' | 'expert'>('guided')
+  const [gStyle, setGStyle] = useState<string | null>(null)
+  const [gTemper, setGTemper] = useState<string | null>(null)
+  const [gWorld, setGWorld] = useState<string | null>(null)
+  const [gName, setGName] = useState('')
 
   // Carte signature du perso sélectionné (visible verrouillée tant que le
   // Lien est insuffisant — on montre la carotte).
@@ -83,11 +88,59 @@ export default function CharacterSelect({
 
   const forge = () => {
     if (prompt.trim().length < 3) return
-    const c = createFromPrompt(prompt.trim())
+    forgeFromPrompt(prompt.trim())
+  }
+
+  const forgeFromPrompt = (p: string) => {
+    const c = createFromPrompt(p)
     saveCustom(c) // le perso survivra aux sessions (et gardera son Lien)
     setCustoms(loadCustoms())
     setSelected(c)
   }
+
+  // Onboarding guidé : 3 questions composent le prompt à la place du joueur.
+  const GUIDED = {
+    style: [
+      { label: '👊 Fonceur', words: 'un combattant fort et puissant comme une brute' },
+      { label: '⚡ Rapide', words: 'un combattant ultra rapide comme l’éclair, un ninja' },
+      { label: '🧱 Mur', words: 'un combattant tank blindé, un mur défensif' },
+      { label: '🎭 Malin', words: 'un combattant vif et insaisissable' },
+    ],
+    temper: [
+      { label: '🔥 Fougueux', words: 'sauvage et furieux, une vraie bête de rage' },
+      { label: '🧊 Calme', words: 'calme, sage et précis comme un maître stratège' },
+      { label: '🪨 Rebelle', words: 'têtu, fier et solitaire, un rival rebelle' },
+      { label: '💞 Loyal', words: 'loyal, fidèle et gentil, un grand cœur' },
+    ],
+    world: [
+      { label: '🌋 Feu', words: 'né du feu et des flammes' },
+      { label: '❄️ Glace', words: 'né de la glace et du froid' },
+      { label: '🌑 Ombre', words: 'né des ténèbres et de l’ombre' },
+      { label: '✨ Lumière', words: 'né de la lumière sacrée' },
+      { label: '🐺 Bête', words: 'mi-humain mi-animal, un fauve, un loup' },
+      { label: '🤖 Cyborg', words: "mi-machine, un cyborg d'acier" },
+    ],
+  }
+
+  const forgeGuided = () => {
+    if (!gStyle || !gTemper || !gWorld) return
+    const name = gName.trim()
+    const p =
+      `${gStyle}, ${gTemper}, ${gWorld}` + (name ? `, appelé ${name.charAt(0).toUpperCase() + name.slice(1)}` : '')
+    forgeFromPrompt(p)
+  }
+
+  const chip = (active: boolean): CSSProperties => ({
+    font: 'inherit',
+    fontSize: '0.72rem',
+    fontWeight: 700,
+    padding: '7px 10px',
+    borderRadius: 10,
+    border: active ? '2px solid var(--accent)' : '2px solid transparent',
+    background: 'var(--panel2)',
+    color: 'var(--text)',
+    cursor: 'pointer',
+  })
 
   return (
     <div className="screen" style={{ justifyContent: 'flex-start' }}>
@@ -95,15 +148,76 @@ export default function CharacterSelect({
         Choisis ton champion
       </h1>
 
-      <textarea
-        className="promptBox"
-        placeholder="…ou décris-le : « un vieux maître cyborg ultra rapide mais fragile, appelé Zenko »"
-        value={prompt}
-        onChange={e => setPrompt(e.target.value)}
-      />
-      <button className="btn secondary" onClick={forge} disabled={prompt.trim().length < 3}>
-        ⚒ Forger ce perso
-      </button>
+      <div style={{ display: 'flex', gap: 8, alignSelf: 'stretch' }}>
+        <button
+          style={{ ...chip(creationMode === 'guided'), flex: 1 }}
+          onClick={() => setCreationMode('guided')}
+        >
+          ✨ Créer en 3 questions
+        </button>
+        <button
+          style={{ ...chip(creationMode === 'expert'), flex: 1 }}
+          onClick={() => setCreationMode('expert')}
+        >
+          ✍️ Mode expert
+        </button>
+      </div>
+
+      {creationMode === 'guided' ? (
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'left' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)' }}>1. SON STYLE ?</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {GUIDED.style.map(o => (
+              <button key={o.label} style={chip(gStyle === o.words)} onClick={() => setGStyle(o.words)}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)' }}>2. SON TEMPÉRAMENT ?</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {GUIDED.temper.map(o => (
+              <button key={o.label} style={chip(gTemper === o.words)} onClick={() => setGTemper(o.words)}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)' }}>3. SON UNIVERS ?</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {GUIDED.world.map(o => (
+              <button key={o.label} style={chip(gWorld === o.words)} onClick={() => setGWorld(o.words)}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <input
+            className="promptBox"
+            style={{ minHeight: 0, padding: '9px 12px' }}
+            placeholder="Son nom (optionnel — sinon on l'invente)"
+            value={gName}
+            maxLength={14}
+            onChange={e => setGName(e.target.value)}
+          />
+          <button
+            className="btn secondary"
+            onClick={forgeGuided}
+            disabled={!gStyle || !gTemper || !gWorld}
+          >
+            ⚒ Donner vie à ce perso
+          </button>
+        </div>
+      ) : (
+        <>
+          <textarea
+            className="promptBox"
+            placeholder="Décris-le librement : « un vieux maître cyborg ultra rapide mais fragile, appelé Zenko »"
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+          />
+          <button className="btn secondary" onClick={forge} disabled={prompt.trim().length < 3}>
+            ⚒ Forger ce perso
+          </button>
+        </>
+      )}
 
       <div className="roster">
         {customs.map(c => (

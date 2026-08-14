@@ -164,6 +164,38 @@ rythme de la voix deviennent du gameplay :
   voix). La collection prend son sens : chaque membre a son trait, son
   Lien, sa signature. On collectionne des relations, pas des skins.
 
+## 4 quater. Parcours joueur & Vie d'Écurie (notes du 2026-08-14)
+
+### Onboarding de création (implémenté)
+
+Trois questions à choix composent le prompt (style de combat, tempérament,
+univers) + nom optionnel ; le mode **expert** garde le texte libre. La page
+blanche est éliminée : un perso naît en 10 secondes.
+
+### Vie d'Écurie (tamagotchi bienveillant — v1)
+
+- Chaque perso a une **humeur** (Radieux / Bien / Neutre / Boudeur) et des
+  **envies** périodiques cohérentes avec son trait (« Fang veut chasser »,
+  « Yuna veut du calme », « Kenta veut du temps avec toi »).
+- Hors combat : **entraîner** (petit boost temporaire d'une stat), **loisir**
+  (répond à l'envie → humeur +), **repos**. Sessions courtes, 2-3 actions
+  par jour réel maximum — un rituel, pas une corvée.
+- **Règle d'or : jamais punitif.** Ignorer son perso le laisse neutre ;
+  s'en occuper le rend meilleur. Pas de perso qui dépérit, pas de
+  culpabilisation.
+- Effets en combat : humeur haute = Hype de départ + petit bonus du trait ;
+  humeur basse = premier ordre moins écouté. Léger, jamais décisif seul.
+- L'entretien nourrit le **Lien** (en plus des victoires) : la relation
+  devient quelque chose qu'on construit, pas seulement qu'on gagne.
+
+### Paliers de Lien : « choisis 1 parmi 2 »
+
+À chaque palier, le perso **propose deux cartes, on en garde une** — deux
+joueurs qui montent le même perso construisent des decks différents. Au
+palier maximum : la carte à créer soi-même **par prompt** (voir §4 ter).
+La distribution initiale : le deck de départ est offert à la création,
+présenté comme un cadeau du perso à son coach.
+
 ## 5. Viralité & partage
 
 - Tout le match est rendu en 9:16 avec la facecam incrustée → capture

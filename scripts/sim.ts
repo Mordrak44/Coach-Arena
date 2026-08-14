@@ -176,6 +176,17 @@ function makeFightingMatch(playerIdx: number): MatchState {
   console.log('Signature Frénésie OK (armée par la carte, déclenchée à la voix)')
 }
 
+// Onboarding guidé : le prompt composé par les 3 questions donne un perso cohérent.
+{
+  const g = createFromPrompt(
+    'un combattant tank blindé, un mur défensif, calme, sage et précis comme un maître stratège, né de la glace et du froid, appelé Frimas',
+  )
+  if (g.name !== 'Frimas') throw new Error(`nom guidé KO : ${g.name}`)
+  if (g.trait !== 'cerebral') throw new Error(`trait guidé KO : ${g.trait}`)
+  if (g.stats.def <= g.stats.atk) throw new Error('le style Mur devrait dominer en DEF')
+  console.log(`Onboarding guidé OK : ${g.name} (${g.trait}, DEF ${g.stats.def})`)
+}
+
 // Commentateur : un match coaché produit une narration avec début et fin.
 {
   const { Commentator } = await import('../src/game/commentator')
