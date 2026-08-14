@@ -145,6 +145,11 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 - [ ] Scènes image-to-video : entrée dans l'arène, moment fort du round, KO
 - [ ] Montage final du match (concat des clips + habillage) exportable 9:16
 - [ ] Génération de perso via API Claude (stats + lore + nom du spécial)
+- [ ] Le discours du coin du ring COMPRIS par Claude : consigne libre
+      (« s'il balance son spécial, esquive et contre ») → primitives DSL
+      réelles (plan + armements conditionnels), comme une carte invisible
+      forgée par la parole. Pendant le round : mots-clés assumés (latence
+      + réalisme boxe : codes courts en combat, stratégie à la pause).
 - [ ] Émotions MediaPipe FaceLandmarker (sourire/cri/colère → bonus distincts)
 - [ ] Export mp4 (transcodage) + partage natif (Web Share API)
 - [ ] i18n (fr/en)
