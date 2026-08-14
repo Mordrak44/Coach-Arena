@@ -3,11 +3,9 @@ import type { CardId, Character } from '../game/types'
 import { ROSTER, TRAIT_INFO, createFromPrompt } from '../game/characters'
 import {
   CARD_POOL,
-  DECK_COPIES,
   TIMING_LABEL,
   SIGNATURE_BOND_LEVEL,
   SIGNATURE_CARDS,
-  buildStarterDeck,
   getCard,
 } from '../game/cards'
 import {
@@ -30,6 +28,18 @@ import {
 } from '../game/stable'
 import { forgeCard, loadForgedCards, saveForgedCard } from '../game/cardForge'
 import type { CoachCard } from '../game/types'
+import {
+  DECK_MAX,
+  DECK_MIN,
+  MAX_COPIES,
+  buildDeckFromTemplate,
+  defaultTemplate,
+  loadTemplate,
+  saveTemplate,
+  templateSize,
+  templateValid,
+  type DeckTemplate,
+} from '../game/deckBuilder'
 
 function StatBar({ label, value, color }: { label: string; value: number; color: string }) {
   return (
@@ -144,12 +154,24 @@ export default function CharacterSelect({
     setForgePrompt('')
   }
 
-  // Deck de départ auto-construit + copies de paliers + cartes forgées (1 copie).
-  const deck: CardId[] = [
-    ...buildStarterDeck(signatureUnlocked && signature ? signature.id : null),
-    ...(selected ? getExtraCopies(selected.id) : []),
-    ...forged.map(c => c.id),
-  ]
+  // Deck-builder : modèle configurable + ajouts mérités (signature, paliers, forge).
+  const [template, setTemplate] = useState<DeckTemplate>(() => loadTemplate())
+  const setCopies = (id: CardId, delta: number) => {
+    setTemplate(t => {
+      const next = { ...t, [id]: Math.max(0, Math.min(MAX_COPIES, (t[id] ?? 0) + delta)) }
+      saveTemplate(next)
+      return next
+    })
+  }
+  const tplSize = templateSize(template)
+  const tplValid = templateValid(template)
+
+  const deck: CardId[] = buildDeckFromTemplate(
+    template,
+    signatureUnlocked && signature ? signature.id : null,
+    selected ? getExtraCopies(selected.id) : [],
+    forged,
+  )
 
   const forge = () => {
     if (prompt.trim().length < 3) return
@@ -411,9 +433,26 @@ export default function CharacterSelect({
         🃏 Ton Deck de Coach ({deck.length} cartes)
       </h2>
       <p className="permNote">
-        Tu pioches 5 cartes ; à chaque pause : 3 points de Souffle à dépenser et un échange
-        possible. Deck de départ auto ({DECK_COPIES} copies par carte) — le deck-builder arrive.
+        Compose ton deck avec les − / + ({DECK_MIN}-{DECK_MAX} cartes de base, {MAX_COPIES} copies
+        max). Signature, cartes de palier et forgées s'ajoutent automatiquement. Pioche de 5,
+        3 Souffle par pause, un échange possible.
       </p>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: '0.78rem' }}>
+        <span style={{ color: tplValid ? 'var(--muted)' : 'var(--accent2)', fontWeight: 700 }}>
+          Base : {tplSize} carte{tplSize > 1 ? 's' : ''}
+          {!tplValid && ` — il en faut entre ${DECK_MIN} et ${DECK_MAX} !`}
+        </span>
+        <button
+          style={chip(false)}
+          onClick={() => {
+            const d = defaultTemplate()
+            saveTemplate(d)
+            setTemplate(d)
+          }}
+        >
+          ↺ Réinitialiser
+        </button>
+      </div>
       <div className="roster">
         {signature && (
           <div
@@ -434,23 +473,44 @@ export default function CharacterSelect({
             </div>
           </div>
         )}
-        {CARD_POOL.map(c => (
-          <div key={c.id} className="charCard">
-            <div className="cname">
-              {c.icon} {c.name} <span style={{ color: 'var(--violet)' }}>{'●'.repeat(c.cost)}</span>
+        {CARD_POOL.map(c => {
+          const n = template[c.id] ?? 0
+          return (
+            <div key={c.id} className="charCard" style={n === 0 ? { opacity: 0.5 } : undefined}>
+              <div className="cname">
+                {c.icon} {c.name}{' '}
+                <span style={{ color: 'var(--violet)' }}>{'●'.repeat(c.cost)}</span>
+              </div>
+              <div className="ctitle">{TIMING_LABEL[c.timing]}</div>
+              <div style={{ fontSize: '0.7rem', marginTop: 4, color: 'var(--muted)' }}>{c.desc}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                <button style={chip(false)} onClick={() => setCopies(c.id, -1)} disabled={n === 0}>
+                  −
+                </button>
+                <b style={{ fontSize: '0.8rem' }}>×{n}</b>
+                <button
+                  style={chip(false)}
+                  onClick={() => setCopies(c.id, +1)}
+                  disabled={n >= MAX_COPIES}
+                >
+                  +
+                </button>
+              </div>
             </div>
-            <div className="ctitle">{TIMING_LABEL[c.timing]}</div>
-            <div style={{ fontSize: '0.7rem', marginTop: 4, color: 'var(--muted)' }}>{c.desc}</div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       <button
         className="btn"
-        disabled={!selected}
-        onClick={() => selected && onConfirm(selected, deck)}
+        disabled={!selected || !tplValid}
+        onClick={() => selected && tplValid && onConfirm(selected, deck)}
       >
-        {!selected ? 'Sélectionne un perso' : `Coacher ${selected.name} !`}
+        {!selected
+          ? 'Sélectionne un perso'
+          : !tplValid
+            ? `Deck invalide (${tplSize} cartes de base)`
+            : `Coacher ${selected.name} !`}
       </button>
     </div>
   )

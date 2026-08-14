@@ -217,6 +217,30 @@ function makeFightingMatch(playerIdx: number): MatchState {
   console.log(`DSL OK : coût budgétisé = coût déclaré pour ${CARD_POOL.length + SIGNATURE_CARDS.length} cartes`)
 }
 
+// Deck-builder : sanitation, bornes, et composition du deck jouable.
+{
+  const {
+    buildDeckFromTemplate,
+    defaultTemplate,
+    sanitizeTemplate,
+    templateSize,
+    templateValid,
+  } = await import('../src/game/deckBuilder')
+  const dflt = defaultTemplate()
+  if (!templateValid(dflt)) throw new Error('deck-builder : le modèle par défaut devrait être valide')
+  // Un modèle trafiqué (copies négatives / absurdes / cartes inconnues) est nettoyé.
+  const dirty = sanitizeTemplate({ secondWind: -5, massage: 99, ['forge-hack' as any]: 3 } as any)
+  if ((dirty.secondWind ?? -1) !== 0 || (dirty.massage ?? -1) !== 3)
+    throw new Error('deck-builder : sanitation KO')
+  if ('forge-hack' in dirty) throw new Error('deck-builder : carte inconnue non filtrée')
+  // Composition : modèle + signature (2) + paliers + forgées.
+  const deck = buildDeckFromTemplate(dflt, 'sigKenta', ['focus'], [])
+  const expected = templateSize(dflt) + 2 + 1
+  if (deck.length !== expected)
+    throw new Error(`deck-builder : taille ${deck.length}, attendu ${expected}`)
+  console.log(`Deck-builder OK (défaut ${templateSize(dflt)} cartes, composition ${deck.length})`)
+}
+
 // Coin adverse : il joue une carte lisible à chaque pause.
 {
   const { enemyCornerPlay } = await import('../src/game/combat')

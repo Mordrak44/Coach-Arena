@@ -96,7 +96,11 @@ portraits du roster qu'après accord explicite de l'utilisateur.
 
 ## v1 — Deck & collection (voir GAME_DESIGN.md §4 bis)
 
-- [ ] Deck-builder : collection, 2-3 copies max par carte, deck 30-60
+- [x] Deck-builder v0 : copies par carte (0-3) réglables sur les tuiles
+      de l'écran de sélection, modèle persisté et assaini au chargement
+      (anti-triche), total borné 12-60 avec blocage du lancement si
+      invalide, réinitialisation. Signature/paliers/forgées s'ajoutent
+      par-dessus : ça se mérite, ça ne se configure pas.
 - [x] L'IA adverse joue au coin du ring (v0 : sous-ensemble Coach — soin
       si < 40 % PV, Douche Froide si ta Hype > 60, sinon auto-moral ;
       annoncé par événement, donc lisible et à terme bloquable). v1 :
@@ -154,6 +158,12 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 
 ## Journal
 
+- 2026-08-14 (routine) : Deck-builder v0 (src/game/deckBuilder.ts +
+  contrôles −/+ sur les tuiles, modèle localStorage assaini, validité
+  12-60, deck jouable = modèle + mérités). Test sim : sanitation d'un
+  modèle trafiqué, composition exacte. Le système TCG demandé est
+  complet de bout en bout : deck composable → pioche → Souffle →
+  mulligan → instants à la voix → récompenses de paliers → forge.
 - 2026-08-14 (routine) : Vague 2 de cartes (8 combos bi-primitives,
   zéro ligne de code moteur — pure donnée DSL, coûts vérifiés 23/23) +
   le coin adverse joue à chaque pause (soin/sabotage/moral, événement
