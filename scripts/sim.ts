@@ -317,6 +317,40 @@ function makeFightingMatch(playerIdx: number): MatchState {
   console.log(`Consignes parlées OK (« ${c1.label} », une par pause)`)
 }
 
+// Réalisateur : moments forts détectés → prompts de scènes prêts pour Kling.
+{
+  const { buildScenePlans, colorWord } = await import('../src/game/sceneDirector')
+  if (colorWord('#ff4757') !== 'red' || colorWord('#3742fa') !== 'blue')
+    throw new Error(`réalisateur : colorWord (${colorWord('#ff4757')}, ${colorWord('#3742fa')})`)
+
+  const m = createMatch(ROSTER[0], ROSTER[1], [])
+  // Match synthétique : round 1 avec spécial adverse, round 2 avec Ulti joueur.
+  m.events.push(
+    { kind: 'special', t: 10, by: 'enemy', name: ROSTER[1].special.name, onoma: ROSTER[1].special.onomatopoeia, dmg: 40 },
+    { kind: 'roundEnd', t: 30, winner: 'enemy' },
+    { kind: 'roundStart', t: 34, round: 2 },
+    { kind: 'ulti', t: 50, by: 'player', name: ROSTER[0].ulti.name, onoma: ROSTER[0].ulti.onomatopoeia, dmg: 80 },
+    { kind: 'roundEnd', t: 55, winner: 'player' },
+    { kind: 'roundStart', t: 59, round: 3 },
+    { kind: 'hit', t: 70, target: 'enemy', dmg: 20, crit: true, onoma: 'DOKAN!!' },
+    { kind: 'roundEnd', t: 75, winner: 'player' },
+    { kind: 'matchEnd', t: 75, winner: 'player' },
+  )
+  m.playerWins = 2
+  m.enemyWins = 1
+  const plans = buildScenePlans(m, ROSTER[0], ROSTER[1])
+  if (plans.length !== 4) throw new Error(`réalisateur : 4 scènes attendues, reçu ${plans.length}`)
+  if (plans[0].id !== 'entrance' || plans[plans.length - 1].id !== 'finale')
+    throw new Error('réalisateur : entrée/finale manquantes')
+  if (!plans.some(p => p.prompt.includes(ROSTER[0].ulti.name)))
+    throw new Error("réalisateur : l'Ulti du joueur aurait dû être un moment fort")
+  for (const p of plans) {
+    if (p.prompt.includes('undefined') || p.prompt.includes('#'))
+      throw new Error(`réalisateur : prompt sale (${p.id})`)
+  }
+  console.log(`Réalisateur OK (${plans.length} scènes : ${plans.map(p => p.id).join(', ')})`)
+}
+
 // Forge de cartes : prompt → primitives bornées + coût budgétisé + jouable en match.
 {
   const { forgeCard } = await import('../src/game/cardForge')

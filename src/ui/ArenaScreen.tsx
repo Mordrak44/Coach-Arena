@@ -15,6 +15,7 @@ import {
   HYPE_MAX,
 } from '../game/combat'
 import { parseConsigne } from '../game/speechTactics'
+import { buildScenePlans, type ScenePlan } from '../game/sceneDirector'
 import { TIMING_LABEL, getCard } from '../game/cards'
 import { Commentator } from '../game/commentator'
 import { ArenaRenderer, CANVAS_H, CANVAS_W } from '../render/arenaRenderer'
@@ -29,6 +30,8 @@ export interface MatchOutcome {
   clip: Blob | null
   /** moment fort : les dernières secondes (le KO) */
   highlight: Blob | null
+  /** plans de scènes cinématiques écrits par le Réalisateur (prompts Kling) */
+  scenes: ScenePlan[]
 }
 
 const PLANS: Array<{ id: TacticPlan; name: string; desc: string }> = [
@@ -315,9 +318,10 @@ export default function ArenaScreen({
       if (m.phase === 'matchEnd' && !finished) {
         finished = true
         const winner = m.playerWins >= 2 ? 'player' : 'enemy'
+        const scenes = buildScenePlans(m, player, enemy)
         setTimeout(async () => {
           const [clip, highlight] = await Promise.all([sys.recorder.stop(), sys.highlight.stop()])
-          if (!disposed) onFinish({ winner, clip, highlight })
+          if (!disposed) onFinish({ winner, clip, highlight, scenes })
         }, 1800) // laisse la pose de victoire à l'écran (et dans le clip)
       }
 

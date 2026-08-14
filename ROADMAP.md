@@ -133,6 +133,13 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 
 - [ ] Refonte du flow de match en « scènes » : entrée → coaching → assaut
       (résolution + commentaire) → coaching → … → montage final
+- [x] Le Réalisateur (sceneDirector.ts) : détection des moments forts
+      depuis les événements (Ulti > spécial > contre > crit, le meilleur
+      par round), prompts vidéo EN prêts pour Kling (entrée + top 2
+      moments + finale « clip héroïque », apparence par archétype +
+      couleurs converties en mots), affichés sur l'écran de résultats
+      avec bouton copier — utilisable à la main dès aujourd'hui, la file
+      async les consommera côté serveur demain.
 - [x] Commentateur shōnen v0 : narration temps réel par templates locaux
       (13 familles d'événements, anti-répétition, rythme contrôlé —
       silence de 3 s entre lignes mineures, les majeures parlent
@@ -213,6 +220,15 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-14 (reprise technique) : Le Réalisateur — le jeu écrit lui-même
+  les prompts des scènes cinématiques de chaque match (entrée, meilleurs
+  moments élus par score d'événements, finale héroïque), exposés sur
+  l'écran de résultats avec copie en un clic. Premier maillon concret du
+  pipeline cinématique : aujourd'hui manuel (coller dans Kling), demain
+  la file async serveur consomme les mêmes ScenePlan. Tests sim :
+  colorWord, 4 scènes sur match synthétique, Ulti élu moment fort,
+  prompts sans placeholder ni hex.
 
 - 2026-08-14 (routine) : Les consignes parlées v0 — réponse au constat
   utilisateur « ce qu'on dit n'a pas d'impact » : au coin du ring, chaque

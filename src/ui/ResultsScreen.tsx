@@ -81,6 +81,41 @@ export default function ResultsScreen({
         <p className="permNote">Pas de clip pour ce match (enregistrement indisponible).</p>
       )}
 
+      {outcome.scenes.length > 0 && (
+        <details style={{ width: '86%', textAlign: 'left' }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
+            🎬 Scènes de ton match ({outcome.scenes.length}) — prompts prêts pour Kling
+          </summary>
+          <p className="permNote">
+            Le Réalisateur a détecté les moments forts et écrit les prompts vidéo. Colle-les dans
+            Kling (image-to-video avec la planche du perso) pour l'épisode anime du match.
+          </p>
+          {outcome.scenes.map(s => (
+            <div key={s.id} style={{ margin: '6px 0' }}>
+              <b style={{ fontSize: '0.8rem' }}>{s.title}</b>{' '}
+              <button
+                className="btn secondary"
+                style={{ fontSize: '0.7rem', padding: '2px 8px' }}
+                onClick={() => navigator.clipboard?.writeText(s.prompt).catch(() => {})}
+              >
+                📋 Copier
+              </button>
+              <div
+                style={{
+                  fontSize: '0.68rem',
+                  opacity: 0.75,
+                  maxHeight: 52,
+                  overflow: 'hidden',
+                  fontFamily: 'monospace',
+                }}
+              >
+                {s.prompt}
+              </div>
+            </div>
+          ))}
+        </details>
+      )}
+
       <button className="btn secondary" onClick={onReplay}>
         ⚡ Revanche
       </button>
