@@ -196,6 +196,12 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [x] FIX mobile découvert par la capture : sur les écrans plus étroits
       que 9:16, l'aspect du .stage cassait et le canvas rognait le HUD
       (height: min(100vh, 100vw·16/9)).
+- [x] Silhouettes v2 « encrées » : contours manga sur toutes les formes,
+      membres courbés en 2 segments (coude/genou implicites), torse
+      habillé (épaules→taille, col en V, ceinture nouée), gants et pieds,
+      visage expressif par état (cri en attaque, œil fermé + grimace
+      quand touché, pupille vers l'adversaire, goutte de sueur PV bas).
+      Vérifié par captures avant/après.
 - [ ] Playtests humains (10-20 personnes) : fun au 15e match ? points de
       décrochage ? → ajuster avant tout investissement
 - [ ] Intégrer les illustrations Kling au jeu : portraits roster à la
@@ -246,6 +252,15 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-14 (routine) : Silhouettes v2 encrées — les bonshommes-bâtons
+  deviennent des personnages : contour manga systématique (formes
+  dessinées en double passe), membres courbés, torse rempli col+ceinture,
+  gants/pieds, visages qui jouent le combat (bouche de cri sur
+  attaque/spécial, œil fermé quand touché, sueur sous 30 % PV). Les
+  morphologies et attributs d'archétypes existants (oreilles de Fang,
+  barbe de Gorō…) s'appliquent par-dessus. Capture avant/après au vert,
+  19 tests + sim OK.
 
 - 2026-08-14 (routine) : Passe 2.5D + boucle visuelle fermée — l'arène a
   de la profondeur (projecteurs, foule en perspective + glowsticks liés à

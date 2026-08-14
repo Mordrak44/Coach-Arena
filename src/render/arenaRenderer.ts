@@ -500,47 +500,109 @@ export class ArenaRenderer {
     const bodyY = -60 + crouch
     const headY = -128 + crouch
 
-    // Jambes
-    ctx.strokeStyle = c
-    ctx.lineWidth = body.limb
-    ctx.lineCap = 'round'
-    ctx.beginPath()
-    ctx.moveTo(0, bodyY + 20)
-    ctx.lineTo(-14, -6)
-    ctx.moveTo(0, bodyY + 20)
-    ctx.lineTo(20, -2)
-    ctx.stroke()
+    // -- silhouette encrée : chaque forme est cerclée d'un contour manga --
+    const OUT = '#161325'
+    const hipY = bodyY + 22
+    const shoulderY = headY + 30
 
-    // Torse
-    ctx.lineWidth = body.torso
-    ctx.beginPath()
-    ctx.moveTo(0, bodyY + 22)
-    ctx.lineTo(4, headY + 26)
-    ctx.stroke()
+    /** Membre courbé en deux temps (coude/genou implicite), avec contour. */
+    const seg = (x1: number, y1: number, x2: number, y2: number, bend: number, color: string, w: number) => {
+      const mx = (x1 + x2) / 2
+      const my = (y1 + y2) / 2
+      const dx = x2 - x1
+      const dy = y2 - y1
+      const len = Math.hypot(dx, dy) || 1
+      const cxp = mx + (-dy / len) * bend
+      const cyp = my + (dx / len) * bend
+      for (const [col, ww] of [
+        [OUT, w + 5],
+        [color, w],
+      ] as const) {
+        ctx.strokeStyle = col
+        ctx.lineWidth = ww
+        ctx.lineCap = 'round'
+        ctx.beginPath()
+        ctx.moveTo(x1, y1)
+        ctx.quadraticCurveTo(cxp, cyp, x2, y2)
+        ctx.stroke()
+      }
+    }
 
-    // Bras
-    ctx.strokeStyle = c2
-    ctx.lineWidth = Math.max(8, body.limb - 2)
+    // Jambes (genou implicite) + pieds
+    seg(0, hipY, -14, -6, 7, c, body.limb)
+    seg(0, hipY, 20, -2, -7, c, body.limb)
+    ctx.fillStyle = OUT
     ctx.beginPath()
-    ctx.moveTo(2, headY + 34)
-    ctx.lineTo(armB.x, armB.y + crouch)
-    ctx.moveTo(2, headY + 34)
-    ctx.lineTo(armF.x, armF.y + crouch)
-    ctx.stroke()
-    // Poings
-    ctx.fillStyle = c2
+    ctx.ellipse(-17, -3, 11, 5.5, -0.2, 0, Math.PI * 2)
+    ctx.fill()
     ctx.beginPath()
-    ctx.arc(armF.x, armF.y + crouch, 9, 0, Math.PI * 2)
-    ctx.arc(armB.x, armB.y + crouch, 8, 0, Math.PI * 2)
+    ctx.ellipse(24, 1, 11, 5.5, 0.15, 0, Math.PI * 2)
     ctx.fill()
 
-    // Tête + bandeau
+    // Torse habillé : épaules larges → taille, col en V et ceinture
+    const shW = body.torso * 0.92
+    const waW = body.torso * 0.55
+    ctx.fillStyle = c
+    ctx.strokeStyle = OUT
+    ctx.lineWidth = 5
+    ctx.beginPath()
+    ctx.moveTo(-shW + 2, shoulderY)
+    ctx.lineTo(shW + 6, shoulderY)
+    ctx.quadraticCurveTo(shW + 2, (shoulderY + hipY) / 2, waW + 2, hipY)
+    ctx.lineTo(-waW, hipY)
+    ctx.quadraticCurveTo(-shW - 2, (shoulderY + hipY) / 2, -shW + 2, shoulderY)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+    // col en V
+    ctx.strokeStyle = c2
+    ctx.lineWidth = 4
+    ctx.beginPath()
+    ctx.moveTo(-6, shoulderY + 2)
+    ctx.lineTo(4, shoulderY + 14)
+    ctx.lineTo(14, shoulderY + 2)
+    ctx.stroke()
+    // ceinture nouée
+    ctx.fillStyle = c2
+    ctx.strokeStyle = OUT
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.rect(-waW - 2, hipY - 8, waW * 2 + 6, 9)
+    ctx.fill()
+    ctx.stroke()
+
+    // Bras (coude implicite) + gants
+    const armW = Math.max(8, body.limb - 2)
+    seg(-4, shoulderY + 4, armB.x, armB.y + crouch, 9, c2, armW)
+    seg(6, shoulderY + 4, armF.x, armF.y + crouch, -9, c2, armW)
+    for (const [ax, ay, r] of [
+      [armF.x, armF.y + crouch, 10.5],
+      [armB.x, armB.y + crouch, 9],
+    ] as const) {
+      ctx.fillStyle = c2
+      ctx.strokeStyle = OUT
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.arc(ax, ay, r, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+    }
+
+    // Tête cerclée + bandeau
     ctx.fillStyle = '#ffe0c2'
+    ctx.strokeStyle = OUT
+    ctx.lineWidth = 4
     ctx.beginPath()
     ctx.arc(6, headY, body.head, 0, Math.PI * 2)
     ctx.fill()
+    ctx.stroke()
     ctx.fillStyle = c
-    ctx.fillRect(-14, headY - 12, 40, 9) // bandeau
+    ctx.strokeStyle = OUT
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.rect(-14, headY - 12, 40, 9) // bandeau
+    ctx.fill()
+    ctx.stroke()
     // Mèche manga
     ctx.strokeStyle = isEnemy ? '#2d3436' : c
     ctx.lineWidth = 5
@@ -549,13 +611,60 @@ export class ArenaRenderer {
     ctx.quadraticCurveTo(-22, headY - 30, -10, headY - 34)
     ctx.stroke()
 
-    // Œil déterminé (trait)
+    // Visage expressif selon l'état
+    const koOrHurt = anim === 'hurt' || anim === 'ko'
+    if (koOrHurt) {
+      // œil fermé de douleur (>)
+      ctx.strokeStyle = '#1a1a1a'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.moveTo(12, headY - 8)
+      ctx.lineTo(20, headY - 4)
+      ctx.lineTo(12, headY)
+      ctx.stroke()
+    } else {
+      // sourcil froncé + œil avec pupille dirigée vers l'adversaire
+      ctx.strokeStyle = '#1a1a1a'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.moveTo(10, headY - 12)
+      ctx.lineTo(24, headY - 8)
+      ctx.stroke()
+      ctx.fillStyle = '#ffffff'
+      ctx.beginPath()
+      ctx.ellipse(17, headY - 3, 5, 4, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#1a1a1a'
+      ctx.beginPath()
+      ctx.arc(19, headY - 3, 2.2, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    // bouche : cri en attaque/spécial, grimace quand touché, neutre sinon
     ctx.strokeStyle = '#1a1a1a'
-    ctx.lineWidth = 3
-    ctx.beginPath()
-    ctx.moveTo(12, headY - 4)
-    ctx.lineTo(22, headY - 6)
-    ctx.stroke()
+    ctx.lineWidth = 2.5
+    if (anim === 'attack' || anim === 'special') {
+      ctx.fillStyle = '#7a2030'
+      ctx.beginPath()
+      ctx.ellipse(14, headY + 11, 5, 6, 0, 0, Math.PI * 2)
+      ctx.fill()
+    } else if (koOrHurt) {
+      ctx.beginPath()
+      ctx.moveTo(9, headY + 12)
+      ctx.lineTo(19, headY + 10)
+      ctx.stroke()
+    } else {
+      ctx.beginPath()
+      ctx.moveTo(10, headY + 10)
+      ctx.lineTo(18, headY + 11)
+      ctx.stroke()
+    }
+    // goutte de sueur quand les PV sont bas
+    if (f.hp / f.maxHp < 0.3 && anim !== 'ko') {
+      ctx.fillStyle = '#8ed6ff'
+      ctx.beginPath()
+      ctx.ellipse(-8, headY - 2 + Math.sin(now * 6) * 2, 3, 5, 0.2, 0, Math.PI * 2)
+      ctx.fill()
+    }
 
     // Attribut distinctif de l'archétype
     switch (f.char.archetype) {
