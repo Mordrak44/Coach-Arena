@@ -285,10 +285,20 @@ export class ArenaRenderer {
     const facing = f.facing
     const c = f.char.color
     const c2 = f.char.color2
+    // Morphologie par archétype : le vétéran est massif, l'insaisissable fluette.
+    const BODY: Record<string, { scale: number; torso: number; limb: number; head: number }> = {
+      brawler: { scale: 1.08, torso: 27, limb: 13, head: 21 },
+      rival: { scale: 1.0, torso: 18, limb: 10, head: 19 },
+      prodigy: { scale: 0.97, torso: 17, limb: 9, head: 19 },
+      veteran: { scale: 1.16, torso: 31, limb: 14, head: 20 },
+      beast: { scale: 1.05, torso: 22, limb: 12, head: 20 },
+      trickster: { scale: 0.92, torso: 14, limb: 8, head: 18 },
+    }
+    const body = BODY[f.char.archetype] ?? BODY.prodigy
 
     ctx.save()
     ctx.translate(x, groundY)
-    ctx.scale(facing, 1)
+    ctx.scale(facing * body.scale, body.scale)
 
     // Aura de hype
     const hypeRatio = f.hype / HYPE_MAX
@@ -305,34 +315,42 @@ export class ArenaRenderer {
       ctx.globalAlpha = 1
     }
 
-    // Pose selon l'animation
+    // Pose selon l'animation — la fente (lunge) vend le mouvement.
     let lean = 0
+    let lunge = 0
     let armF = { x: 30, y: -95 } // bras avant (poing)
     let armB = { x: -18, y: -90 }
     let crouch = 0
     switch (anim) {
       case 'attack':
-        lean = 0.35
-        armF = { x: 62, y: -105 }
+        lean = 0.4
+        lunge = 20
+        armF = { x: 66, y: -102 }
+        armB = { x: -26, y: -78 }
         break
       case 'special':
         lean = 0.15
-        armF = { x: 70, y: -130 }
-        crouch = -6
+        lunge = 10
+        armF = { x: 72, y: -134 }
+        armB = { x: -30, y: -70 }
+        crouch = -12 // il décolle
         break
       case 'hurt':
-        lean = -0.3
-        armF = { x: 10, y: -70 }
+        lean = -0.35
+        lunge = -10
+        armF = { x: 8, y: -68 }
         break
       case 'guard':
         lean = -0.05
-        armF = { x: 22, y: -118 }
-        armB = { x: 16, y: -112 }
-        crouch = 8
+        armF = { x: 24, y: -120 }
+        armB = { x: 18, y: -114 }
+        crouch = 10
         break
       case 'dodge':
-        lean = -0.5
-        crouch = 14
+        lean = -0.55
+        lunge = -18
+        crouch = 16
+        armF = { x: 14, y: -110 }
         break
       case 'ko':
         // au sol
@@ -342,9 +360,12 @@ export class ArenaRenderer {
       case 'idle': {
         const bob = Math.sin(now * 4) * 3
         crouch = bob
+        // légère danse de garde
+        lunge = Math.sin(now * 2.3) * 4
         break
       }
     }
+    ctx.translate(lunge, 0)
     ctx.rotate(lean * 0.3)
 
     const bodyY = -60 + crouch
@@ -352,7 +373,7 @@ export class ArenaRenderer {
 
     // Jambes
     ctx.strokeStyle = c
-    ctx.lineWidth = 13
+    ctx.lineWidth = body.limb
     ctx.lineCap = 'round'
     ctx.beginPath()
     ctx.moveTo(0, bodyY + 20)
@@ -362,7 +383,7 @@ export class ArenaRenderer {
     ctx.stroke()
 
     // Torse
-    ctx.lineWidth = 22
+    ctx.lineWidth = body.torso
     ctx.beginPath()
     ctx.moveTo(0, bodyY + 22)
     ctx.lineTo(4, headY + 26)
@@ -370,7 +391,7 @@ export class ArenaRenderer {
 
     // Bras
     ctx.strokeStyle = c2
-    ctx.lineWidth = 11
+    ctx.lineWidth = Math.max(8, body.limb - 2)
     ctx.beginPath()
     ctx.moveTo(2, headY + 34)
     ctx.lineTo(armB.x, armB.y + crouch)
@@ -387,7 +408,7 @@ export class ArenaRenderer {
     // Tête + bandeau
     ctx.fillStyle = '#ffe0c2'
     ctx.beginPath()
-    ctx.arc(6, headY, 20, 0, Math.PI * 2)
+    ctx.arc(6, headY, body.head, 0, Math.PI * 2)
     ctx.fill()
     ctx.fillStyle = c
     ctx.fillRect(-14, headY - 12, 40, 9) // bandeau
@@ -406,6 +427,77 @@ export class ArenaRenderer {
     ctx.moveTo(12, headY - 4)
     ctx.lineTo(22, headY - 6)
     ctx.stroke()
+
+    // Attribut distinctif de l'archétype
+    switch (f.char.archetype) {
+      case 'beast': {
+        // oreilles pointues + queue
+        ctx.fillStyle = c
+        ctx.beginPath()
+        ctx.moveTo(-6, headY - 16)
+        ctx.lineTo(-14, headY - 34)
+        ctx.lineTo(2, headY - 20)
+        ctx.closePath()
+        ctx.moveTo(14, headY - 17)
+        ctx.lineTo(20, headY - 34)
+        ctx.lineTo(24, headY - 16)
+        ctx.closePath()
+        ctx.fill()
+        ctx.strokeStyle = c
+        ctx.lineWidth = 7
+        ctx.beginPath()
+        ctx.moveTo(-8, bodyY + 18)
+        ctx.quadraticCurveTo(-40, bodyY + 6, -44, bodyY - 22 + Math.sin(now * 3) * 6)
+        ctx.stroke()
+        break
+      }
+      case 'veteran': {
+        // barbe grise
+        ctx.fillStyle = '#c8cdd2'
+        ctx.beginPath()
+        ctx.arc(8, headY + 12, 12, 0, Math.PI)
+        ctx.fill()
+        break
+      }
+      case 'rival': {
+        // longue mèche sombre qui flotte
+        ctx.strokeStyle = '#2d3436'
+        ctx.lineWidth = 6
+        ctx.beginPath()
+        ctx.moveTo(-6, headY - 12)
+        ctx.quadraticCurveTo(-30, headY + 6, -34 + Math.sin(now * 2) * 4, headY + 34)
+        ctx.stroke()
+        break
+      }
+      case 'prodigy': {
+        // queue de cheval haute
+        ctx.strokeStyle = c
+        ctx.lineWidth = 6
+        ctx.beginPath()
+        ctx.moveTo(-4, headY - 16)
+        ctx.quadraticCurveTo(-24, headY - 6, -22 + Math.sin(now * 2.6) * 3, headY + 22)
+        ctx.stroke()
+        break
+      }
+      case 'trickster': {
+        // foulard flottant
+        ctx.strokeStyle = c2
+        ctx.lineWidth = 5
+        ctx.beginPath()
+        ctx.moveTo(0, headY + 20)
+        ctx.quadraticCurveTo(-28, headY + 24 + Math.sin(now * 4) * 5, -42, headY + 14 + Math.sin(now * 4 + 1) * 7)
+        ctx.stroke()
+        break
+      }
+      case 'brawler':
+        // bandes de poings
+        ctx.strokeStyle = '#fff'
+        ctx.lineWidth = 3
+        ctx.beginPath()
+        ctx.arc(armF.x, armF.y + crouch, 9, 0, Math.PI * 2)
+        ctx.stroke()
+        break
+    }
 
     // Traînée de vitesse en attaque
     if (anim === 'attack' || anim === 'special') {

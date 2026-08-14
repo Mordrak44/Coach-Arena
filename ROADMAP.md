@@ -68,7 +68,12 @@ portraits du roster qu'après accord explicite de l'utilisateur.
 - [x] Incruster la facecam DANS le clip exporté (composite canvas caché :
       jeu + facecam miroir bordée « ● COACH » + watermark COACH ARENA —
       c'est le composite qui est enregistré, l'écran de jeu reste inchangé)
-- [ ] Meilleure silhouette des persos (poses d'attaque/garde/esquive distinctes)
+- [x] Meilleure silhouette des persos — morphologie par archétype (le
+      vétéran massif, l'insaisissable fluette…), attributs distinctifs
+      animés (oreilles+queue de la Bête, barbe du Vétéran, mèche du
+      Rival, queue de cheval de la Prodige, foulard de l'Insaisissable,
+      bandes de poing du Cogneur), poses avec fente (lunge) sur
+      attaque/esquive/spécial, danse de garde en idle
 - [x] Onboarding permissions micro/caméra — écran « Vestiaire » avant
       l'arène : annonce VS shōnen, demande des capteurs avec explication,
       état micro/caméra/reco vocale, conseil de coaching selon le trait
@@ -158,6 +163,10 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 
 ## Journal
 
+- 2026-08-14 (routine) : Silhouettes par archétype (6 morphologies, 6
+  attributs animés, fentes d'action, danse de garde) — dernier gros
+  item v0.5 hors vitest. Le placeholder vectoriel a maintenant de la
+  personnalité en attendant les illustrations Kling.
 - 2026-08-14 (routine) : Deck-builder v0 (src/game/deckBuilder.ts +
   contrôles −/+ sur les tuiles, modèle localStorage assaini, validité
   12-60, deck jouable = modèle + mérités). Test sim : sanitation d'un
