@@ -135,14 +135,25 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 
 - [ ] L'Écurie : 3 combattants, remplacement au coin du ring (format
       switch — voir GAME_DESIGN.md §4 ter), collection de persos
-- [ ] Cartes créées par prompt (DSL bornée + budget de puissance,
-      habillage libre) — prérequis : DSL d'effets v1
+- [x] Cartes créées par prompt v0 — la Forge de cartes : parseur local à
+      14 familles de mots-clés → max 2 primitives clampées, coût
+      budgétisé, timing déduit, nom extrait ou généré, desc auto depuis
+      les effets, refus si aucun effet reconnu. Persistance (max 8),
+      re-clamp au rechargement (anti-triche localStorage), 1 copie de
+      chaque forgée dans le deck. v1 : parseur → API Claude, mêmes
+      garde-fous.
 - [ ] Prosodie vocale (intonation, pas seulement volume)
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-14 (routine) : Forge de cartes par prompt (v0 mots-clés) —
+  section ⚒ sur l'écran de sélection, cartes forgées persistées et
+  re-clampées au chargement, ajoutées au deck. Test sim de bout en
+  bout : prompt → primitives attendues → carte JOUÉE dans un vrai match
+  avec effet mesuré. Le pipeline « habillage libre, mécanique bornée »
+  fonctionne ; il ne reste qu'à brancher Claude à la place du parseur.
 - 2026-08-14 (routine) : DSL d'effets — les 15 cartes deviennent des
   données (EffectPrimitive[14 types] + computeCost par budget de
   puissance + clampEffect). CardMods refondu en état générique ;

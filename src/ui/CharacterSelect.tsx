@@ -28,6 +28,8 @@ import {
   moodInfo,
   type StableAction,
 } from '../game/stable'
+import { forgeCard, loadForgedCards, saveForgedCard } from '../game/cardForge'
+import type { CoachCard } from '../game/types'
 
 function StatBar({ label, value, color }: { label: string; value: number; color: string }) {
   return (
@@ -121,10 +123,32 @@ export default function CharacterSelect({
     setStableVersion(v => v + 1)
   }
 
-  // Deck de départ auto-construit + copies gagnées aux paliers de Lien.
+  // Forge de cartes par prompt
+  const [forged, setForged] = useState<CoachCard[]>(() => loadForgedCards())
+  const [forgePrompt, setForgePrompt] = useState('')
+  const [forgeMsg, setForgeMsg] = useState('')
+
+  const onForgeCard = () => {
+    const r = forgeCard(forgePrompt.trim())
+    if (!r) {
+      setForgeMsg(
+        "Aucun effet reconnu — essaie des mots comme : soigne, motive, sabote, bouclier, esquive, contre, rage, provoque, encaisse…",
+      )
+      return
+    }
+    saveForgedCard(r.card)
+    setForged(loadForgedCards())
+    setForgeMsg(
+      `⚒ « ${r.card.name} » forgée (${r.matched} effet${r.matched > 1 ? 's' : ''}, coût ${r.card.cost}) — ajoutée à ton deck !`,
+    )
+    setForgePrompt('')
+  }
+
+  // Deck de départ auto-construit + copies de paliers + cartes forgées (1 copie).
   const deck: CardId[] = [
     ...buildStarterDeck(signatureUnlocked && signature ? signature.id : null),
     ...(selected ? getExtraCopies(selected.id) : []),
+    ...forged.map(c => c.id),
   ]
 
   const forge = () => {
@@ -346,6 +370,42 @@ export default function CharacterSelect({
           </div>
         </div>
       )}
+
+      <div
+        style={{
+          width: '100%',
+          background: 'var(--panel2)',
+          border: '2px solid var(--violet)',
+          borderRadius: 12,
+          padding: '10px 14px',
+          textAlign: 'left',
+          fontSize: '0.78rem',
+        }}
+      >
+        <div style={{ fontWeight: 900, textTransform: 'uppercase', fontSize: '0.72rem', color: 'var(--violet)' }}>
+          ⚒ Forge de cartes — décris-la, elle rejoint ton deck
+        </div>
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <input
+            className="promptBox"
+            style={{ minHeight: 0, padding: '9px 12px', flex: 1 }}
+            placeholder="« une carte qui soigne et motive, appelée Regain »"
+            value={forgePrompt}
+            maxLength={120}
+            onChange={e => setForgePrompt(e.target.value)}
+          />
+          <button className="btn secondary" onClick={onForgeCard} disabled={forgePrompt.trim().length < 4}>
+            ⚒
+          </button>
+        </div>
+        {forgeMsg && <div style={{ marginTop: 6, color: 'var(--muted)' }}>{forgeMsg}</div>}
+        {forged.length > 0 && (
+          <div style={{ marginTop: 6, color: 'var(--muted)' }}>
+            Forgées ({forged.length}/8) :{' '}
+            {forged.map(c => `${c.icon} ${c.name} (${'●'.repeat(c.cost)})`).join(' · ')}
+          </div>
+        )}
+      </div>
 
       <h2 style={{ fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--accent)' }}>
         🃏 Ton Deck de Coach ({deck.length} cartes)

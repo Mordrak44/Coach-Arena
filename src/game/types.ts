@@ -89,6 +89,8 @@ export type CardId =
   | 'sigGoro' // Leçon d'Expérience : le premier spécial adverse du round est réduit de moitié
   | 'sigFang' // Frénésie : le prochain « attaque ! » → +50 % dégâts pendant 5 s
   | 'sigNyx' // Pas de l'Ombre : +15 % d'esquive ce round
+  // Cartes forgées par prompt (Forge de cartes) — id dynamique
+  | `forge-${string}`
 
 /**
  * Primitives d'effets — la DSL des cartes. Chaque carte est une combinaison

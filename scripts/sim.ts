@@ -217,6 +217,47 @@ function makeFightingMatch(playerIdx: number): MatchState {
   console.log(`DSL OK : coût budgétisé = coût déclaré pour ${CARD_POOL.length + SIGNATURE_CARDS.length} cartes`)
 }
 
+// Forge de cartes : prompt → primitives bornées + coût budgétisé + jouable en match.
+{
+  const { forgeCard } = await import('../src/game/cardForge')
+  const { registerCustomCard } = await import('../src/game/cards')
+  const r = forgeCard('une carte qui soigne un peu et motive les troupes, appelée Regain')
+  if (!r) throw new Error('forge : aucun effet reconnu')
+  const kinds = r.card.effects.map(e => e.kind).sort()
+  if (JSON.stringify(kinds) !== JSON.stringify(['heal', 'hype']))
+    throw new Error(`forge : primitives inattendues ${kinds}`)
+  if (r.card.name !== 'Regain') throw new Error(`forge : nom ${r.card.name}`)
+  if (r.card.cost < 1 || r.card.cost > 3) throw new Error(`forge : coût hors bornes ${r.card.cost}`)
+  if (forgeCard('blablabla sans aucun sens') !== null)
+    throw new Error('forge : un prompt sans effet devrait être refusé')
+  // La carte forgée est jouable : dans un match, elle soigne réellement.
+  registerCustomCard(r.card)
+  const m = createMatch(ROSTER[0], ROSTER[1], [r.card.id, r.card.id, r.card.id, r.card.id, r.card.id])
+  // avance jusqu'à la première phase tactique
+  let lastCmdAt = -10
+  let roundStart = 0
+  let prevPhase: string = m.phase
+  while (m.phase !== 'tactics' && m.phase !== 'matchEnd') {
+    let command: any = null
+    if (m.phase === 'fighting' && m.t - lastCmdAt > 4) {
+      command = 'attack'
+      lastCmdAt = m.t
+    }
+    tick(m, 1 / 60, { command, voiceEnergy: 0.5, faceEnergy: 0.5 })
+    if (prevPhase !== 'fighting' && m.phase === 'fighting') roundStart = m.t
+    prevPhase = m.phase
+    if (m.phase === 'fighting' && m.t - roundStart > ROUND_TIME_LIMIT) forceRoundTimeout(m)
+  }
+  if (m.phase === 'tactics') {
+    const hpBefore = m.player.hp
+    const hypeBefore = m.player.hype
+    if (!playCard(m, r.card.id)) throw new Error('forge : carte injouable en phase tactique')
+    if (m.player.hp <= hpBefore && m.player.hype <= hypeBefore)
+      throw new Error('forge : la carte jouée n’a eu aucun effet')
+  }
+  console.log(`Forge OK : « ${r.card.name} » (${kinds.join('+')}, coût ${r.card.cost}) jouée en match`)
+}
+
 // Paliers de Lien : options de récompense déterministes et distinctes.
 {
   const { rewardOptionsFor } = await import('../src/game/progression')

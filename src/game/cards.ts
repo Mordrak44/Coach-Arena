@@ -243,8 +243,19 @@ export const SIGNATURE_CARDS: CoachCard[] = [
 
 const ALL_CARDS = [...CARD_POOL, ...SIGNATURE_CARDS]
 
+/** Registre des cartes forgées par prompt (rempli au chargement + à la forge). */
+const customRegistry = new Map<CardId, CoachCard>()
+
+export function registerCustomCard(card: CoachCard): void {
+  customRegistry.set(card.id, card)
+}
+
+export function getCustomCards(): CoachCard[] {
+  return [...customRegistry.values()]
+}
+
 export function getCard(id: CardId): CoachCard {
-  return ALL_CARDS.find(c => c.id === id)!
+  return ALL_CARDS.find(c => c.id === id) ?? customRegistry.get(id)!
 }
 
 /** Palier de Lien requis pour débloquer la carte signature d'un perso. */
