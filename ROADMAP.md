@@ -69,7 +69,10 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       jeu + facecam miroir bordée « ● COACH » + watermark COACH ARENA —
       c'est le composite qui est enregistré, l'écran de jeu reste inchangé)
 - [ ] Meilleure silhouette des persos (poses d'attaque/garde/esquive distinctes)
-- [ ] Onboarding permissions micro/caméra (fallback clavier si refus)
+- [x] Onboarding permissions micro/caméra — écran « Vestiaire » avant
+      l'arène : annonce VS shōnen, demande des capteurs avec explication,
+      état micro/caméra/reco vocale, conseil de coaching selon le trait
+      du perso, fallback boutons/clavier assumé si refus
 - [ ] Tests unitaires du moteur de combat (vitest)
 
 ## v1 — Mode Cinématique (voir GAME_DESIGN.md §7)
@@ -153,3 +156,8 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
   en frénésie sur ordre, Nyx devient fumée). Verrouillées sous Lien
   niv. 2, filtrées du carnet si on change de perso. Micro-tests Yuna
   (anti-confusion) et Fang (armée→voix) au vert.
+- 2026-08-13 (routine h+8) : Écran Vestiaire (ReadyScreen) — annonce du
+  match VS avec lore de l'adversaire, permissions demandées AVANT
+  l'arène avec explication de chaque capteur et fallback affiché,
+  rappel du trait d'écoute du perso, bouton « Faire sonner le gong ».
+  Le flux médias est acquis au Vestiaire et transmis à l'arène.

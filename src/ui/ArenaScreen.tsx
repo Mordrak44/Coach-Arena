@@ -45,11 +45,14 @@ export default function ArenaScreen({
   player,
   enemy,
   deck,
+  preStream,
   onFinish,
 }: {
   player: Character
   enemy: Character
   deck: CardId[]
+  /** flux micro/caméra déjà obtenu par l'écran Vestiaire (null si refusé) */
+  preStream?: MediaStream | null
   onFinish: (outcome: MatchOutcome) => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -110,15 +113,17 @@ export default function ArenaScreen({
     sys.sound.start()
 
     const setup = async () => {
-      // Micro + caméra ; on tolère chaque refus séparément.
-      let stream: MediaStream | null = null
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-      } catch {
+      // Flux déjà obtenu au Vestiaire ; sinon on demande ici (accès direct).
+      let stream: MediaStream | null = preStream ?? null
+      if (!stream) {
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
         } catch {
-          stream = null
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+          } catch {
+            stream = null
+          }
         }
       }
       if (disposed) {
