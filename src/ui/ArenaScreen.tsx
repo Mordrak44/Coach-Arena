@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CardId, Character, CoachCommand, MatchState, TacticPlan } from '../game/types'
 import {
+  type MatchOpts,
   ROUND_TIME_LIMIT,
   SOUFFLE_PER_CORNER,
   addSpeechHype,
@@ -49,19 +50,22 @@ export default function ArenaScreen({
   player,
   enemy,
   deck,
+  matchOpts,
   preStream,
   onFinish,
 }: {
   player: Character
   enemy: Character
   deck: CardId[]
+  /** effets de la Vie d'Écurie (Hype de départ, bouderie) */
+  matchOpts?: MatchOpts
   /** flux micro/caméra déjà obtenu par l'écran Vestiaire (null si refusé) */
   preStream?: MediaStream | null
   onFinish: (outcome: MatchOutcome) => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const camRef = useRef<HTMLVideoElement>(null)
-  const matchRef = useRef<MatchState>(createMatch(player, enemy, deck))
+  const matchRef = useRef<MatchState>(createMatch(player, enemy, deck, matchOpts))
   const pendingCmd = useRef<CoachCommand | null>(null)
 
   // Instances systèmes, stables pour toute la durée du composant.

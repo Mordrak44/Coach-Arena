@@ -110,10 +110,18 @@ function makeFighter(char: Character, side: 'player' | 'enemy'): FighterState {
   }
 }
 
+export interface MatchOpts {
+  /** Hype de départ (humeur de la Vie d'Écurie) */
+  startHype?: number
+  /** humeur basse : le premier ordre du match est boudé */
+  sulky?: boolean
+}
+
 export function createMatch(
   playerChar: Character,
   enemyChar: Character,
   deckList?: CardId[],
+  opts: MatchOpts = {},
 ): MatchState {
   const deck = shuffle(deckList ?? buildStarterDeck(null))
   const m: MatchState = {
@@ -131,6 +139,7 @@ export function createMatch(
     discard: [],
     souffle: SOUFFLE_PER_CORNER,
     mulliganUsed: false,
+    sulky: opts.sulky ?? false,
     mods: {
       perfectCounter: false,
       warCry: false,
@@ -148,6 +157,7 @@ export function createMatch(
     },
     events: [{ kind: 'roundStart', t: 0, round: 1 }],
   }
+  m.player.hype = Math.min(HYPE_MAX, opts.startHype ?? 0)
   drawCards(m, HAND_SIZE)
   return m
 }
@@ -316,6 +326,12 @@ function applyCommand(m: MatchState, cmd: CoachCommand, voiceEnergy: number): vo
   const stance = COMMAND_STANCE[cmd]
   if (stance) {
     f.ordersThisRound++
+    // Boudeur (Vie d'Écurie) : le premier ordre du match passe à la trappe.
+    if (m.sulky) {
+      m.sulky = false
+      m.events.push({ kind: 'trait', t: m.t, text: `${f.char.name.toUpperCase()} BOUDE…`, color: '#cc88ff' })
+      return
+    }
     // Têtu : le premier ordre de posture du round est superbement ignoré.
     if (trait === 'tetu' && f.ordersThisRound === 1) {
       m.events.push({ kind: 'trait', t: m.t, text: `${f.char.name.toUpperCase()} T'IGNORE…`, color: '#a29bfe' })

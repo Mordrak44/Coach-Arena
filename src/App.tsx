@@ -3,6 +3,14 @@ import type { CardId, Character } from './game/types'
 import { pickOpponent } from './game/characters'
 import { buildStarterDeck } from './game/cards'
 import { applyBond, recordResult } from './game/progression'
+import {
+  consumeTraining,
+  getStable,
+  moodIgnoresFirstOrder,
+  moodStartHype,
+  recordMatchMood,
+} from './game/stable'
+import type { MatchOpts } from './game/combat'
 import { useRef } from 'react'
 import TitleScreen from './ui/TitleScreen'
 import CharacterSelect from './ui/CharacterSelect'
@@ -21,10 +29,25 @@ export default function App() {
   const [deck, setDeck] = useState<CardId[]>(() => buildStarterDeck(null))
 
   const streamRef = useRef<MediaStream | null>(null)
+  const matchOptsRef = useRef<MatchOpts>({})
 
   const startMatch = (char: Character, chosenDeck?: CardId[]) => {
     if (chosenDeck) setDeck(chosenDeck)
-    setPlayer(applyBond(char)) // le Lien booste le Cœur du perso
+    let fighter = applyBond(char) // le Lien booste le Cœur du perso
+    // Vie d'Écurie : humeur → Hype de départ / bouderie ; entraînement → +1 stat.
+    const stable = getStable(char.id, char.trait)
+    const trained = consumeTraining(char.id)
+    if (trained) {
+      fighter = {
+        ...fighter,
+        stats: { ...fighter.stats, [trained]: Math.min(12, fighter.stats[trained] + 1) },
+      }
+    }
+    matchOptsRef.current = {
+      startHype: moodStartHype(stable.mood),
+      sulky: moodIgnoresFirstOrder(stable.mood),
+    }
+    setPlayer(fighter)
     setEnemy(pickOpponent(char.id))
     setScreen('ready') // le Vestiaire : annonce du match + permissions
   }
@@ -49,9 +72,11 @@ export default function App() {
             player={player}
             enemy={enemy}
             deck={deck}
+            matchOpts={matchOptsRef.current}
             preStream={streamRef.current}
             onFinish={o => {
               recordResult(player.id, o.winner === 'player')
+              recordMatchMood(player.id, o.winner === 'player')
               setOutcome(o)
               setScreen('results')
             }}

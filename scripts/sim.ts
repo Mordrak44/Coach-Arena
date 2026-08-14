@@ -187,6 +187,24 @@ function makeFightingMatch(playerIdx: number): MatchState {
   console.log(`Onboarding guidé OK : ${g.name} (${g.trait}, DEF ${g.stats.def})`)
 }
 
+// Vie d'Écurie : humeur → Hype de départ ; bouderie → premier ordre ignoré.
+{
+  const m = createMatch(ROSTER[0], ROSTER[1], [], { startHype: 15, sulky: true })
+  if (m.player.hype !== 15) throw new Error(`startHype KO : ${m.player.hype}`)
+  while (m.phase === 'intro') tick(m, 1 / 60, { command: null, voiceEnergy: 0, faceEnergy: 0 })
+  m.player.nextActionAt = m.t + 1000
+  m.enemy.nextActionAt = m.t + 1000
+  const before = m.player.stance
+  tick(m, 1 / 60, { command: 'defend', voiceEnergy: 0.3, faceEnergy: 0 })
+  if (m.player.stance !== before) throw new Error('sulky : le premier ordre aurait dû être boudé')
+  while (m.t - m.player.lastOrderAt < 2.1 && m.phase === 'fighting')
+    tick(m, 1 / 60, { command: null, voiceEnergy: 0, faceEnergy: 0 })
+  tick(m, 1 / 60, { command: 'defend', voiceEnergy: 0.3, faceEnergy: 0 })
+  if (m.phase === 'fighting' && m.player.stance !== 'defensive')
+    throw new Error('sulky : le second ordre aurait dû passer (Kenta n’est pas têtu)')
+  console.log('Vie d’Écurie OK (Hype de départ + bouderie du premier ordre)')
+}
+
 // Commentateur : un match coaché produit une narration avec début et fin.
 {
   const { Commentator } = await import('../src/game/commentator')

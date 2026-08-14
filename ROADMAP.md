@@ -79,10 +79,14 @@ portraits du roster qu'après accord explicite de l'utilisateur.
 
 - [x] Onboarding de création par 3 questions (style / tempérament /
       univers + nom optionnel), mode expert conservé en second onglet
-- [ ] Humeur du perso (Radieux/Bien/Neutre/Boudeur) persistée, effets
-      légers en combat (Hype de départ, écoute du premier ordre)
-- [ ] Envies périodiques selon le trait + actions hors combat :
-      entraîner / loisir / repos (jamais punitif — tout est bonus)
+- [x] Humeur du perso (Radieux/Bien/Neutre/Boudeur) persistée, effets
+      légers en combat (Hype de départ +5/+15, perso boudeur = premier
+      ordre du match ignoré), dérive douce vers Neutre (4 pts/jour,
+      jamais punitive), humeur liée aux résultats de match
+- [x] Envies périodiques selon le trait + actions hors combat :
+      entraîner (+1 stat au prochain match) / loisir / repos — 3 actions
+      par jour réel, envie comblée = gros bonus d'humeur ; panneau
+      « L'Écurie » sur l'écran de sélection
 - [ ] Paliers de Lien : « choisis 1 carte parmi 2 » proposées par le
       perso (les choix construisent des decks distincts par joueur)
 - [ ] L'entretien nourrit le Lien (pas seulement les victoires)
@@ -199,6 +203,14 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
   Familles reformulées par timing : Coach / Instant·voix / Instant·pari.
   Équilibrage sain : le deck naïf n'est plus un auto-win (93 % vs 94 %
   sans cartes) — la valeur est dans le choix, plus dans la possession.
+- 2026-08-14 (routine) : Vie d'Écurie v1 — src/game/stable.ts (humeur
+  persistée avec dérive douce, envies par trait, 3 actions/jour :
+  entraîner +1 stat consommé au prochain match / loisir / repos, envie
+  comblée +10 humeur et compteur pour le Lien futur), panneau Écurie à
+  la sélection, effets en combat via MatchOpts (startHype, sulky).
+  Test sim dédié au vert. Reste : « choisis 1 carte parmi 2 » aux
+  paliers, et l'entretien qui nourrit le Lien (desiresFulfilled stocké,
+  pas encore branché sur bondLevel).
 - 2026-08-14 : Onboarding de création en 3 questions (style, tempérament,
   univers, nom optionnel) composant le prompt automatiquement — fin de la
   page blanche ; mode expert conservé. Design Vie d'Écurie gravé

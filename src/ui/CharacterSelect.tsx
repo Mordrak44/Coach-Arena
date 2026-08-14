@@ -10,6 +10,14 @@ import {
   buildStarterDeck,
 } from '../game/cards'
 import { bondLevel, bondTitle, getProgress, loadCustoms, saveCustom } from '../game/progression'
+import {
+  ACTIONS_PER_DAY,
+  desireText,
+  doStableAction,
+  getStable,
+  moodInfo,
+  type StableAction,
+} from '../game/stable'
 
 function StatBar({ label, value, color }: { label: string; value: number; color: string }) {
   return (
@@ -82,6 +90,19 @@ export default function CharacterSelect({
     !!selected && !!signature && bondLevel(getProgress(selected.id).wins) >= SIGNATURE_BOND_LEVEL
 
   const pickChar = (c: Character) => setSelected(c)
+
+  // Vie d'Écurie du perso sélectionné
+  const [stableMsg, setStableMsg] = useState('')
+  const [stableVersion, setStableVersion] = useState(0)
+  const stable = selected ? getStable(selected.id, selected.trait) : null
+  void stableVersion
+
+  const onStableAction = (action: StableAction, stat?: 'atk' | 'def' | 'spd') => {
+    if (!selected) return
+    const r = doStableAction(selected.id, selected.trait, action, stat)
+    setStableMsg(r.message)
+    setStableVersion(v => v + 1)
+  }
 
   // Deck de départ auto-construit (le deck-builder complet viendra en v1).
   const deck: CardId[] = buildStarterDeck(signatureUnlocked && signature ? signature.id : null)
@@ -227,6 +248,48 @@ export default function CharacterSelect({
           <CharCard key={c.id} char={c} selected={selected?.id === c.id} onClick={() => pickChar(c)} />
         ))}
       </div>
+
+      {selected && stable && (
+        <div
+          style={{
+            width: '100%',
+            background: 'var(--panel2)',
+            borderRadius: 12,
+            padding: '10px 14px',
+            textAlign: 'left',
+            fontSize: '0.78rem',
+          }}
+        >
+          <div style={{ fontWeight: 900, textTransform: 'uppercase', fontSize: '0.72rem', color: 'var(--accent)' }}>
+            🏠 L'Écurie — {selected.name} {moodInfo(stable.mood).icon}{' '}
+            <span style={{ color: 'var(--muted)' }}>({moodInfo(stable.mood).label})</span>
+          </div>
+          {desireText(selected, stable) && (
+            <div style={{ marginTop: 4, color: '#fd79a8' }}>💭 {desireText(selected, stable)}</div>
+          )}
+          <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+            <button style={chip(false)} onClick={() => onStableAction('train', 'atk')}>
+              🥊 Entraîner ATK
+            </button>
+            <button style={chip(false)} onClick={() => onStableAction('train', 'def')}>
+              🛡 DEF
+            </button>
+            <button style={chip(false)} onClick={() => onStableAction('train', 'spd')}>
+              💨 SPD
+            </button>
+            <button style={chip(false)} onClick={() => onStableAction('leisure')}>
+              🎈 Loisir
+            </button>
+            <button style={chip(false)} onClick={() => onStableAction('rest')}>
+              😴 Repos
+            </button>
+          </div>
+          <div style={{ marginTop: 6, color: 'var(--muted)' }}>
+            {stableMsg ||
+              `${ACTIONS_PER_DAY - stable.actionsToday} action(s) restante(s) aujourd'hui. Son humeur influence le début du match.`}
+          </div>
+        </div>
+      )}
 
       <h2 style={{ fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--accent)' }}>
         🃏 Ton Deck de Coach ({deck.length} cartes)
