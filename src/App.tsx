@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CardId, Character } from './game/types'
-import { pickOpponent } from './game/characters'
+import { ROSTER, pickOpponent } from './game/characters'
 import { buildStarterDeck } from './game/cards'
 import { applyBond, recordResult } from './game/progression'
 import {
@@ -20,10 +20,14 @@ import ResultsScreen from './ui/ResultsScreen'
 
 type Screen = 'title' | 'select' | 'ready' | 'arena' | 'results'
 
+// Mode démo (?demo) : saute directement dans l'arène sans capteurs — pour
+// les captures d'écran, le press kit et les tests visuels automatisés.
+const DEMO = typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo')
+
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('title')
-  const [player, setPlayer] = useState<Character | null>(null)
-  const [enemy, setEnemy] = useState<Character | null>(null)
+  const [screen, setScreen] = useState<Screen>(DEMO ? 'arena' : 'title')
+  const [player, setPlayer] = useState<Character | null>(DEMO ? ROSTER[0] : null)
+  const [enemy, setEnemy] = useState<Character | null>(DEMO ? ROSTER[4] : null)
   const [outcome, setOutcome] = useState<MatchOutcome | null>(null)
   const [matchKey, setMatchKey] = useState(0)
   const [deck, setDeck] = useState<CardId[]>(() => buildStarterDeck(null))
@@ -78,6 +82,7 @@ export default function App() {
             deck={deck}
             matchOpts={matchOptsRef.current}
             preStream={streamRef.current}
+            noMedia={DEMO}
             onFinish={o => {
               recordResult(player.id, o.winner === 'player')
               recordMatchMood(player.id, o.winner === 'player')

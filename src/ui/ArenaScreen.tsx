@@ -57,6 +57,7 @@ export default function ArenaScreen({
   deck,
   matchOpts,
   preStream,
+  noMedia,
   onFinish,
 }: {
   player: Character
@@ -66,6 +67,8 @@ export default function ArenaScreen({
   matchOpts?: MatchOpts
   /** flux micro/caméra déjà obtenu par l'écran Vestiaire (null si refusé) */
   preStream?: MediaStream | null
+  /** mode démo : ne demande aucun capteur (captures d'écran, tests visuels) */
+  noMedia?: boolean
   onFinish: (outcome: MatchOutcome) => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -136,7 +139,7 @@ export default function ArenaScreen({
     const setup = async () => {
       // Flux déjà obtenu au Vestiaire ; sinon on demande ici (accès direct).
       let stream: MediaStream | null = preStream ?? null
-      if (!stream) {
+      if (!stream && !noMedia) {
         try {
           stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
         } catch {

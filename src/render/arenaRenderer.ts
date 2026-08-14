@@ -196,6 +196,14 @@ export class ArenaRenderer {
 
     this.drawFloats(ctx, now)
     this.drawCracks(ctx, now)
+
+    // Vignette : concentre l'œil sur le ring (avant le HUD, qui reste net).
+    const vg = ctx.createRadialGradient(CANVAS_W / 2, 540, 260, CANVAS_W / 2, 540, 620)
+    vg.addColorStop(0, 'rgba(0,0,0,0)')
+    vg.addColorStop(1, 'rgba(5,4,12,0.5)')
+    ctx.fillStyle = vg
+    ctx.fillRect(-30, -30, CANVAS_W + 60, CANVAS_H + 60)
+
     this.drawHUD(ctx, m, roundTimeLeft)
     this.drawCommentary(ctx, now)
     this.drawSpecialBanner(ctx, now)
@@ -210,7 +218,7 @@ export class ArenaRenderer {
     ctx.restore()
   }
 
-  // -- fond : dégradé sombre + speed lines manga convergentes ---------------
+  // -- fond 2.5D : horizon, projecteurs, foule en perspective ---------------
 
   private drawBackground(ctx: CanvasRenderingContext2D, m: MatchState, now: number) {
     const g = ctx.createLinearGradient(0, 0, 0, CANVAS_H)
@@ -220,8 +228,33 @@ export class ArenaRenderer {
     ctx.fillStyle = g
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
 
-    // Speed lines radiales — plus denses quand la hype monte / pendant un special
     const hype = Math.max(m.player.hype, m.enemy.hype) / HYPE_MAX
+
+    // Lueur d'horizon derrière la foule : la salle respire avec la Hype.
+    const hg = ctx.createRadialGradient(CANVAS_W / 2, 445, 30, CANVAS_W / 2, 445, 360)
+    hg.addColorStop(0, `rgba(120,100,220,${0.16 + hype * 0.12})`)
+    hg.addColorStop(1, 'transparent')
+    ctx.fillStyle = hg
+    ctx.fillRect(0, 100, CANVAS_W, 420)
+
+    // Projecteurs : cônes de lumière qui balaient doucement la scène.
+    for (let i = 0; i < 3; i++) {
+      const baseX = 90 + i * 180
+      const sway = Math.sin(now * 0.5 + i * 2.1) * 60
+      const lg = ctx.createLinearGradient(0, 60, 0, 620)
+      lg.addColorStop(0, 'rgba(200,190,255,0.10)')
+      lg.addColorStop(1, 'rgba(200,190,255,0)')
+      ctx.fillStyle = lg
+      ctx.beginPath()
+      ctx.moveTo(baseX - 12, 60)
+      ctx.lineTo(baseX + 12, 60)
+      ctx.lineTo(baseX + sway + 90, 620)
+      ctx.lineTo(baseX + sway - 90, 620)
+      ctx.closePath()
+      ctx.fill()
+    }
+
+    // Speed lines radiales — plus denses quand la hype monte / pendant un special
     const special = now < this.specialBannerUntil
     const count = special ? 60 : 18 + Math.floor(hype * 24)
     const cx = CANVAS_W / 2
@@ -238,40 +271,130 @@ export class ArenaRenderer {
       ctx.stroke()
     }
 
-    // Foule stylisée : rangées de points sombres qui vibrent
-    ctx.fillStyle = 'rgba(70,60,110,0.5)'
-    for (let row = 0; row < 3; row++) {
-      const y = 180 + row * 26
-      for (let x = 10; x < CANVAS_W; x += 22) {
-        const bob = Math.sin(now * 3 + x * 0.3 + row) * (2 + hype * 4)
+    // Foule en perspective : les rangées lointaines sont hautes, petites et
+    // serrées ; les proches, basses, larges et sombres. Quelques fans
+    // brandissent des bâtons lumineux quand la salle chauffe.
+    for (let row = 0; row < 5; row++) {
+      const depth = row / 4 // 0 = loin, 1 = proche
+      const y = 285 + depth * 150
+      const r = 3.5 + depth * 4
+      const step = 13 + depth * 12
+      const alpha = 0.3 + depth * 0.25
+      ctx.fillStyle = `rgba(58,50,96,${alpha})`
+      for (let x = 6 + ((row * 9) % step); x < CANVAS_W; x += step) {
+        const bob = Math.sin(now * (2.4 + depth) + x * 0.31 + row * 1.7) * (1.5 + hype * (2 + depth * 3))
         ctx.beginPath()
-        ctx.arc(x, y + bob, 7, 0, Math.PI * 2)
+        ctx.arc(x, y + bob, r, 0, Math.PI * 2)
         ctx.fill()
+        // fan lumineux occasionnel (déterministe, densité liée à la Hype)
+        if (hype > 0.35 && (x * 7 + row * 5) % 37 < 2 + hype * 4) {
+          ctx.fillStyle = (x + row) % 2 ? 'rgba(255,221,0,0.6)' : 'rgba(255,51,102,0.55)'
+          ctx.fillRect(x - 1, y + bob - r - 8, 2.5, 7)
+          ctx.fillStyle = `rgba(58,50,96,${alpha})`
+        }
       }
     }
   }
 
+  // -- ring 2.5D : lattes convergentes, cercle central, poteaux, cordes -----
+
   private drawRing(ctx: CanvasRenderingContext2D) {
-    // Sol du ring en perspective simple
-    ctx.fillStyle = '#241f38'
+    const topY = 560
+    const botY = 790
+    const topL = 40
+    const topR = CANVAS_W - 40
+    const botL = -70
+    const botR = CANVAS_W + 70
+    const vpX = CANVAS_W / 2 // point de fuite
+    const vpY = 250
+
+    // Tablier (mat)
+    const mg = ctx.createLinearGradient(0, topY, 0, botY)
+    mg.addColorStop(0, '#2c2646')
+    mg.addColorStop(1, '#1d1930')
+    ctx.fillStyle = mg
     ctx.beginPath()
-    ctx.moveTo(20, 560)
-    ctx.lineTo(CANVAS_W - 20, 560)
-    ctx.lineTo(CANVAS_W + 60, 780)
-    ctx.lineTo(-60, 780)
+    ctx.moveTo(topL, topY)
+    ctx.lineTo(topR, topY)
+    ctx.lineTo(botR, botY)
+    ctx.lineTo(botL, botY)
     ctx.closePath()
     ctx.fill()
+
+    // Lattes du sol : rayons issus du point de fuite, clippés au tablier.
+    ctx.save()
+    ctx.clip() // le path du tablier est encore actif
+    ctx.strokeStyle = 'rgba(120,110,180,0.22)'
+    ctx.lineWidth = 2
+    for (let i = 0; i <= 8; i++) {
+      const xTop = topL + ((topR - topL) * i) / 8
+      // prolonge la droite (vp → bord haut) jusqu'au bas de l'écran
+      const dx = xTop - vpX
+      const dy = topY - vpY
+      const k = (botY - vpY) / dy
+      ctx.beginPath()
+      ctx.moveTo(xTop, topY)
+      ctx.lineTo(vpX + dx * k, botY)
+      ctx.stroke()
+    }
+    // Traverses horizontales, resserrées vers le haut (profondeur)
+    for (const p of [0.18, 0.42, 0.72]) {
+      const y = topY + (botY - topY) * p
+      ctx.beginPath()
+      ctx.moveTo(0, y)
+      ctx.lineTo(CANVAS_W, y)
+      ctx.stroke()
+    }
+    // Cercle central du ring
+    ctx.strokeStyle = 'rgba(255,51,102,0.35)'
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.ellipse(CANVAS_W / 2, 668, 118, 30, 0, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.strokeStyle = 'rgba(255,221,0,0.25)'
+    ctx.beginPath()
+    ctx.ellipse(CANVAS_W / 2, 668, 62, 15, 0, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.restore()
+
+    // Liseré avant du tablier
     ctx.strokeStyle = '#4a4370'
     ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.moveTo(topL, topY)
+    ctx.lineTo(topR, topY)
     ctx.stroke()
-    // Cordes
-    ctx.strokeStyle = '#ff3366'
-    ctx.lineWidth = 4
-    for (let i = 0; i < 3; i++) {
-      const y = 560 - 40 - i * 34
+
+    // Poteaux de coin + tendeurs
+    for (const side of [-1, 1] as const) {
+      const px = side === -1 ? 22 : CANVAS_W - 22
+      const pg = ctx.createLinearGradient(px - 7, 0, px + 7, 0)
+      pg.addColorStop(0, '#3a3560')
+      pg.addColorStop(0.5, '#6c64a8')
+      pg.addColorStop(1, '#2c2846')
+      ctx.fillStyle = pg
+      ctx.fillRect(px - 7, 415, 14, topY - 415)
+      ctx.fillStyle = '#ff3366'
       ctx.beginPath()
-      ctx.moveTo(14, y)
-      ctx.lineTo(CANVAS_W - 14, y)
+      ctx.arc(px, 415, 9, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
+    // Cordes : légère tension + reflet — attachées aux poteaux.
+    for (let i = 0; i < 3; i++) {
+      const y = topY - 40 - i * 34
+      const sag = 6 - i * 1.5
+      ctx.strokeStyle = i === 1 ? '#ffffff' : '#ff3366'
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.moveTo(22, y)
+      ctx.quadraticCurveTo(CANVAS_W / 2, y + sag, CANVAS_W - 22, y)
+      ctx.stroke()
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)'
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.moveTo(22, y - 1.5)
+      ctx.quadraticCurveTo(CANVAS_W / 2, y + sag - 1.5, CANVAS_W - 22, y - 1.5)
       ctx.stroke()
     }
   }
@@ -299,6 +422,12 @@ export class ArenaRenderer {
     ctx.save()
     ctx.translate(x, groundY)
     ctx.scale(facing * body.scale, body.scale)
+
+    // Ombre portée au sol : ancre le perso dans la perspective du ring.
+    ctx.fillStyle = 'rgba(0,0,0,0.38)'
+    ctx.beginPath()
+    ctx.ellipse(0, 8, 48, 11, 0, 0, Math.PI * 2)
+    ctx.fill()
 
     // Aura de hype
     const hypeRatio = f.hype / HYPE_MAX

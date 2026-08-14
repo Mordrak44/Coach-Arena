@@ -184,6 +184,18 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ### Tier 0 — prouver le fun
+- [x] Passe de rendu 2.5D (fausse perspective, zéro 3D) : horizon lumineux
+      lié à la Hype, projecteurs qui balaient, foule étagée en perspective
+      avec fans à bâtons lumineux, ring à lattes convergentes (point de
+      fuite) + cercle central + poteaux/tendeurs + cordes tendues avec
+      reflet, ombres portées sous les persos, vignette. Vérifiée par
+      captures Chromium headless.
+- [x] Mode démo (?demo : arène directe sans capteurs) + outil de capture
+      scripts/shot.mjs (vite preview + Chromium préinstallé) — press kit
+      et tests visuels automatisés.
+- [x] FIX mobile découvert par la capture : sur les écrans plus étroits
+      que 9:16, l'aspect du .stage cassait et le canvas rognait le HUD
+      (height: min(100vh, 100vw·16/9)).
 - [ ] Playtests humains (10-20 personnes) : fun au 15e match ? points de
       décrochage ? → ajuster avant tout investissement
 - [ ] Intégrer les illustrations Kling au jeu : portraits roster à la
@@ -234,6 +246,16 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-14 (routine) : Passe 2.5D + boucle visuelle fermée — l'arène a
+  de la profondeur (projecteurs, foule en perspective + glowsticks liés à
+  la Hype, lattes vers le point de fuite, poteaux/cordes, ombres,
+  vignette) SANS 3D, dans le canvas existant. Mode ?demo (arène directe
+  sans capteurs) + scripts/shot.mjs : je peux enfin VOIR le jeu depuis la
+  session (captures Chromium headless) — et la première capture a
+  immédiatement révélé un bug mobile réel (HUD rogné sur écrans < 9:16,
+  corrigé). Le rendu est vérifié visuellement à chaque itération
+  désormais.
 
 - 2026-08-14 (autonome) : PWA + vitest — le jeu s'installe sur l'écran
   d'accueil (manifest, icônes CA générées, service worker offline
