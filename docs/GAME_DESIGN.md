@@ -123,6 +123,27 @@ rythme de la voix deviennent du gameplay :
   (chaque perso a les siennes) → collection et rétention, sans rien
   vendre qui touche l'équilibre du direct.
 
+## 4 ter. Vision : tout personnalisable par prompt (notes du 2026-08-14)
+
+- **Cartes par prompt** : le joueur décrit une carte, l'IA la traduit en
+  une combinaison de **primitives d'effets bornées** (soin X %, ±Hype,
+  ×dégâts N s, sabotage adverse…) avec un **budget de puissance** qui
+  fixe automatiquement le coût en Souffle. L'habillage (nom, description
+  WTF, illustration) est libre ; la mécanique reste dans les bornes.
+  Prérequis : la DSL d'effets (roadmap v1 deck).
+- **Lecture fine du coach** : étage actuel = volume + mouvement ; étage
+  suivant = MediaPipe (expressions, gestes) + prosodie (intonation, pas
+  seulement volume). Chaque perso interprète le style du coach selon son
+  trait et son Lien — la matrice s'enrichit.
+- **Perso ou créature : le prompt décide.** Le moteur est agnostique
+  (stats/trait/spécial) ; c'est un choix d'habillage, compatible avec la
+  direction 2D illustrée.
+- **v2 — L'Écurie (maître de gladiateurs)** : 3 combattants, un seul en
+  arène, remplacement au coin du ring = LA décision tactique (format
+  « switch » type Pokémon, pas de mêlée simultanée — illisible à la
+  voix). La collection prend son sens : chaque membre a son trait, son
+  Lien, sa signature. On collectionne des relations, pas des skins.
+
 ## 5. Viralité & partage
 
 - Tout le match est rendu en 9:16 avec la facecam incrustée → capture

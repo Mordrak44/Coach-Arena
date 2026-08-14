@@ -13,6 +13,7 @@ import {
   HYPE_MAX,
 } from '../game/combat'
 import { TIMING_LABEL, getCard } from '../game/cards'
+import { Commentator } from '../game/commentator'
 import { ArenaRenderer, CANVAS_H, CANVAS_W } from '../render/arenaRenderer'
 import { VoiceCoach } from '../systems/voice'
 import { FaceCoach } from '../systems/facecam'
@@ -70,6 +71,7 @@ export default function ArenaScreen({
     highlight: HighlightRecorder
     renderer: ArenaRenderer
     sound: SoundSystem
+    commentator: Commentator
     stream: MediaStream | null
     /** canvas caché : jeu + facecam + watermark — c'est LUI qui est enregistré */
     composite: HTMLCanvasElement
@@ -85,6 +87,7 @@ export default function ArenaScreen({
       highlight: new HighlightRecorder(),
       renderer: new ArenaRenderer(),
       sound: new SoundSystem(),
+      commentator: new Commentator(),
       stream: null,
       composite,
     }
@@ -235,6 +238,10 @@ export default function ArenaScreen({
         }
       }
       sys.sound.setCrowdHype(Math.max(m.player.hype, m.enemy.hype) / HYPE_MAX)
+
+      // Commentateur shōnen : nouvelle ligne → affichée dans le canvas (et le clip)
+      const commentLine = sys.commentator.ingest(m)
+      if (commentLine) sys.renderer.setCommentary(commentLine.text, commentLine.weight, m.t)
 
       // Rendu
       const ctx = canvasRef.current?.getContext('2d')

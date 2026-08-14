@@ -91,8 +91,12 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 
 - [ ] Refonte du flow de match en « scènes » : entrée → coaching → assaut
       (résolution + commentaire) → coaching → … → montage final
-- [ ] Commentateur shōnen : résolution de round → texte narratif immédiat
-      (templates locaux d'abord, API Claude ensuite)
+- [x] Commentateur shōnen v0 : narration temps réel par templates locaux
+      (13 familles d'événements, anti-répétition, rythme contrôlé —
+      silence de 3 s entre lignes mineures, les majeures parlent
+      toujours), dessinée dans le canvas donc présente dans les clips.
+      Toutes les lignes sont datées et conservées → nourriront les
+      prompts des scènes Kling et le montage. API Claude ensuite.
 - [ ] File de génération asynchrone (jobs Kling en arrière-plan, affichage
       quand prêt, fallback arcade si échec/retard)
 - [ ] Portrait de référence par perso (Kling image) — ⚠️ crédits, accord requis
@@ -106,6 +110,11 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 
 ## v2
 
+- [ ] L'Écurie : 3 combattants, remplacement au coin du ring (format
+      switch — voir GAME_DESIGN.md §4 ter), collection de persos
+- [ ] Cartes créées par prompt (DSL bornée + budget de puissance,
+      habillage libre) — prérequis : DSL d'effets v1
+- [ ] Prosodie vocale (intonation, pas seulement volume)
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
@@ -178,3 +187,10 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
   Familles reformulées par timing : Coach / Instant·voix / Instant·pari.
   Équilibrage sain : le deck naïf n'est plus un auto-win (93 % vs 94 %
   sans cartes) — la valeur est dans le choix, plus dans la possession.
+- 2026-08-14 (routine) : Commentateur shōnen v0 (templates FR, poids
+  1-3 pilotant taille/durée d'affichage, bandeau dessiné dans le canvas
+  → visible dans les clips exportés). Test sim : 21 lignes sur un
+  match, placeholders substitués, finale correcte. Vision « tout par
+  prompt » gravée au design doc (§4 ter) : cartes par prompt via DSL
+  bornée + budget de puissance, écurie v2 format switch, perso ou
+  créature au choix du prompt.

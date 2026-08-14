@@ -175,4 +175,33 @@ function makeFightingMatch(playerIdx: number): MatchState {
   console.log('Signature Frénésie OK (armée par la carte, déclenchée à la voix)')
 }
 
+// Commentateur : un match coaché produit une narration avec début et fin.
+{
+  const { Commentator } = await import('../src/game/commentator')
+  const com = new Commentator()
+  const m = createMatch(ROSTER[0], ROSTER[1], buildStarterDeck(null))
+  let roundStart = 0
+  let prevPhase: string = m.phase
+  let lastCmdAt = -10
+  for (let i = 0; i < 60 * 60 * 10 && m.phase !== 'matchEnd'; i++) {
+    let command: any = null
+    if (m.phase === 'fighting' && m.t - lastCmdAt > 4) {
+      command = m.player.hype >= 100 ? 'special' : 'attack'
+      lastCmdAt = m.t
+    }
+    tick(m, 1 / 60, { command, voiceEnergy: 0.6, faceEnergy: 0.5 })
+    com.ingest(m)
+    if (prevPhase !== 'fighting' && m.phase === 'fighting') roundStart = m.t
+    prevPhase = m.phase
+    if (m.phase === 'fighting' && m.t - roundStart > ROUND_TIME_LIMIT) forceRoundTimeout(m)
+    if (m.phase === 'tactics' && m.plan === null) chooseTacticPlan(m, 'pressure')
+  }
+  if (com.lines.length < 5) throw new Error(`commentateur trop discret : ${com.lines.length} lignes`)
+  const last = com.lines[com.lines.length - 1]
+  if (!/TERMINÉ|impose/i.test(last.text)) throw new Error(`dernière ligne inattendue : ${last.text}`)
+  if (com.lines.some(l => /\{[A-Za-z]+\}/.test(l.text)))
+    throw new Error('placeholder non substitué dans la narration')
+  console.log(`Commentateur OK (${com.lines.length} lignes, finit sur : « ${last.text} »)`)
+}
+
 console.log('OK — tous les matchs se terminent.')

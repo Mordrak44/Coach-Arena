@@ -37,6 +37,10 @@ export class ArenaRenderer {
   private crackX = CANVAS_W / 2
   private crackY = 600
   private crackSeed = 1
+  /** ligne du commentateur shōnen */
+  private commentText = ''
+  private commentWeight: 1 | 2 | 3 = 1
+  private commentUntil = 0
 
   /** Consomme les nouveaux events du match pour déclencher les FX. */
   ingestEvents(m: MatchState, now: number) {
@@ -179,6 +183,7 @@ export class ArenaRenderer {
     this.drawFloats(ctx, now)
     this.drawCracks(ctx, now)
     this.drawHUD(ctx, m, roundTimeLeft)
+    this.drawCommentary(ctx, now)
     this.drawSpecialBanner(ctx, now)
 
     // Flash d'impact
@@ -436,6 +441,44 @@ export class ArenaRenderer {
       ctx.fillText(f.text, 0, 0)
       ctx.restore()
     }
+  }
+
+  // -- commentateur shōnen --------------------------------------------------
+
+  setCommentary(text: string, weight: 1 | 2 | 3, now: number) {
+    this.commentText = text
+    this.commentWeight = weight
+    this.commentUntil = now + (weight === 3 ? 4.5 : weight === 2 ? 3.2 : 2.4)
+  }
+
+  private drawCommentary(ctx: CanvasRenderingContext2D, now: number) {
+    if (now >= this.commentUntil || !this.commentText) return
+    const k = this.commentUntil - now
+    const size = this.commentWeight === 3 ? 26 : this.commentWeight === 2 ? 22 : 18
+    ctx.save()
+    ctx.globalAlpha = Math.min(1, k * 3)
+    // Coupe en deux lignes au besoin (au dernier espace avant le milieu)
+    const text = this.commentText
+    let lines: string[] = [text]
+    if (text.length > 34) {
+      const cut = text.lastIndexOf(' ', Math.ceil(text.length / 2) + 6)
+      if (cut > 0) lines = [text.slice(0, cut), text.slice(cut + 1)]
+    }
+    const y0 = 150
+    const h = lines.length * (size + 8) + 14
+    ctx.fillStyle = 'rgba(8,6,16,0.72)'
+    ctx.fillRect(0, y0 - size - 8, CANVAS_W, h)
+    ctx.fillStyle = this.commentWeight === 3 ? '#ffdd00' : '#ffffff'
+    ctx.strokeStyle = '#111'
+    ctx.lineWidth = 4
+    ctx.textAlign = 'center'
+    ctx.font = `900 italic ${size}px sans-serif`
+    lines.forEach((l, i) => {
+      const y = y0 + i * (size + 8)
+      ctx.strokeText(l, CANVAS_W / 2, y)
+      ctx.fillText(l, CANVAS_W / 2, y)
+    })
+    ctx.restore()
   }
 
   // -- écran fissuré (KO) ---------------------------------------------------
