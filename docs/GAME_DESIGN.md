@@ -260,6 +260,46 @@ gratuit / mode cinématique premium. Optimisations possibles : ne générer en
 vidéo que LE moment fort du match (1 clip), images statiques + FX caméra
 pour le reste.
 
+### Modèle de monétisation (proposition chiffrée)
+
+Coûts réels mesurés par action (base : clip Kling 5 s ≈ 0,30 €, appel
+texte Claude < 0,02 €, match arcade = 0 €) :
+
+| Action | Coût réel | Prix en crédits (1 crédit vendu ≈ 0,05 €) |
+| --- | --- | --- |
+| Match arcade + coaching vocal | 0 € | **Gratuit illimité** (le moteur viral) |
+| Création de perso par prompt (Claude + planche Kling) | ~0,05 € | 20 crédits |
+| Forge de carte par prompt | < 0,01 € | 5 crédits |
+| Clip héroïque du KO (1 clip Kling) | ~0,30 € | 25 crédits |
+| Match cinématique complet (5-6 clips) | ~1,50 € | 120 crédits |
+
+**Structure de vente :**
+
+- **Arcade gratuit pour tous, sans achat** — non négociable : la boucle
+  virale TikTok (clic sur un clip → je joue immédiatement) meurt si
+  l'entrée est payante.
+- **Pass Coach ~9,99 €** = mode histoire complet + 300 crédits de départ
+  + accès Forge. Les cinématiques du mode histoire sont générées **une
+  seule fois à l'écriture** et servies à tous les joueurs : coût fixe
+  amorti, pas un coût par joueur. Seul le contenu personnalisé (ton
+  perso, tes clips) coûte à l'unité. 300 crédits ≈ 3-4 créations de
+  persos + une poignée de clips héroïques, ou 2 matchs cinématiques.
+  Marge plancher : ~7 € nets (après commission store) − ~3,75 € de coût
+  si TOUS les crédits sont dépensés → toujours positif.
+- **Recharges** : 100 cr = 4,99 € · 250 cr = 9,99 € · 600 cr = 19,99 €.
+
+**Crédits gagnés en PvP — garde-fous obligatoires** (chaque crédit
+gagné est un coût réel quand il est dépensé) :
+
+- Double monnaie légère : le PvP rapporte des **Éclats** dépensables
+  uniquement sur les actions à coût Claude (forge, création de perso) —
+  coût réel en centimes, valeur perçue forte.
+- Le contenu adossé à Kling ne se gagne que borné : **1 clip héroïque
+  gratuit / jour** pour une victoire PvP. Ce n'est pas une perte : le
+  clip watermarké partagé sur TikTok EST la publicité — c'est un budget
+  d'acquisition, pas un cadeau.
+- Jamais de conversion Éclats → crédits durs.
+
 ## 8. Jalons
 
 - **v0 (prototype jouable)** : roster + création par mots-clés, combat BO3
