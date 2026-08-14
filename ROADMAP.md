@@ -47,8 +47,13 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       42 %, coach + carnet 93 %. Coach fantôme adverse renforcé (trickle de
       Hype + lecture des postures). Durée de round pas encore mesurée.
 - [ ] Cartes signatures par perso (débloquées par paliers de Lien)
-- [ ] Mesurer/ajuster la durée moyenne des rounds (cible 45-60 s)
-- [ ] Sons : impacts, foule, gong de round (WebAudio, généré)
+- [x] Mesurer/ajuster la durée moyenne des rounds : 7 s → 36,5 s de
+      moyenne (médiane 40 s, 22 % de décisions aux points à 60 s).
+      Accepté comme « proche de la cible » ; à revoir après playtests réels.
+- [x] Sons : impacts, foule, gong de round (WebAudio, généré) — synthèse
+      complète (impacts/crit, garde, esquive, contre, riser+explosion de
+      spécial, gong battant, KO, jingle Hype, cartes, foule liée à la
+      Hype), bouton muet dans l'arène
 - [ ] FX supplémentaires : zoom dramatique sur special, écran fissuré au KO
 - [ ] Replay du moment fort en fin de match (buffer des 8 dernières secondes)
 - [ ] Incruster la facecam DANS le clip exporté (composite canvas)
@@ -110,3 +115,13 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
   Équilibrage passe 1 : Hype continue du joueur ~20 s pour remplir la
   jauge (avant ~6 s), coach fantôme adverse avec trickle de Hype et
   contre-postures → coach parfait 100 % → 80 %.
+- 2026-08-13 (routine h+4) : Bande-son WebAudio 100 % synthétisée (zéro
+  asset) branchée sur les events du match, foule qui gronde avec la Hype,
+  bouton muet. Équilibrage passe 2 — découverte : rounds de 7 s ! Refonte
+  des dégâts (baseDamage, HP_SCALE 2.6, spéciaux ~40-50 % de la vie,
+  contres 11) → rounds ~37 s. Découverte n°2 : le perso non coaché ne
+  tirait JAMAIS son spécial (il attendait l'ordre) → mécanique
+  d'initiative : jauge pleine + coach muet 6 s → il tire seul ; le skill
+  du coach devient le timing. Résultats : coach parfait 88 %, sans coach
+  40 %, avec carnet 97 % (cartes à surveiller). Auto-motivation de Hype
+  symétrique pour les deux camps.

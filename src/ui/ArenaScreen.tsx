@@ -15,6 +15,7 @@ import { ArenaRenderer, CANVAS_H, CANVAS_W } from '../render/arenaRenderer'
 import { VoiceCoach } from '../systems/voice'
 import { FaceCoach } from '../systems/facecam'
 import { MatchRecorder } from '../systems/recorder'
+import { SoundSystem } from '../systems/sound'
 
 export interface MatchOutcome {
   winner: 'player' | 'enemy'
@@ -59,6 +60,7 @@ export default function ArenaScreen({
     face: FaceCoach
     recorder: MatchRecorder
     renderer: ArenaRenderer
+    sound: SoundSystem
     stream: MediaStream | null
   }>()
   if (!sysRef.current) {
@@ -67,6 +69,7 @@ export default function ArenaScreen({
       face: new FaceCoach(),
       recorder: new MatchRecorder(),
       renderer: new ArenaRenderer(),
+      sound: new SoundSystem(),
       stream: null,
     }
   }
@@ -81,6 +84,7 @@ export default function ArenaScreen({
   const [tacticsLeft, setTacticsLeft] = useState(0)
   const [speechEnergy, setSpeechEnergy] = useState(0)
   const [specialReady, setSpecialReady] = useState(false)
+  const [muted, setMuted] = useState(false)
 
   // -- setup : médias + boucle de jeu ---------------------------------------
   useEffect(() => {
@@ -90,6 +94,9 @@ export default function ArenaScreen({
     let last = performance.now()
     let roundStart = 0
     let finished = false
+    let soundEventIdx = 0
+
+    sys.sound.start()
 
     const setup = async () => {
       // Micro + caméra ; on tolère chaque refus séparément.
@@ -163,6 +170,47 @@ export default function ArenaScreen({
       setSpecialReady(m.player.hype >= HYPE_MAX)
       setHeard(sys.voice.state.lastHeard)
 
+      // --- Bande-son : consomme les nouveaux événements du match ---
+      for (; soundEventIdx < m.events.length; soundEventIdx++) {
+        const ev = m.events[soundEventIdx]
+        switch (ev.kind) {
+          case 'hit':
+            sys.sound.hit(ev.crit)
+            break
+          case 'blocked':
+            sys.sound.block()
+            break
+          case 'dodged':
+            sys.sound.dodge()
+            break
+          case 'countered':
+            sys.sound.counter()
+            break
+          case 'special':
+            sys.sound.special()
+            break
+          case 'confused':
+            sys.sound.confused()
+            break
+          case 'hypeFull':
+            sys.sound.hypeFull()
+            break
+          case 'card':
+            sys.sound.cardPlay()
+            break
+          case 'roundStart':
+            sys.sound.gong()
+            break
+          case 'roundEnd':
+            sys.sound.gong()
+            break
+          case 'matchEnd':
+            sys.sound.ko()
+            break
+        }
+      }
+      sys.sound.setCrowdHype(Math.max(m.player.hype, m.enemy.hype) / HYPE_MAX)
+
       // Rendu
       const ctx = canvasRef.current?.getContext('2d')
       if (ctx) {
@@ -197,6 +245,7 @@ export default function ArenaScreen({
       sys.voice.stop()
       sys.face.stop()
       sys.recorder.stop()
+      sys.sound.stop()
       sys.stream?.getTracks().forEach(t => t.stop())
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -218,9 +267,34 @@ export default function ArenaScreen({
     }
   }
 
+  const toggleMute = () => {
+    const next = !muted
+    setMuted(next)
+    sysRef.current!.sound.setMuted(next)
+  }
+
   return (
     <div className="arenaWrap">
       <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} />
+
+      <button
+        onClick={toggleMute}
+        aria-label={muted ? 'Activer le son' : 'Couper le son'}
+        style={{
+          position: 'absolute',
+          top: 8,
+          left: 8,
+          zIndex: 6,
+          background: 'rgba(0,0,0,0.45)',
+          border: 'none',
+          borderRadius: 8,
+          fontSize: '1.05rem',
+          padding: '4px 8px',
+          cursor: 'pointer',
+        }}
+      >
+        {muted ? '🔇' : '🔊'}
+      </button>
 
       {camOk && (
         <>

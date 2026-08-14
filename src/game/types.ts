@@ -116,6 +116,8 @@ export interface FighterState {
   lastOrderAt: number
   /** nombre d'ordres de posture reçus ce round (trait Têtu) */
   ordersThisRound: number
+  /** jauge pleine depuis cet instant ; passé un délai, le perso tire seul (0 = pas pleine) */
+  hypeFullSince: number
   /** position x normalisée 0..1 dans l'arène */
   x: number
   /** 1 = regarde à droite, -1 = à gauche */

@@ -23,6 +23,11 @@ export const HYPE_MAX = 100
 export const CONFUSION_ORDER_WINDOW = 2 // s : deux ordres à moins de 2 s = confusion
 export const CONFUSION_DURATION = 3
 
+/** Dégâts de base d'un coup normal — calibré pour des rounds de 45-60 s. */
+function baseDamage(atk: number): number {
+  return 2 + atk * 0.6
+}
+
 const STANCE_MODS: Record<Stance, { atk: number; def: number; dodge: number }> = {
   neutral: { atk: 1, def: 1, dodge: 0.08 },
   aggressive: { atk: 1.45, def: 0.7, dodge: 0.05 },
@@ -42,11 +47,15 @@ const PLAN_EFFECTS: Record<TacticPlan, { stance: Stance; atk: number; def: numbe
 // Création
 // ---------------------------------------------------------------------------
 
+/** Les PV affichés (stat) sont multipliés en combat pour tenir la durée de round cible. */
+const HP_SCALE = 2.6
+
 function makeFighter(char: Character, side: 'player' | 'enemy'): FighterState {
+  const hp = Math.round(char.stats.hp * HP_SCALE)
   return {
     char,
-    hp: char.stats.hp,
-    maxHp: char.stats.hp,
+    hp,
+    maxHp: hp,
     hype: 0,
     stance: 'neutral',
     confusedUntil: 0,
@@ -54,6 +63,7 @@ function makeFighter(char: Character, side: 'player' | 'enemy'): FighterState {
     nextActionAt: 0,
     lastOrderAt: -10,
     ordersThisRound: 0,
+    hypeFullSince: 0,
     x: side === 'player' ? 0.28 : 0.72,
     facing: side === 'player' ? 1 : -1,
     anim: { kind: 'idle', until: 0 },
@@ -228,7 +238,7 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
       counterMul *= 2
       m.events.push({ kind: 'cardProc', t: m.t, text: 'CONTRE PARFAIT !!' })
     }
-    const dmg = Math.round((6 + d.char.stats.atk * 1.6) * counterMul)
+    const dmg = Math.round((3 + d.char.stats.atk * 0.7) * counterMul)
     a.hp = Math.max(0, a.hp - dmg)
     a.anim = { kind: 'hurt', until: m.t + 0.4 }
     d.anim = { kind: 'attack', until: m.t + 0.35 }
@@ -248,7 +258,7 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
 
   // Bonus du plan tactique du joueur (actif jusqu'à la fin du round)
   const plan = m.plan ? PLAN_EFFECTS[m.plan] : null
-  const base = 5 + a.char.stats.atk * 1.5
+  const base = baseDamage(a.char.stats.atk)
   const crit = Math.random() < 0.12 + (a.stance === 'aggressive' ? 0.08 : 0)
   let dmg = base * aMod.atk * (crit ? 1.7 : 1)
   if (plan && atkSide === 'player') dmg *= plan.atk
@@ -283,7 +293,8 @@ function fireSpecial(m: MatchState, side: 'player' | 'enemy'): void {
   a.hype = 0
   a.anim = { kind: 'special', until: m.t + 1.2 }
   const dMod = STANCE_MODS[d.stance]
-  let dmg = (5 + a.char.stats.atk * 1.5) * a.char.special.power
+  // Un spécial est un haymaker : ~40-50 % de la vie d'un perso moyen.
+  let dmg = baseDamage(a.char.stats.atk) * a.char.special.power * 2.2
   dmg *= 1 - Math.min(0.4, (d.char.stats.def * dMod.def) / 40) // les specials percent la garde
   d.hp = Math.max(0, d.hp - Math.round(dmg))
   d.anim = { kind: 'hurt', until: m.t + 0.8 }
@@ -309,7 +320,7 @@ function pick<T>(arr: T[]): T {
 function enemyCoachAI(m: MatchState, dt: number): void {
   const e = m.enemy
   // Le coach fantôme encourage son poulain en continu (équivalent voix+visage).
-  e.hype = Math.min(HYPE_MAX, e.hype + 2.5 * dt * (0.5 + e.char.stats.hrt / 12))
+  e.hype = Math.min(HYPE_MAX, e.hype + 1.2 * dt * (0.5 + e.char.stats.hrt / 12))
   // Provoqué : agressif verrouillé, n'écoute plus son coach.
   if (m.t < m.mods.provokedUntil) {
     e.stance = 'aggressive'
@@ -382,12 +393,27 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
   } else if (p.char.trait === 'sanguin' && input.voiceEnergy > 0.55) {
     voiceW = 0.9
   }
+  // Auto-motivation de base : même sans coach, un combattant se bat
+  // (symétrique du trickle du coach fantôme adverse).
+  p.hype = Math.min(HYPE_MAX, p.hype + 1.2 * dt * hrtScale)
+
   const energy = input.voiceEnergy * voiceW + input.faceEnergy * faceW
   if (energy > 0.15) {
     const wasFull = p.hype >= HYPE_MAX
-    // Une énergie soutenue (~0,65) remplit la jauge en ~20 s.
-    p.hype = Math.min(HYPE_MAX, p.hype + energy * 7 * hrtScale * dt)
+    // Une énergie soutenue (~0,65) remplit la jauge en ~35 s (auto-motivation incluse).
+    p.hype = Math.min(HYPE_MAX, p.hype + energy * 4 * hrtScale * dt)
     if (!wasFull && p.hype >= HYPE_MAX) m.events.push({ kind: 'hypeFull', t: m.t, who: 'player' })
+  }
+
+  // Initiative : jauge pleine et coach silencieux → le perso tire seul.
+  // Le skill du coach, c'est de crier « SPÉCIAL ! » au meilleur moment avant ça.
+  if (p.hype >= HYPE_MAX) {
+    if (p.hypeFullSince === 0) p.hypeFullSince = m.t
+    else if (m.t - p.hypeFullSince > 6 && m.t >= p.confusedUntil) {
+      fireSpecial(m, 'player')
+    }
+  } else {
+    p.hypeFullSince = 0
   }
 
   // Dernière Chance : sous 15 % PV, la Hype se remplit d'un coup (une fois).

@@ -16,6 +16,9 @@ interface SimOptions {
   deck?: CardId[]
 }
 
+/** Durées de round collectées sur l'ensemble des matchs simulés. */
+const roundDurations: number[] = []
+
 function runMatch(opts: SimOptions): { winner: 'player' | 'enemy'; cardProcs: number } {
   // Matchup aléatoire pour mesurer l'équilibrage global, pas un duel précis.
   const pi = Math.floor(Math.random() * ROSTER.length)
@@ -48,6 +51,7 @@ function runMatch(opts: SimOptions): { winner: 'player' | 'enemy'; cardProcs: nu
       if (m.events[seenEvents].kind === 'cardProc') cardProcs++
     }
     if (prevPhase !== 'fighting' && m.phase === 'fighting') roundStart = m.t
+    if (prevPhase === 'fighting' && m.phase !== 'fighting') roundDurations.push(m.t - roundStart)
     prevPhase = m.phase
     if (m.phase === 'fighting' && m.t - roundStart > ROUND_TIME_LIMIT) forceRoundTimeout(m)
     if (m.phase === 'tactics') {
@@ -61,7 +65,7 @@ function runMatch(opts: SimOptions): { winner: 'player' | 'enemy'; cardProcs: nu
   throw new Error(`match non terminé : phase=${m.phase} t=${m.t.toFixed(1)}`)
 }
 
-const N = 60
+const N = 100
 let coachedWins = 0
 let idleWins = 0
 let deckWins = 0
@@ -81,6 +85,15 @@ console.log(`Coach actif, sans cartes : ${coachedWins}/${N} (${Math.round((coach
 console.log(`Coach absent            : ${idleWins}/${N} (${Math.round((idleWins / N) * 100)}%)`)
 console.log(`Coach actif + carnet    : ${deckWins}/${N} (${Math.round((deckWins / N) * 100)}%)`)
 console.log(`Déclenchements de cartes armées/conditionnelles : ${totalProcs} sur ${N} matchs`)
+
+roundDurations.sort((a, b) => a - b)
+const avg = roundDurations.reduce((s, d) => s + d, 0) / roundDurations.length
+const med = roundDurations[Math.floor(roundDurations.length / 2)]
+const timeouts = roundDurations.filter(d => d >= ROUND_TIME_LIMIT - 0.1).length
+console.log(
+  `Durée de round : moyenne ${avg.toFixed(1)} s, médiane ${med.toFixed(1)} s, ` +
+    `timeouts ${timeouts}/${roundDurations.length} (cible 45-60 s)`,
+)
 
 // Sanity création par prompt
 const c = createFromPrompt('un vieux maître cyborg ultra rapide mais fragile, appelé Zenko')
