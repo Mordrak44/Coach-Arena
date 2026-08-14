@@ -106,10 +106,14 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       (anti-triche), total borné 12-60 avec blocage du lancement si
       invalide, réinitialisation. Signature/paliers/forgées s'ajoutent
       par-dessus : ça se mérite, ça ne se configure pas.
-- [x] L'IA adverse joue au coin du ring (v0 : sous-ensemble Coach — soin
-      si < 40 % PV, Douche Froide si ta Hype > 60, sinon auto-moral ;
-      annoncé par événement, donc lisible et à terme bloquable). v1 :
-      vrai deck adverse complet avec mods symétriques.
+- [x] L'IA adverse joue au coin du ring — v1 : VRAI deck adverse complet
+      (starter + sa carte signature, pioche/Souffle/défausse identiques au
+      joueur), heuristique situationnelle par primitive DSL, mods
+      100 % symétriques (enemyMods) : Garde de Fer, frénésie, contres
+      armés, Dernière Chance et même la Provocation fonctionnent dans les
+      deux sens — provoqué, TON perso se verrouille agressif et n'écoute
+      plus. Chaque carte adverse reste annoncée (lisible, à terme
+      bloquable).
 - [x] Effets de cartes paramétrés en données (DSL) — 14 primitives
       (soins, Hype, sabotage, réductions, armements vocaux, paris),
       coût en Souffle calculé par budget de puissance (reproduit
@@ -163,7 +167,17 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 
 ## Journal
 
-- 2026-08-14 (routine) : Silhouettes par archétype (6 morphologies, 6
+- 2026-08-14 (routine) : Le coin adverse joue un VRAI deck — enemyDeck/
+  enemyHand/enemySouffle symétriques, applyCardEffects paramétré par camp,
+  mods des deux côtés dans resolveAttack/fireSpecial/tick (procs suffixés
+  « ADVERSE » à l'écran), heuristique de valeur par primitive au coin du
+  ring, signature de l'adversaire dans son deck. Provocation adverse :
+  ton perso se verrouille agressif et refuse tes ordres. Piège mesuré en
+  sim : donner une fenêtre de contre à chaque posture de l'IA → winrate
+  coach 0 % ; restreinte aux contres armés par carte → coach+deck 86 %,
+  coach sans cartes 76 % (le deck redevient un vrai avantage), sans
+  coach 13 %. Modèle de monétisation gravé au design doc (Pass Coach
+  9,99 € = histoire + 300 crédits, grille par action, Éclats PvP bornés). (6 morphologies, 6
   attributs animés, fentes d'action, danse de garde) — dernier gros
   item v0.5 hors vitest. Le placeholder vectoriel a maintenant de la
   personnalité en attendant les illustrations Kling.

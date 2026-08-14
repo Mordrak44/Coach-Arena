@@ -1,6 +1,7 @@
 import type {
   CardId,
   Character,
+  CoachCard,
   EffectPrimitive,
   CoachCommand,
   CoachInput,
@@ -10,7 +11,7 @@ import type {
   Stance,
   TacticPlan,
 } from './types'
-import { buildStarterDeck, getCard, shuffle } from './cards'
+import { buildStarterDeck, getCard, shuffle, signatureFor } from './cards'
 
 // ---------------------------------------------------------------------------
 // Constantes d'équilibrage
@@ -142,10 +143,16 @@ export function createMatch(
     mulliganUsed: false,
     sulky: opts.sulky ?? false,
     mods: freshMods(),
+    enemyDeck: shuffle(buildStarterDeck(signatureFor(enemyChar.id))),
+    enemyHand: [],
+    enemyDiscard: [],
+    enemySouffle: SOUFFLE_PER_CORNER,
+    enemyMods: freshMods(),
     events: [{ kind: 'roundStart', t: 0, round: 1 }],
   }
   m.player.hype = Math.min(HYPE_MAX, opts.startHype ?? 0)
   drawCards(m, HAND_SIZE)
+  drawEnemyCards(m, HAND_SIZE)
   return m
 }
 
@@ -162,6 +169,18 @@ export function drawCards(m: MatchState, n: number): void {
       m.discard = []
     }
     m.hand.push(m.deck.shift()!)
+  }
+}
+
+/** Pioche du coin adverse — mêmes règles que le joueur (défausse remélangée). */
+function drawEnemyCards(m: MatchState, n: number): void {
+  while (n-- > 0 && m.enemyHand.length < HAND_SIZE) {
+    if (m.enemyDeck.length === 0) {
+      if (m.enemyDiscard.length === 0) return
+      m.enemyDeck = shuffle(m.enemyDiscard)
+      m.enemyDiscard = []
+    }
+    m.enemyHand.push(m.enemyDeck.shift()!)
   }
 }
 
@@ -207,54 +226,66 @@ export function freshMods(): MatchState['mods'] {
   }
 }
 
-/** Applique les primitives d'une carte sur l'état des mods (DSL → runtime). */
-function applyCardEffects(m: MatchState, effects: EffectPrimitive[]): void {
+/** Mods du camp donné (le joueur et le coin adverse en ont un chacun). */
+function modsOf(m: MatchState, side: 'player' | 'enemy'): MatchState['mods'] {
+  return side === 'player' ? m.mods : m.enemyMods
+}
+
+/**
+ * Applique les primitives d'une carte sur l'état runtime (DSL → runtime),
+ * du point de vue du camp qui la joue : « soi » et « l'adversaire » sont
+ * relatifs, les mods vont dans ceux du camp joueur de la carte.
+ */
+function applyCardEffects(m: MatchState, effects: EffectPrimitive[], side: 'player' | 'enemy'): void {
+  const self = side === 'player' ? m.player : m.enemy
+  const foe = side === 'player' ? m.enemy : m.player
+  const mods = modsOf(m, side)
   for (const e of effects) {
     switch (e.kind) {
       case 'heal':
-        m.player.hp = Math.min(m.player.maxHp, m.player.hp + Math.round(m.player.maxHp * e.pct))
+        self.hp = Math.min(self.maxHp, self.hp + Math.round(self.maxHp * e.pct))
         break
       case 'hype':
-        m.player.hype = Math.min(HYPE_MAX, m.player.hype + e.amount)
+        self.hype = Math.min(HYPE_MAX, self.hype + e.amount)
         break
       case 'enemyHype':
-        m.enemy.hype = Math.max(0, Math.min(HYPE_MAX, m.enemy.hype + e.amount))
+        foe.hype = Math.max(0, Math.min(HYPE_MAX, foe.hype + e.amount))
         break
       case 'damageReduction':
-        m.mods.damageReductionMul = Math.min(m.mods.damageReductionMul, e.mul)
+        mods.damageReductionMul = Math.min(mods.damageReductionMul, e.mul)
         break
       case 'dodgeBonus':
-        m.mods.dodgeBonus += e.add
+        mods.dodgeBonus += e.add
         break
       case 'immuneConfusion':
-        m.mods.immuneConfusion = true
+        mods.immuneConfusion = true
         break
       case 'armCounterMul':
-        m.mods.armedCounterMul = e.mul
+        mods.armedCounterMul = e.mul
         break
       case 'armCheerHype':
-        m.mods.armedCheerHype = e.amount
+        mods.armedCheerHype = e.amount
         break
       case 'armAttackFrenzy':
-        m.mods.armedFrenzyMul = e.mul
-        m.mods.armedFrenzyDuration = e.duration
+        mods.armedFrenzyMul = e.mul
+        mods.armedFrenzyDuration = e.duration
         break
       case 'lowHpHypeFull':
-        m.mods.lowHpThreshold = e.threshold
+        mods.lowHpThreshold = e.threshold
         break
       case 'provoke':
-        m.mods.provokedUntil = -1 // prend effet au démarrage du round suivant
+        mods.provokedUntil = -1 // prend effet au démarrage du round suivant
         break
       case 'counterHype':
-        m.mods.counterHypeAmount = e.amount
+        mods.counterHypeAmount = e.amount
         break
       case 'hitsTakenHype':
-        m.mods.hitsTakenTarget = e.hits
-        m.mods.hitsTakenHype = e.amount
-        m.mods.hitsTakenCount = 0
+        mods.hitsTakenTarget = e.hits
+        mods.hitsTakenHype = e.amount
+        mods.hitsTakenCount = 0
         break
       case 'halveEnemySpecial':
-        m.mods.halveEnemySpecial = true
+        mods.halveEnemySpecial = true
         break
     }
   }
@@ -272,7 +303,7 @@ export function playCard(m: MatchState, id: CardId): boolean {
   m.souffle -= card.cost
   m.events.push({ kind: 'card', t: m.t, name: card.name })
 
-  applyCardEffects(m, card.effects)
+  applyCardEffects(m, card.effects, 'player')
   return true
 }
 
@@ -337,6 +368,11 @@ function applyCommand(m: MatchState, cmd: CoachCommand, voiceEnergy: number): vo
 
   const stance = COMMAND_STANCE[cmd]
   if (stance) {
+    // Provoqué par une carte adverse : verrouillé agressif, sourd au coach.
+    if (m.t < m.enemyMods.provokedUntil) {
+      m.events.push({ kind: 'trait', t: m.t, text: `${f.char.name.toUpperCase()} EST PROVOQUÉ·E !`, color: '#ff7675' })
+      return
+    }
     f.ordersThisRound++
     // Boudeur (Vie d'Écurie) : le premier ordre du match passe à la trappe.
     if (m.sulky) {
@@ -389,6 +425,10 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
   const defSide = atkSide === 'player' ? 'enemy' : 'player'
   const aMod = STANCE_MODS[a.stance]
   const dMod = STANCE_MODS[d.stance]
+  const atkMods = modsOf(m, atkSide)
+  const defMods = modsOf(m, defSide)
+  // suffixe des procs de cartes adverses : le joueur doit savoir qui proc
+  const adv = defSide === 'enemy' ? ' ADVERSE' : ''
 
   a.anim = { kind: 'attack', until: m.t + 0.35 }
 
@@ -396,16 +436,16 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
   if (m.t < d.counterUntil) {
     d.counterUntil = 0
     let counterMul = 1.3
-    if (defSide === 'player' && m.mods.armedCounterMul > 0) {
-      counterMul *= m.mods.armedCounterMul
-      m.mods.armedCounterMul = 0
-      m.events.push({ kind: 'cardProc', t: m.t, text: 'CONTRE PARFAIT !!' })
+    if (defMods.armedCounterMul > 0) {
+      counterMul *= defMods.armedCounterMul
+      defMods.armedCounterMul = 0
+      m.events.push({ kind: 'cardProc', t: m.t, text: `CONTRE PARFAIT${adv} !!` })
     }
     // Orgueil du Rival (Rei) : humilier remplit la Hype.
-    if (defSide === 'player' && m.mods.counterHypeAmount > 0) {
-      d.hype = Math.min(HYPE_MAX, d.hype + m.mods.counterHypeAmount)
-      m.mods.counterHypeAmount = 0
-      m.events.push({ kind: 'cardProc', t: m.t, text: 'ORGUEIL DU RIVAL !!' })
+    if (defMods.counterHypeAmount > 0) {
+      d.hype = Math.min(HYPE_MAX, d.hype + defMods.counterHypeAmount)
+      defMods.counterHypeAmount = 0
+      m.events.push({ kind: 'cardProc', t: m.t, text: `ORGUEIL DU RIVAL${adv} !!` })
     }
     const dmg = Math.round((3 + d.char.stats.atk * 0.7) * counterMul)
     a.hp = Math.max(0, a.hp - dmg)
@@ -416,8 +456,8 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
     return
   }
 
-  // Esquive (Pas de l'Ombre : +15 % pour le joueur)
-  const shadowBonus = defSide === 'player' ? m.mods.dodgeBonus : 0
+  // Esquive (Pas de l'Ombre & co — bonus du camp défenseur)
+  const shadowBonus = defMods.dodgeBonus
   const dodgeChance =
     dMod.dodge + shadowBonus + d.char.stats.spd * 0.012 - (m.t < d.confusedUntil ? 0.08 : 0)
   if (Math.random() < dodgeChance) {
@@ -437,8 +477,8 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
   const mitigation = 1 - Math.min(0.65, (d.char.stats.def * dMod.def * defPlanMul) / 24)
   dmg *= mitigation
   if (m.t < a.confusedUntil) dmg *= 0.7
-  if (defSide === 'player') dmg *= m.mods.damageReductionMul // Garde de Fer & co
-  if (atkSide === 'player' && m.t < m.mods.frenzyUntil) dmg *= Math.max(1.1, m.mods.armedFrenzyMul) // Frénésie
+  dmg *= defMods.damageReductionMul // Garde de Fer & co (camp défenseur)
+  if (m.t < atkMods.frenzyUntil) dmg *= Math.max(1.1, atkMods.armedFrenzyMul) // Frénésie
 
   const blocked = d.stance === 'defensive' && Math.random() < 0.35
   if (blocked) {
@@ -457,12 +497,12 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
   chargeUlti(m, a, dmg, false)
   chargeUlti(m, d, dmg, true)
   // Cœur Vaillant (Kenta) : la douleur le nourrit.
-  if (defSide === 'player' && m.mods.hitsTakenTarget > 0) {
-    m.mods.hitsTakenCount++
-    if (m.mods.hitsTakenCount >= m.mods.hitsTakenTarget) {
-      d.hype = Math.min(HYPE_MAX, d.hype + m.mods.hitsTakenHype)
-      m.mods.hitsTakenTarget = 0
-      m.events.push({ kind: 'cardProc', t: m.t, text: 'CŒUR VAILLANT !!' })
+  if (defMods.hitsTakenTarget > 0) {
+    defMods.hitsTakenCount++
+    if (defMods.hitsTakenCount >= defMods.hitsTakenTarget) {
+      d.hype = Math.min(HYPE_MAX, d.hype + defMods.hitsTakenHype)
+      defMods.hitsTakenTarget = 0
+      m.events.push({ kind: 'cardProc', t: m.t, text: `CŒUR VAILLANT${adv} !!` })
     }
   }
   const onoma = crit ? pick(['DOKAN!!', 'BAKOOM!', 'GYAAA!']) : pick(['BAM!', 'PAF!', 'DOGO!', 'BISHI!'])
@@ -479,11 +519,17 @@ function fireSpecial(m: MatchState, side: 'player' | 'enemy'): void {
   // Un spécial est un haymaker : ~40-50 % de la vie d'un perso moyen.
   let dmg = baseDamage(a.char.stats.atk) * a.char.special.power * 2.2
   dmg *= 1 - Math.min(0.4, (d.char.stats.def * dMod.def) / 40) // les specials percent la garde
-  // Leçon d'Expérience (Gorō) : il a vu venir le premier spécial adverse.
-  if (side === 'enemy' && m.mods.halveEnemySpecial) {
-    m.mods.halveEnemySpecial = false
+  // Leçon d'Expérience (Gorō) : le camp qui encaisse a vu venir le premier
+  // spécial adverse (mods du défenseur, symétrique).
+  const specDefMods = modsOf(m, defSide)
+  if (specDefMods.halveEnemySpecial) {
+    specDefMods.halveEnemySpecial = false
     dmg *= 0.5
-    m.events.push({ kind: 'cardProc', t: m.t, text: "LEÇON D'EXPÉRIENCE !!" })
+    m.events.push({
+      kind: 'cardProc',
+      t: m.t,
+      text: defSide === 'enemy' ? "LEÇON D'EXPÉRIENCE ADVERSE !!" : "LEÇON D'EXPÉRIENCE !!",
+    })
   }
   d.hp = Math.max(0, d.hp - Math.round(dmg))
   d.anim = { kind: 'hurt', until: m.t + 0.8 }
@@ -496,7 +542,6 @@ function fireSpecial(m: MatchState, side: 'player' | 'enemy'): void {
     onoma: a.char.special.onomatopoeia,
     dmg: Math.round(dmg),
   })
-  void defSide
 }
 
 function pick<T>(arr: T[]): T {
@@ -508,22 +553,91 @@ function pick<T>(arr: T[]): T {
 // ---------------------------------------------------------------------------
 
 /**
- * Le coin adverse joue SA carte au coin du ring (sous-ensemble « Coach » :
- * soin, moral, sabotage). Lisible par le joueur via l'événement — et à terme
- * bloquable par des cartes d'interaction.
+ * Valeur situationnelle d'une carte pour le coin adverse — l'heuristique du
+ * coach fantôme. Somme par primitive, comparable au coût en Souffle.
  */
-export function enemyCornerPlay(m: MatchState): void {
+function enemyCardValue(m: MatchState, card: CoachCard): number {
   const e = m.enemy
   const p = m.player
-  if (e.hp / e.maxHp < 0.4) {
-    e.hp = Math.min(e.maxHp, e.hp + Math.round(e.maxHp * 0.12))
-    m.events.push({ kind: 'card', t: m.t, name: 'Second Souffle (coin adverse)' })
-  } else if (p.hype > 60) {
-    p.hype = Math.max(0, p.hype - 20)
-    m.events.push({ kind: 'card', t: m.t, name: 'Douche Froide (coin adverse)' })
-  } else {
-    e.hype = Math.min(HYPE_MAX, e.hype + 15)
-    m.events.push({ kind: 'card', t: m.t, name: 'Mise au Point (coin adverse)' })
+  let v = 0
+  for (const ef of card.effects) {
+    switch (ef.kind) {
+      case 'heal': {
+        const missing = 1 - e.hp / e.maxHp
+        v += ef.pct * 10 * (missing > 0.35 ? 2 : missing > 0.15 ? 1 : 0)
+        break
+      }
+      case 'hype':
+        v += e.hype < 75 ? ef.amount / 15 : 0
+        break
+      case 'enemyHype': // sabotage : vise le joueur
+        v += p.hype > 50 ? Math.abs(ef.amount) / 15 : 0
+        break
+      case 'damageReduction':
+        v += (1 - ef.mul) * 4
+        break
+      case 'dodgeBonus':
+        v += ef.add * 10
+        break
+      case 'immuneConfusion':
+        break // l'adversaire ne peut pas être confus : carte morte pour lui
+      case 'armCounterMul':
+        v += 0.5 // son coach fantôme prend parfois la posture contre
+        break
+      case 'armCheerHype':
+        v += 0.5
+        break
+      case 'armAttackFrenzy':
+        v += 1
+        break
+      case 'lowHpHypeFull':
+        v += e.hp / e.maxHp < 0.5 ? 1.4 : 0.6
+        break
+      case 'provoke':
+        v += 1.3 // verrouiller le perso du joueur, sourd à son coach : fort
+        break
+      case 'counterHype':
+        v += 0.4
+        break
+      case 'hitsTakenHype':
+        v += 0.7
+        break
+      case 'halveEnemySpecial':
+        v += p.hype > 60 ? 1.6 : 0.6
+        break
+    }
+  }
+  return v
+}
+
+/**
+ * Le coin adverse joue son VRAI deck au coin du ring : Souffle rechargé,
+ * main recomplétée, puis il joue gloutonnement la meilleure carte abordable
+ * tant que la situation le justifie. Chaque carte est annoncée par un
+ * événement — lisible par le joueur, et à terme bloquable.
+ */
+export function enemyCornerPlay(m: MatchState): void {
+  m.enemySouffle = SOUFFLE_PER_CORNER
+  drawEnemyCards(m, HAND_SIZE - m.enemyHand.length)
+  for (;;) {
+    let best: CardId | null = null
+    let bestValue = 0.75 // seuil : en dessous, il garde son Souffle
+    for (const id of new Set(m.enemyHand)) {
+      const card = getCard(id)
+      if (card.cost > m.enemySouffle) continue
+      const v = enemyCardValue(m, card)
+      if (v > bestValue) {
+        best = id
+        bestValue = v
+      }
+    }
+    if (!best) return
+    const card = getCard(best)
+    m.enemyHand.splice(m.enemyHand.indexOf(best), 1)
+    m.enemyDiscard.push(best)
+    m.enemySouffle -= card.cost
+    m.events.push({ kind: 'card', t: m.t, name: `${card.name} (coin adverse)` })
+    applyCardEffects(m, card.effects, 'enemy')
   }
 }
 
@@ -546,7 +660,9 @@ function enemyCoachAI(m: MatchState, dt: number): void {
     fireSpecial(m, 'enemy')
     return
   }
-  // Change de posture selon la situation (lecture du match).
+  // Change de posture selon la situation (lecture du match). Un changement
+  // de posture est « l'ordre » du coach fantôme : il libère les instants
+  // armés de son deck, comme la voix du joueur libère les siens.
   if (Math.random() < 0.9 * dt) {
     const hpRatio = e.hp / e.maxHp
     const pHpRatio = m.player.hp / m.player.maxHp
@@ -555,6 +671,22 @@ function enemyCoachAI(m: MatchState, dt: number): void {
     else if (m.player.stance === 'aggressive') e.stance = pick(['counter', 'defensive', 'evasive'])
     else if (m.player.stance === 'defensive') e.stance = pick(['neutral', 'aggressive'])
     else e.stance = pick(['neutral', 'aggressive', 'defensive', 'evasive', 'counter'])
+
+    const em = m.enemyMods
+    // Fenêtre de contre UNIQUEMENT quand une carte l'arme : une fenêtre à
+    // chaque prise de posture (~1/s) contrerait presque toutes les attaques
+    // du joueur — mesuré en sim : winrate coach 82 % → 0 %.
+    if (e.stance === 'counter' && em.armedCounterMul > 0) e.counterUntil = m.t + 2.5
+    if (e.stance === 'aggressive' && em.armedFrenzyDuration > 0) {
+      em.frenzyUntil = m.t + em.armedFrenzyDuration
+      em.armedFrenzyDuration = 0
+      m.events.push({ kind: 'cardProc', t: m.t, text: 'FRÉNÉSIE ADVERSE !!' })
+    }
+    if (em.armedCheerHype > 0) {
+      e.hype = Math.min(HYPE_MAX, e.hype + em.armedCheerHype)
+      em.armedCheerHype = 0
+      m.events.push({ kind: 'cardProc', t: m.t, text: 'CRI DE GUERRE ADVERSE !!' })
+    }
   }
 }
 
@@ -642,12 +774,24 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
   // le libère (bouton/clavier en secours). Un Ulti gâché sans le coach
   // n'aurait aucune saveur — et l'IA adverse, elle, n'attend personne.
 
+  // Provoqué par le coin adverse : agressif verrouillé, symétrique de la
+  // provocation du joueur (le refus des ordres est dans applyCommand).
+  if (m.t < m.enemyMods.provokedUntil) p.stance = 'aggressive'
+
   // Dernière Chance : sous 15 % PV, la Hype se remplit d'un coup (une fois).
   if (m.mods.lowHpThreshold > 0 && p.hp > 0 && p.hp < p.maxHp * m.mods.lowHpThreshold) {
     m.mods.lowHpThreshold = 0
     p.hype = HYPE_MAX
     m.events.push({ kind: 'cardProc', t: m.t, text: 'DERNIÈRE CHANCE !!' })
     m.events.push({ kind: 'hypeFull', t: m.t, who: 'player' })
+  }
+  // … et sa version adverse (deck symétrique).
+  const en = m.enemy
+  if (m.enemyMods.lowHpThreshold > 0 && en.hp > 0 && en.hp < en.maxHp * m.enemyMods.lowHpThreshold) {
+    m.enemyMods.lowHpThreshold = 0
+    en.hype = HYPE_MAX
+    m.events.push({ kind: 'cardProc', t: m.t, text: 'DERNIÈRE CHANCE ADVERSE !!' })
+    m.events.push({ kind: 'hypeFull', t: m.t, who: 'enemy' })
   }
 
   enemyCoachAI(m, dt)
@@ -690,10 +834,13 @@ function endRound(m: MatchState, winner: 'player' | 'enemy'): void {
       m.events.push({ kind: 'ultiReady', t: m.t, who: loser === m.player ? 'player' : 'enemy' })
   }
   loser.anim = { kind: 'ko', until: m.t + ROUND_END_DURATION }
-  // Les effets « durée d'un round » expirent.
+  // Les effets « durée d'un round » expirent — des deux côtés.
   const provoked = m.mods.provokedUntil
   m.mods = freshMods()
   m.mods.provokedUntil = provoked // temporel, expire tout seul
+  const enemyProvoked = m.enemyMods.provokedUntil
+  m.enemyMods = freshMods()
+  m.enemyMods.provokedUntil = enemyProvoked
   m.phase = 'roundEnd'
   m.phaseUntil = m.t + ROUND_END_DURATION
   m.events.push({ kind: 'roundEnd', t: m.t, winner })
@@ -735,10 +882,14 @@ function startNextRound(m: MatchState, plan: TacticPlan): void {
   e.stance = 'neutral'
   e.anim = { kind: 'idle', until: 0 }
 
-  // Provocation jouée au coin du ring : prend effet maintenant.
+  // Provocations jouées au coin du ring : prennent effet maintenant.
   if (m.mods.provokedUntil === -1) {
     m.mods.provokedUntil = m.t + INTRO_DURATION + 10
     e.stance = 'aggressive'
+  }
+  if (m.enemyMods.provokedUntil === -1) {
+    m.enemyMods.provokedUntil = m.t + INTRO_DURATION + 10
+    p.stance = 'aggressive'
   }
 
   m.plan = plan

@@ -141,8 +141,10 @@ export interface CoachCard {
 }
 
 /**
- * État runtime GÉNÉRIQUE des effets de cartes actifs côté joueur — alimenté
- * par les primitives (types.EffectPrimitive), lu par le moteur de combat.
+ * État runtime GÉNÉRIQUE des effets de cartes actifs pour UN camp (le
+ * joueur ET le coin adverse en ont un chacun) — alimenté par les primitives
+ * (types.EffectPrimitive), lu par le moteur de combat. « L'ennemi » dans les
+ * commentaires s'entend du point de vue du camp propriétaire des mods.
  * Expire à la fin du round (sauf provokedUntil/frenzyUntil, temporels).
  */
 export interface CardMods {
@@ -246,6 +248,13 @@ export interface MatchState {
   sulky: boolean
   /** effets de cartes actifs côté joueur */
   mods: CardMods
+  /** le coin adverse joue un VRAI deck, symétrique du joueur */
+  enemyDeck: CardId[]
+  enemyHand: CardId[]
+  enemyDiscard: CardId[]
+  enemySouffle: number
+  /** effets de cartes actifs côté adverse */
+  enemyMods: CardMods
   events: CombatEvent[]
 }
 

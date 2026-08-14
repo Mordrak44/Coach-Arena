@@ -241,18 +241,54 @@ function makeFightingMatch(playerIdx: number): MatchState {
   console.log(`Deck-builder OK (défaut ${templateSize(dflt)} cartes, composition ${deck.length})`)
 }
 
-// Coin adverse : il joue une carte lisible à chaque pause.
+// Coin adverse : vrai deck — sabotage, soin, mods symétriques, provocation.
 {
   const { enemyCornerPlay } = await import('../src/game/combat')
+  const forceHand = (m: MatchState, ids: CardId[]) => {
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = [...ids]
+  }
+
+  // Sabotage : Hype joueur haute + Douche Froide en main → elle est jouée.
   const m = createMatch(ROSTER[0], ROSTER[1], [])
   m.player.hype = 80
-  const before = m.player.hype
+  forceHand(m, ['coldShower'])
   enemyCornerPlay(m)
   const ev = m.events[m.events.length - 1]
   if (ev.kind !== 'card' || !ev.name.includes('adverse'))
     throw new Error('coin adverse : événement manquant')
-  if (m.player.hype >= before) throw new Error('coin adverse : la Douche Froide aurait dû saper la Hype')
-  console.log(`Coin adverse OK (« ${ev.name} », Hype ${before} → ${m.player.hype})`)
+  if (m.player.hype >= 80) throw new Error('coin adverse : la Douche Froide aurait dû saper la Hype')
+  if (m.enemySouffle >= 3) throw new Error('coin adverse : le Souffle aurait dû être dépensé')
+
+  // Soin : PV bas + Second Souffle en main → il se soigne.
+  const m2 = createMatch(ROSTER[0], ROSTER[1], [])
+  m2.enemy.hp = Math.round(m2.enemy.maxHp * 0.3)
+  forceHand(m2, ['secondWind'])
+  const hpBefore = m2.enemy.hp
+  enemyCornerPlay(m2)
+  if (m2.enemy.hp <= hpBefore) throw new Error('coin adverse : il aurait dû se soigner')
+
+  // Mods symétriques : sa Garde de Fer arme SES mods, pas ceux du joueur.
+  const m3 = createMatch(ROSTER[0], ROSTER[1], [])
+  forceHand(m3, ['ironGuard'])
+  enemyCornerPlay(m3)
+  if (m3.enemyMods.damageReductionMul >= 1)
+    throw new Error('coin adverse : ironGuard aurait dû armer enemyMods.damageReductionMul')
+  if (m3.mods.damageReductionMul < 1)
+    throw new Error('coin adverse : les mods du joueur ne doivent pas bouger')
+
+  // Provocation adverse : le perso du joueur démarre le round agressif.
+  const m4 = createMatch(ROSTER[0], ROSTER[1], [])
+  forceHand(m4, ['provocation'])
+  enemyCornerPlay(m4)
+  if (m4.enemyMods.provokedUntil !== -1) throw new Error('coin adverse : provocation non armée')
+  m4.phase = 'tactics'
+  m4.phaseUntil = m4.t // expire immédiatement → startNextRound
+  tick(m4, 1 / 60, { command: null, voiceEnergy: 0, faceEnergy: 0 })
+  if (m4.player.stance !== 'aggressive')
+    throw new Error('coin adverse : le joueur provoqué devrait être verrouillé agressif')
+  console.log('Coin adverse (vrai deck) OK : sabotage, soin, mods symétriques, provocation')
 }
 
 // Forge de cartes : prompt → primitives bornées + coût budgétisé + jouable en match.

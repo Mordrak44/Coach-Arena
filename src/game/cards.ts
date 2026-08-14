@@ -358,6 +358,11 @@ export function getCard(id: CardId): CoachCard {
 /** Palier de Lien requis pour débloquer la carte signature d'un perso. */
 export const SIGNATURE_BOND_LEVEL = 2
 
+/** Carte signature d'un perso du roster (null pour les persos custom). */
+export function signatureFor(charId: string): CardId | null {
+  return SIGNATURE_CARDS.find(c => c.signatureOf === charId)?.id ?? null
+}
+
 export const TIMING_LABEL: Record<CardTiming, string> = {
   pause: 'Coach',
   armed: 'Instant · voix',
