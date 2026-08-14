@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import type { Character } from '../game/types'
 import { MatchRecorder } from '../systems/recorder'
-import { bondLevel, bondTitle, getProgress } from '../game/progression'
+import { bondLevelFor, bondTitle, getProgress } from '../game/progression'
 import type { MatchOutcome } from './ArenaScreen'
 
 export default function ResultsScreen({
@@ -17,7 +17,7 @@ export default function ResultsScreen({
 }) {
   const won = outcome.winner === 'player'
   const prog = getProgress(player.id)
-  const level = bondLevel(prog.wins)
+  const level = bondLevelFor(player.id)
   // URL créée UNE fois (pas à chaque rendu — sinon fuite mémoire de blobs
   // multi-Mo et vidéo qui redémarre), révoquée au démontage.
   const highlightUrl = useMemo(

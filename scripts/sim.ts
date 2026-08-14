@@ -205,6 +205,18 @@ function makeFightingMatch(playerIdx: number): MatchState {
   console.log('Vie d’Écurie OK (Hype de départ + bouderie du premier ordre)')
 }
 
+// Paliers de Lien : options de récompense déterministes et distinctes.
+{
+  const { rewardOptionsFor } = await import('../src/game/progression')
+  const [a1, b1] = rewardOptionsFor('kenta', 1)
+  const [a2, b2] = rewardOptionsFor('kenta', 1)
+  if (a1 !== a2 || b1 !== b2) throw new Error('récompense non déterministe pour un même palier')
+  if (a1 === b1) throw new Error('les deux options de récompense sont identiques')
+  const [a3] = rewardOptionsFor('kenta', 2)
+  void a3 // niveau différent → tirage différent possible (pas d'assertion stricte)
+  console.log(`Récompenses de palier OK (niv.1 : ${a1} vs ${b1})`)
+}
+
 // Commentateur : un match coaché produit une narration avec début et fin.
 {
   const { Commentator } = await import('../src/game/commentator')

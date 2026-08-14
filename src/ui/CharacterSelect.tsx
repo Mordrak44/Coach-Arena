@@ -8,8 +8,18 @@ import {
   SIGNATURE_BOND_LEVEL,
   SIGNATURE_CARDS,
   buildStarterDeck,
+  getCard,
 } from '../game/cards'
-import { bondLevel, bondTitle, getProgress, loadCustoms, saveCustom } from '../game/progression'
+import {
+  bondLevelFor,
+  bondTitle,
+  claimReward,
+  getExtraCopies,
+  getProgress,
+  loadCustoms,
+  pendingReward,
+  saveCustom,
+} from '../game/progression'
 import {
   ACTIONS_PER_DAY,
   desireText,
@@ -60,8 +70,8 @@ export function CharCard({
 
 function BondLine({ charId }: { charId: string }) {
   const p = getProgress(charId)
-  const level = bondLevel(p.wins)
-  if (p.wins === 0 && p.losses === 0) return null
+  const level = bondLevelFor(charId)
+  if (p.wins === 0 && p.losses === 0 && level === 0) return null
   return (
     <div style={{ fontSize: '0.66rem', marginTop: 3, color: '#fd79a8' }}>
       💞 Lien niv. {level} · {bondTitle(level)} · {p.wins}V/{p.losses}D
@@ -87,9 +97,16 @@ export default function CharacterSelect({
   // Lien est insuffisant — on montre la carotte).
   const signature = selected ? SIGNATURE_CARDS.find(c => c.signatureOf === selected.id) : undefined
   const signatureUnlocked =
-    !!selected && !!signature && bondLevel(getProgress(selected.id).wins) >= SIGNATURE_BOND_LEVEL
+    !!selected && !!signature && bondLevelFor(selected.id) >= SIGNATURE_BOND_LEVEL
 
   const pickChar = (c: Character) => setSelected(c)
+
+  // Récompense de palier de Lien : « choisis 1 carte parmi 2 »
+  const reward = selected ? pendingReward(selected.id) : null
+  const onClaimReward = (cardId: CardId) => {
+    if (!selected) return
+    if (claimReward(selected.id, cardId)) setStableVersion(v => v + 1)
+  }
 
   // Vie d'Écurie du perso sélectionné
   const [stableMsg, setStableMsg] = useState('')
@@ -104,8 +121,11 @@ export default function CharacterSelect({
     setStableVersion(v => v + 1)
   }
 
-  // Deck de départ auto-construit (le deck-builder complet viendra en v1).
-  const deck: CardId[] = buildStarterDeck(signatureUnlocked && signature ? signature.id : null)
+  // Deck de départ auto-construit + copies gagnées aux paliers de Lien.
+  const deck: CardId[] = [
+    ...buildStarterDeck(signatureUnlocked && signature ? signature.id : null),
+    ...(selected ? getExtraCopies(selected.id) : []),
+  ]
 
   const forge = () => {
     if (prompt.trim().length < 3) return
@@ -287,6 +307,42 @@ export default function CharacterSelect({
           <div style={{ marginTop: 6, color: 'var(--muted)' }}>
             {stableMsg ||
               `${ACTIONS_PER_DAY - stable.actionsToday} action(s) restante(s) aujourd'hui. Son humeur influence le début du match.`}
+          </div>
+        </div>
+      )}
+
+      {selected && reward && (
+        <div
+          style={{
+            width: '100%',
+            background: 'var(--panel2)',
+            border: '2px solid var(--accent)',
+            borderRadius: 12,
+            padding: '10px 14px',
+            textAlign: 'left',
+            fontSize: '0.78rem',
+          }}
+        >
+          <div style={{ fontWeight: 900, textTransform: 'uppercase', fontSize: '0.72rem', color: 'var(--accent)' }}>
+            🎁 Palier de Lien {reward.level} — {selected.name} te propose une carte. Gardes-en UNE :
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            {reward.options.map(id => {
+              const c = getCard(id)
+              return (
+                <button
+                  key={id}
+                  className="planCard"
+                  style={{ flex: 1 }}
+                  onClick={() => onClaimReward(id)}
+                >
+                  <b>
+                    {c.icon} {c.name} <span style={{ color: 'var(--violet)' }}>{'●'.repeat(c.cost)}</span>
+                  </b>
+                  <span>+1 copie dans ton deck · {c.desc}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
       )}

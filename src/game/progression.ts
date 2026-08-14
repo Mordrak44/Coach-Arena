@@ -1,4 +1,6 @@
-import type { Character } from './types'
+import type { CardId, Character } from './types'
+import { CARD_POOL } from './cards'
+import { getDesiresFulfilled } from './stable'
 
 // Lien coach-perso : progression persistante (localStorage).
 // Gagner des matchs avec un perso monte son Lien → bonus de Cœur (HRT) par
@@ -13,6 +15,10 @@ const MAX_CUSTOMS = 4
 export interface CharProgress {
   wins: number
   losses: number
+  /** copies supplémentaires choisies aux paliers de Lien (« 1 parmi 2 ») */
+  extraCopies?: CardId[]
+  /** dernier palier dont la récompense a été réclamée */
+  lastRewardLevel?: number
 }
 
 type ProgressMap = Record<string, CharProgress>
@@ -83,9 +89,76 @@ export function bondTitle(level: number): string {
   return BOND_TITLES[Math.max(0, Math.min(BOND_TITLES.length - 1, level))]
 }
 
+/**
+ * Niveau de Lien effectif d'un perso : victoires + soin de la Vie d'Écurie
+ * (3 envies comblées valent une victoire). La relation se construit, elle ne
+ * fait pas que se gagner.
+ */
+export function bondLevelFor(charId: string): number {
+  const wins = getProgress(charId).wins
+  const care = Math.floor(getDesiresFulfilled(charId) / 3)
+  return bondLevel(wins + care)
+}
+
+// --- Paliers « choisis 1 carte parmi 2 » -----------------------------------
+
+function hash(str: string): number {
+  let h = 2166136261
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
+
+/**
+ * Les 2 cartes proposées à un palier donné — déterministes par (perso,
+ * palier) pour qu'un rafraîchissement d'écran ne relance pas les dés.
+ */
+export function rewardOptionsFor(charId: string, level: number): [CardId, CardId] {
+  const pool = CARD_POOL.map(c => c.id)
+  const a = hash(`${charId}:${level}:a`) % pool.length
+  let b = hash(`${charId}:${level}:b`) % pool.length
+  if (b === a) b = (b + 1) % pool.length
+  return [pool[a], pool[b]]
+}
+
+export interface PendingReward {
+  level: number
+  options: [CardId, CardId]
+}
+
+/** Récompense de palier en attente (une à la fois, dans l'ordre des paliers). */
+export function pendingReward(charId: string): PendingReward | null {
+  const p = getProgress(charId)
+  const claimed = p.lastRewardLevel ?? 0
+  const level = bondLevelFor(charId)
+  if (level <= claimed) return null
+  const next = claimed + 1
+  return { level: next, options: rewardOptionsFor(charId, next) }
+}
+
+/** Le joueur garde une des deux cartes : +1 copie dans le deck de ce perso. */
+export function claimReward(charId: string, cardId: CardId): boolean {
+  const map = readJson<ProgressMap>(PROG_KEY, {})
+  const p = map[charId] ?? { wins: 0, losses: 0 }
+  const claimed = p.lastRewardLevel ?? 0
+  const reward = pendingReward(charId)
+  if (!reward || !reward.options.includes(cardId)) return false
+  p.extraCopies = [...(p.extraCopies ?? []), cardId]
+  p.lastRewardLevel = claimed + 1
+  map[charId] = p
+  writeJson(PROG_KEY, map)
+  return true
+}
+
+export function getExtraCopies(charId: string): CardId[] {
+  return getProgress(charId).extraCopies ?? []
+}
+
 /** Retourne une copie du perso avec le bonus de Lien appliqué (HRT plafonné à 12). */
 export function applyBond(char: Character): Character {
-  const level = bondLevel(getProgress(char.id).wins)
+  const level = bondLevelFor(char.id)
   const bonus = bondHrtBonus(level)
   if (bonus === 0) return char
   return {

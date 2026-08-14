@@ -208,6 +208,11 @@ export function consumeTraining(charId: string): 'atk' | 'def' | 'spd' | null {
   return stat
 }
 
+/** Nombre total d'envies comblées (lu par la progression : soin → Lien). */
+export function getDesiresFulfilled(charId: string): number {
+  return readAll()[charId]?.desiresFulfilled ?? 0
+}
+
 export function moodInfo(mood: number): { label: string; icon: string } {
   if (mood >= 75) return { label: 'Radieux', icon: '🤩' }
   if (mood >= 50) return { label: 'Bien', icon: '🙂' }

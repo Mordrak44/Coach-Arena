@@ -87,9 +87,12 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       entraîner (+1 stat au prochain match) / loisir / repos — 3 actions
       par jour réel, envie comblée = gros bonus d'humeur ; panneau
       « L'Écurie » sur l'écran de sélection
-- [ ] Paliers de Lien : « choisis 1 carte parmi 2 » proposées par le
-      perso (les choix construisent des decks distincts par joueur)
-- [ ] L'entretien nourrit le Lien (pas seulement les victoires)
+- [x] Paliers de Lien : « choisis 1 carte parmi 2 » — à chaque palier le
+      perso propose 2 cartes (tirage déterministe par perso+palier), on en
+      garde une = +1 copie dans son deck ; récompenses réclamées dans
+      l'ordre des paliers, panneau 🎁 sur l'écran de sélection
+- [x] L'entretien nourrit le Lien : 3 envies comblées = 1 victoire
+      d'équivalence dans le calcul du niveau (bondLevelFor)
 
 ## v1 — Deck & collection (voir GAME_DESIGN.md §4 bis)
 
@@ -136,6 +139,13 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 
 ## Journal
 
+- 2026-08-14 (routine) : Boucle Vie d'Écurie bouclée — bondLevelFor
+  (victoires + soin : 3 envies comblées = 1 victoire), paliers « choisis
+  1 parmi 2 » (tirage déterministe FNV par perso+palier, +1 copie au
+  deck, réclamation dans l'ordre), panneau 🎁 à la sélection, deck =
+  starter + copies gagnées. Tous les usages de bondLevel(wins) migrés.
+  Kling : test terminé la veille, en attente du verdict visuel
+  utilisateur (« GO roster ») avant toute nouvelle dépense.
 - 2026-08-14 : AUDIT COMPLET (demande utilisateur) — 10 bugs confirmés et
   corrigés, dont 3 critiques : (1) clips de moment fort corrompus au-delà
   de 14 s (chunk de l'ancien MediaRecorder poussé dans le tableau du
