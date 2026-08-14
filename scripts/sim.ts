@@ -217,6 +217,20 @@ function makeFightingMatch(playerIdx: number): MatchState {
   console.log(`DSL OK : coût budgétisé = coût déclaré pour ${CARD_POOL.length + SIGNATURE_CARDS.length} cartes`)
 }
 
+// Coin adverse : il joue une carte lisible à chaque pause.
+{
+  const { enemyCornerPlay } = await import('../src/game/combat')
+  const m = createMatch(ROSTER[0], ROSTER[1], [])
+  m.player.hype = 80
+  const before = m.player.hype
+  enemyCornerPlay(m)
+  const ev = m.events[m.events.length - 1]
+  if (ev.kind !== 'card' || !ev.name.includes('adverse'))
+    throw new Error('coin adverse : événement manquant')
+  if (m.player.hype >= before) throw new Error('coin adverse : la Douche Froide aurait dû saper la Hype')
+  console.log(`Coin adverse OK (« ${ev.name} », Hype ${before} → ${m.player.hype})`)
+}
+
 // Forge de cartes : prompt → primitives bornées + coût budgétisé + jouable en match.
 {
   const { forgeCard } = await import('../src/game/cardForge')

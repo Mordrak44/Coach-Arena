@@ -174,6 +174,103 @@ export const CARD_POOL: CoachCard[] = [
     desc: "L'adversaire démarre le round fou de rage : agressif verrouillé 10 s. Tu sais ce qui arrive.",
     effects: [{ kind: 'provoke', duration: 10 }],
   },
+  // --- Vague 2 : combos de primitives (démonstration de la DSL) ---
+  {
+    id: 'adrenaline',
+    name: 'Adrénaline',
+    timing: 'pause',
+    cost: 1,
+    icon: '💉',
+    desc: 'Petit soin (6 % PV) et petit coup de fouet (+10 Hype). Le combo du coin pressé.',
+    effects: [
+      { kind: 'heal', pct: 0.06 },
+      { kind: 'hype', amount: 10 },
+    ],
+  },
+  {
+    id: 'fortress',
+    name: 'Forteresse',
+    timing: 'pause',
+    cost: 2,
+    icon: '🏰',
+    desc: 'Dégâts reçus −25 % et +5 % d’esquive ce round. On verrouille tout.',
+    effects: [
+      { kind: 'damageReduction', mul: 0.75 },
+      { kind: 'dodgeBonus', add: 0.05 },
+    ],
+  },
+  {
+    id: 'verbalUppercut',
+    name: 'Uppercut Verbal',
+    timing: 'armed',
+    cost: 1,
+    icon: '🗯️',
+    desc: '+5 Hype tout de suite, et ton prochain encouragement en donne +20.',
+    effects: [
+      { kind: 'armCheerHype', amount: 20 },
+      { kind: 'hype', amount: 5 },
+    ],
+  },
+  {
+    id: 'totalCounter',
+    name: 'Contre-Attaque Totale',
+    timing: 'armed',
+    cost: 2,
+    icon: '🌀',
+    desc: 'Le prochain « CONTRE ! » inflige ×1.5 dégâts ET rapporte +20 Hype.',
+    effects: [
+      { kind: 'armCounterMul', mul: 1.5 },
+      { kind: 'counterHype', amount: 20 },
+    ],
+  },
+  {
+    id: 'lastStand',
+    name: "Baroud d'Honneur",
+    timing: 'condition',
+    cost: 2,
+    icon: '🚩',
+    desc: 'Soigne 4 % PV, et sous 20 % PV ce round : Hype pleine. Le pari du guerrier.',
+    effects: [
+      { kind: 'lowHpHypeFull', threshold: 0.2 },
+      { kind: 'heal', pct: 0.04 },
+    ],
+  },
+  {
+    id: 'ambush',
+    name: 'Guet-Apens',
+    timing: 'condition',
+    cost: 3,
+    icon: '🕸️',
+    desc: 'Provoque l’adversaire (agressif 8 s) ET arme un contre ×1.4 : le piège complet.',
+    effects: [
+      { kind: 'provoke', duration: 8 },
+      { kind: 'armCounterMul', mul: 1.4 },
+    ],
+  },
+  {
+    id: 'coldBlood',
+    name: 'Sang-Froid Glacial',
+    timing: 'pause',
+    cost: 2,
+    icon: '🥶',
+    desc: 'L’adversaire perd 20 Hype, et ton perso est immunisé à la confusion ce round.',
+    effects: [
+      { kind: 'enemyHype', amount: -20 },
+      { kind: 'immuneConfusion' },
+    ],
+  },
+  {
+    id: 'steelSkin',
+    name: "Peau d'Acier",
+    timing: 'condition',
+    cost: 2,
+    icon: '🦾',
+    desc: 'Dégâts reçus −15 %, et encaisser 3 coups rapporte +25 Hype. La douleur devient carburant.',
+    effects: [
+      { kind: 'hitsTakenHype', hits: 3, amount: 25 },
+      { kind: 'damageReduction', mul: 0.85 },
+    ],
+  },
 ]
 
 // Cartes signatures — une par perso du roster, débloquées au palier de

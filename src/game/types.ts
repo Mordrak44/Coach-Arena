@@ -82,6 +82,15 @@ export type CardId =
   | 'warCry' // armed : le prochain encouragement crié remplit fort la Hype
   | 'lastChance' // condition : sous 15 % PV → Hype pleine (une fois)
   | 'provocation' // condition : l'adversaire démarre le round agressif
+  // Vague 2 (combos DSL)
+  | 'adrenaline' // pause : petit soin + petite Hype
+  | 'fortress' // pause : réduction de dégâts + esquive
+  | 'verbalUppercut' // armed : encouragement boosté + Hype immédiate
+  | 'totalCounter' // armed : contre ×1.5 qui donne de la Hype
+  | 'lastStand' // condition : sous 20 % PV → Hype pleine, + petit soin
+  | 'ambush' // condition : provoque ET arme un contre — le piège complet
+  | 'coldBlood' // pause : sabote la Hype adverse + immunité confusion
+  | 'steelSkin' // condition : encaisser nourrit + réduction légère
   // Cartes signatures (une par perso du roster, débloquées par le Lien)
   | 'sigKenta' // Cœur Vaillant : encaisser 3 coups → +40 Hype
   | 'sigRei' // Orgueil du Rival : le prochain contre remplit 50 % de la Hype

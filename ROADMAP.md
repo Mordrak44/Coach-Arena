@@ -97,15 +97,21 @@ portraits du roster qu'après accord explicite de l'utilisateur.
 ## v1 — Deck & collection (voir GAME_DESIGN.md §4 bis)
 
 - [ ] Deck-builder : collection, 2-3 copies max par carte, deck 30-60
-- [ ] L'IA adverse joue son propre deck (→ cartes d'interaction :
-      bloquer/saboter la carte adverse, façon « Douche Froide » étendue)
+- [x] L'IA adverse joue au coin du ring (v0 : sous-ensemble Coach — soin
+      si < 40 % PV, Douche Froide si ta Hype > 60, sinon auto-moral ;
+      annoncé par événement, donc lisible et à terme bloquable). v1 :
+      vrai deck adverse complet avec mods symétriques.
 - [x] Effets de cartes paramétrés en données (DSL) — 14 primitives
       (soins, Hype, sabotage, réductions, armements vocaux, paris),
       coût en Souffle calculé par budget de puissance (reproduit
       exactement les 15 coûts existants — test de régression), bornes
       clampEffect prêtes pour les cartes générées par prompt. Le moteur
       lit un état générique, plus aucun effet codé en dur par carte.
-- [ ] Nouvelles cartes par vagues de 5-10, équilibrées via scripts/sim.ts
+- [x] Vague 2 : 8 nouvelles cartes combos (Adrénaline, Forteresse,
+      Uppercut Verbal, Contre-Attaque Totale, Baroud d'Honneur,
+      Guet-Apens, Sang-Froid Glacial, Peau d'Acier) — 100 % données DSL,
+      coûts auto-validés. Deck de départ : 18 → 34 cartes (cible 30-60
+      atteinte). Prochaines vagues de 5-10 au fil de l'eau.
 
 ## v1 — Mode Cinématique (voir GAME_DESIGN.md §7)
 
@@ -148,6 +154,12 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 
 ## Journal
 
+- 2026-08-14 (routine) : Vague 2 de cartes (8 combos bi-primitives,
+  zéro ligne de code moteur — pure donnée DSL, coûts vérifiés 23/23) +
+  le coin adverse joue à chaque pause (soin/sabotage/moral, événement
+  annoncé). Équilibre : coach 82 %, sans coach 26 %, deck naïf 82 % (le
+  coin adverse compense le deck joué bêtement — l'avantage viendra du
+  bon choix de cartes).
 - 2026-08-14 (routine) : Forge de cartes par prompt (v0 mots-clés) —
   section ⚒ sur l'écran de sélection, cartes forgées persistées et
   re-clampées au chargement, ajoutées au deck. Test sim de bout en

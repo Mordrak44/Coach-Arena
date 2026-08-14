@@ -507,6 +507,26 @@ function pick<T>(arr: T[]): T {
 // IA adverse : un « coach fantôme » simple pilote l'ennemi.
 // ---------------------------------------------------------------------------
 
+/**
+ * Le coin adverse joue SA carte au coin du ring (sous-ensemble « Coach » :
+ * soin, moral, sabotage). Lisible par le joueur via l'événement — et à terme
+ * bloquable par des cartes d'interaction.
+ */
+export function enemyCornerPlay(m: MatchState): void {
+  const e = m.enemy
+  const p = m.player
+  if (e.hp / e.maxHp < 0.4) {
+    e.hp = Math.min(e.maxHp, e.hp + Math.round(e.maxHp * 0.12))
+    m.events.push({ kind: 'card', t: m.t, name: 'Second Souffle (coin adverse)' })
+  } else if (p.hype > 60) {
+    p.hype = Math.max(0, p.hype - 20)
+    m.events.push({ kind: 'card', t: m.t, name: 'Douche Froide (coin adverse)' })
+  } else {
+    e.hype = Math.min(HYPE_MAX, e.hype + 15)
+    m.events.push({ kind: 'card', t: m.t, name: 'Mise au Point (coin adverse)' })
+  }
+}
+
 function enemyCoachAI(m: MatchState, dt: number): void {
   const e = m.enemy
   // Le coach fantôme encourage son poulain en continu (équivalent voix+visage).
@@ -568,6 +588,7 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
           m.souffle = SOUFFLE_PER_CORNER
           m.mulliganUsed = false
           drawCards(m, HAND_SIZE - m.hand.length)
+          enemyCornerPlay(m)
         }
       }
       return
