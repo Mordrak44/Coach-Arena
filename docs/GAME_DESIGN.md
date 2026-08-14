@@ -291,6 +291,20 @@ texte Claude < 0,02 €, match arcade = 0 €) :
   positif ; confortable si les joueurs préfèrent le clip héroïque.
 - **Recharges** : 100 cr = 4,99 € · 250 cr = 9,99 € · 600 cr = 19,99 €.
 
+**Canaux de vente — chaque canal vend ce qu'il sait vendre.** Un jeu
+web *payant à l'entrée* ne se vend pas (psychologie « onglet = gratuit ») ;
+un jeu web *free-to-play avec achats* se vend très bien (RuneScape,
+jeux de navigateur allemands). Donc : le **web** porte l'arcade gratuit
+(viralité TikTok) et les **recharges de crédits** (Stripe/Apple Pay,
+~97 % de marge) ; les **stores** (Steam, mobile) portent l'Édition
+Histoire à 14,90 € — le buy-to-play est chez lui sur un store, et la
+commission de 30 % ne s'applique qu'au canal où le store apporte
+l'acheteur. Précédent : Cookie Clicker, gratuit en web ET vendu 4,99 €
+sur Steam avec succès. Techniquement : même code, wrapper
+Capacitor/Electron pour les stores. Ordre : web d'abord (prouver le
+jeu), stores ensuite (encaisser la notoriété), quand le mode histoire
+existe.
+
 **Coût de l'analyse vocale (clarification)** : reconnaissance de
 commandes = Web Speech API du navigateur (0 €), volume/énergie = calcul
 local (0 €), prosodie/intonation = pitch local (0 €). Seule la
