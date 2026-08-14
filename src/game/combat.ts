@@ -1,6 +1,7 @@
 import type {
   CardId,
   Character,
+  EffectPrimitive,
   CoachCommand,
   CoachInput,
   CombatEvent,
@@ -140,21 +141,7 @@ export function createMatch(
     souffle: SOUFFLE_PER_CORNER,
     mulliganUsed: false,
     sulky: opts.sulky ?? false,
-    mods: {
-      perfectCounter: false,
-      warCry: false,
-      ironGuard: false,
-      lastChance: false,
-      provokedUntil: 0,
-      kentaHeart: false,
-      hitsTakenThisRound: 0,
-      reiCounterHype: false,
-      yunaFocus: false,
-      goroLesson: false,
-      fangFrenzy: false,
-      frenzyUntil: 0,
-      nyxShadow: false,
-    },
+    mods: freshMods(),
     events: [{ kind: 'roundStart', t: 0, round: 1 }],
   }
   m.player.hype = Math.min(HYPE_MAX, opts.startHype ?? 0)
@@ -200,6 +187,79 @@ export function mulligan(m: MatchState, ids: CardId[]): boolean {
   return true
 }
 
+export function freshMods(): MatchState['mods'] {
+  return {
+    damageReductionMul: 1,
+    dodgeBonus: 0,
+    immuneConfusion: false,
+    armedCounterMul: 0,
+    armedCheerHype: 0,
+    armedFrenzyMul: 0,
+    armedFrenzyDuration: 0,
+    frenzyUntil: 0,
+    lowHpThreshold: 0,
+    provokedUntil: 0,
+    counterHypeAmount: 0,
+    hitsTakenTarget: 0,
+    hitsTakenHype: 0,
+    hitsTakenCount: 0,
+    halveEnemySpecial: false,
+  }
+}
+
+/** Applique les primitives d'une carte sur l'état des mods (DSL → runtime). */
+function applyCardEffects(m: MatchState, effects: EffectPrimitive[]): void {
+  for (const e of effects) {
+    switch (e.kind) {
+      case 'heal':
+        m.player.hp = Math.min(m.player.maxHp, m.player.hp + Math.round(m.player.maxHp * e.pct))
+        break
+      case 'hype':
+        m.player.hype = Math.min(HYPE_MAX, m.player.hype + e.amount)
+        break
+      case 'enemyHype':
+        m.enemy.hype = Math.max(0, Math.min(HYPE_MAX, m.enemy.hype + e.amount))
+        break
+      case 'damageReduction':
+        m.mods.damageReductionMul = Math.min(m.mods.damageReductionMul, e.mul)
+        break
+      case 'dodgeBonus':
+        m.mods.dodgeBonus += e.add
+        break
+      case 'immuneConfusion':
+        m.mods.immuneConfusion = true
+        break
+      case 'armCounterMul':
+        m.mods.armedCounterMul = e.mul
+        break
+      case 'armCheerHype':
+        m.mods.armedCheerHype = e.amount
+        break
+      case 'armAttackFrenzy':
+        m.mods.armedFrenzyMul = e.mul
+        m.mods.armedFrenzyDuration = e.duration
+        break
+      case 'lowHpHypeFull':
+        m.mods.lowHpThreshold = e.threshold
+        break
+      case 'provoke':
+        m.mods.provokedUntil = -1 // prend effet au démarrage du round suivant
+        break
+      case 'counterHype':
+        m.mods.counterHypeAmount = e.amount
+        break
+      case 'hitsTakenHype':
+        m.mods.hitsTakenTarget = e.hits
+        m.mods.hitsTakenHype = e.amount
+        m.mods.hitsTakenCount = 0
+        break
+      case 'halveEnemySpecial':
+        m.mods.halveEnemySpecial = true
+        break
+    }
+  }
+}
+
 /** Joue une carte pendant la phase tactique, si le Souffle le permet. */
 export function playCard(m: MatchState, id: CardId): boolean {
   if (m.phase !== 'tactics') return false
@@ -212,55 +272,7 @@ export function playCard(m: MatchState, id: CardId): boolean {
   m.souffle -= card.cost
   m.events.push({ kind: 'card', t: m.t, name: card.name })
 
-  switch (id) {
-    case 'secondWind':
-      m.player.hp = Math.min(m.player.maxHp, m.player.hp + Math.round(m.player.maxHp * 0.2))
-      break
-    case 'massage':
-      m.player.hp = Math.min(m.player.maxHp, m.player.hp + Math.round(m.player.maxHp * 0.08))
-      break
-    case 'focus':
-      m.player.hype = Math.min(HYPE_MAX, m.player.hype + 15)
-      break
-    case 'coldShower':
-      m.enemy.hype = Math.max(0, m.enemy.hype - 30)
-      break
-    case 'ironGuard':
-      m.mods.ironGuard = true
-      break
-    case 'perfectCounter':
-      m.mods.perfectCounter = true
-      break
-    case 'warCry':
-      m.mods.warCry = true
-      break
-    case 'lastChance':
-      m.mods.lastChance = true
-      break
-    case 'provocation':
-      // Prend effet au démarrage du round suivant (voir startNextRound).
-      m.mods.provokedUntil = -1
-      break
-    case 'sigKenta':
-      m.mods.kentaHeart = true
-      m.mods.hitsTakenThisRound = 0
-      break
-    case 'sigRei':
-      m.mods.reiCounterHype = true
-      break
-    case 'sigYuna':
-      m.mods.yunaFocus = true
-      break
-    case 'sigGoro':
-      m.mods.goroLesson = true
-      break
-    case 'sigFang':
-      m.mods.fangFrenzy = true
-      break
-    case 'sigNyx':
-      m.mods.nyxShadow = true
-      break
-  }
+  applyCardEffects(m, card.effects)
   return true
 }
 
@@ -288,9 +300,9 @@ function applyCommand(m: MatchState, cmd: CoachCommand, voiceEnergy: number): vo
     // Sanguin : les cris l'enflamment. Cérébral : hurler ne l'aide pas.
     if (trait === 'sanguin' && shouting) gain *= 1.5
     if (trait === 'cerebral' && shouting) gain *= 0.4
-    if (m.mods.warCry) {
-      m.mods.warCry = false
-      gain += 35
+    if (m.mods.armedCheerHype > 0) {
+      gain += m.mods.armedCheerHype
+      m.mods.armedCheerHype = 0
       m.events.push({ kind: 'cardProc', t: m.t, text: 'CRI DE GUERRE !!' })
     }
     f.hype = Math.min(HYPE_MAX, f.hype + gain)
@@ -313,7 +325,7 @@ function applyCommand(m: MatchState, cmd: CoachCommand, voiceEnergy: number): vo
 
   // Ordres de posture : détection du spam d'ordres contradictoires.
   // (Concentration Absolue : Yuna ne peut pas être confuse.)
-  if (m.t - f.lastOrderAt < CONFUSION_ORDER_WINDOW && m.t >= f.confusedUntil && !m.mods.yunaFocus) {
+  if (m.t - f.lastOrderAt < CONFUSION_ORDER_WINDOW && m.t >= f.confusedUntil && !m.mods.immuneConfusion) {
     f.confusedUntil = m.t + CONFUSION_DURATION
     m.events.push({ kind: 'confused', t: m.t, who: 'player' })
     f.lastOrderAt = m.t
@@ -351,9 +363,11 @@ function applyCommand(m: MatchState, cmd: CoachCommand, voiceEnergy: number): vo
     f.stance = stance
     if (cmd === 'counter') f.counterUntil = m.t + 2.5
     // Frénésie (Fang) : l'ordre d'attaque lâche la bête.
-    if (cmd === 'attack' && m.mods.fangFrenzy) {
-      m.mods.fangFrenzy = false
-      m.mods.frenzyUntil = m.t + 5
+    // armedFrenzyDuration > 0 = armée ; le multiplicateur reste lisible
+    // pendant frenzyUntil, mais le déclencheur est consommé.
+    if (cmd === 'attack' && m.mods.armedFrenzyDuration > 0) {
+      m.mods.frenzyUntil = m.t + m.mods.armedFrenzyDuration
+      m.mods.armedFrenzyDuration = 0
       m.events.push({ kind: 'cardProc', t: m.t, text: 'FRÉNÉSIE !!' })
     }
     f.hype = Math.min(HYPE_MAX, f.hype + orderHype)
@@ -382,15 +396,15 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
   if (m.t < d.counterUntil) {
     d.counterUntil = 0
     let counterMul = 1.3
-    if (defSide === 'player' && m.mods.perfectCounter) {
-      m.mods.perfectCounter = false
-      counterMul *= 2
+    if (defSide === 'player' && m.mods.armedCounterMul > 0) {
+      counterMul *= m.mods.armedCounterMul
+      m.mods.armedCounterMul = 0
       m.events.push({ kind: 'cardProc', t: m.t, text: 'CONTRE PARFAIT !!' })
     }
     // Orgueil du Rival (Rei) : humilier remplit la Hype.
-    if (defSide === 'player' && m.mods.reiCounterHype) {
-      m.mods.reiCounterHype = false
-      d.hype = Math.min(HYPE_MAX, d.hype + 50)
+    if (defSide === 'player' && m.mods.counterHypeAmount > 0) {
+      d.hype = Math.min(HYPE_MAX, d.hype + m.mods.counterHypeAmount)
+      m.mods.counterHypeAmount = 0
       m.events.push({ kind: 'cardProc', t: m.t, text: 'ORGUEIL DU RIVAL !!' })
     }
     const dmg = Math.round((3 + d.char.stats.atk * 0.7) * counterMul)
@@ -403,7 +417,7 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
   }
 
   // Esquive (Pas de l'Ombre : +15 % pour le joueur)
-  const shadowBonus = defSide === 'player' && m.mods.nyxShadow ? 0.15 : 0
+  const shadowBonus = defSide === 'player' ? m.mods.dodgeBonus : 0
   const dodgeChance =
     dMod.dodge + shadowBonus + d.char.stats.spd * 0.012 - (m.t < d.confusedUntil ? 0.08 : 0)
   if (Math.random() < dodgeChance) {
@@ -423,8 +437,8 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
   const mitigation = 1 - Math.min(0.65, (d.char.stats.def * dMod.def * defPlanMul) / 24)
   dmg *= mitigation
   if (m.t < a.confusedUntil) dmg *= 0.7
-  if (defSide === 'player' && m.mods.ironGuard) dmg *= 0.65 // Garde de Fer
-  if (atkSide === 'player' && m.t < m.mods.frenzyUntil) dmg *= 1.5 // Frénésie
+  if (defSide === 'player') dmg *= m.mods.damageReductionMul // Garde de Fer & co
+  if (atkSide === 'player' && m.t < m.mods.frenzyUntil) dmg *= Math.max(1.1, m.mods.armedFrenzyMul) // Frénésie
 
   const blocked = d.stance === 'defensive' && Math.random() < 0.35
   if (blocked) {
@@ -443,11 +457,11 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
   chargeUlti(m, a, dmg, false)
   chargeUlti(m, d, dmg, true)
   // Cœur Vaillant (Kenta) : la douleur le nourrit.
-  if (defSide === 'player' && m.mods.kentaHeart) {
-    m.mods.hitsTakenThisRound++
-    if (m.mods.hitsTakenThisRound >= 3) {
-      m.mods.kentaHeart = false
-      d.hype = Math.min(HYPE_MAX, d.hype + 40)
+  if (defSide === 'player' && m.mods.hitsTakenTarget > 0) {
+    m.mods.hitsTakenCount++
+    if (m.mods.hitsTakenCount >= m.mods.hitsTakenTarget) {
+      d.hype = Math.min(HYPE_MAX, d.hype + m.mods.hitsTakenHype)
+      m.mods.hitsTakenTarget = 0
       m.events.push({ kind: 'cardProc', t: m.t, text: 'CŒUR VAILLANT !!' })
     }
   }
@@ -466,8 +480,8 @@ function fireSpecial(m: MatchState, side: 'player' | 'enemy'): void {
   let dmg = baseDamage(a.char.stats.atk) * a.char.special.power * 2.2
   dmg *= 1 - Math.min(0.4, (d.char.stats.def * dMod.def) / 40) // les specials percent la garde
   // Leçon d'Expérience (Gorō) : il a vu venir le premier spécial adverse.
-  if (side === 'enemy' && m.mods.goroLesson) {
-    m.mods.goroLesson = false
+  if (side === 'enemy' && m.mods.halveEnemySpecial) {
+    m.mods.halveEnemySpecial = false
     dmg *= 0.5
     m.events.push({ kind: 'cardProc', t: m.t, text: "LEÇON D'EXPÉRIENCE !!" })
   }
@@ -608,8 +622,8 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
   // n'aurait aucune saveur — et l'IA adverse, elle, n'attend personne.
 
   // Dernière Chance : sous 15 % PV, la Hype se remplit d'un coup (une fois).
-  if (m.mods.lastChance && p.hp > 0 && p.hp < p.maxHp * 0.15) {
-    m.mods.lastChance = false
+  if (m.mods.lowHpThreshold > 0 && p.hp > 0 && p.hp < p.maxHp * m.mods.lowHpThreshold) {
+    m.mods.lowHpThreshold = 0
     p.hype = HYPE_MAX
     m.events.push({ kind: 'cardProc', t: m.t, text: 'DERNIÈRE CHANCE !!' })
     m.events.push({ kind: 'hypeFull', t: m.t, who: 'player' })
@@ -656,18 +670,9 @@ function endRound(m: MatchState, winner: 'player' | 'enemy'): void {
   }
   loser.anim = { kind: 'ko', until: m.t + ROUND_END_DURATION }
   // Les effets « durée d'un round » expirent.
-  m.mods.ironGuard = false
-  m.mods.perfectCounter = false
-  m.mods.warCry = false
-  m.mods.lastChance = false
-  m.mods.kentaHeart = false
-  m.mods.hitsTakenThisRound = 0
-  m.mods.reiCounterHype = false
-  m.mods.yunaFocus = false
-  m.mods.goroLesson = false
-  m.mods.fangFrenzy = false
-  m.mods.frenzyUntil = 0
-  m.mods.nyxShadow = false
+  const provoked = m.mods.provokedUntil
+  m.mods = freshMods()
+  m.mods.provokedUntil = provoked // temporel, expire tout seul
   m.phase = 'roundEnd'
   m.phaseUntil = m.t + ROUND_END_DURATION
   m.events.push({ kind: 'roundEnd', t: m.t, winner })

@@ -90,41 +90,77 @@ export type CardId =
   | 'sigFang' // Frénésie : le prochain « attaque ! » → +50 % dégâts pendant 5 s
   | 'sigNyx' // Pas de l'Ombre : +15 % d'esquive ce round
 
+/**
+ * Primitives d'effets — la DSL des cartes. Chaque carte est une combinaison
+ * de primitives PARAMÉTRÉES ; le coût en Souffle est calculé depuis un
+ * budget de puissance (voir cards.ts). C'est la fondation des centaines de
+ * cartes et des cartes créées par prompt : l'habillage est libre, la
+ * mécanique reste dans ces bornes.
+ */
+export type EffectPrimitive =
+  // — effets immédiats (timing pause) —
+  | { kind: 'heal'; pct: number } // % des PV max
+  | { kind: 'hype'; amount: number } // Hype immédiate
+  | { kind: 'enemyHype'; amount: number } // sabotage (négatif) de la Hype adverse
+  | { kind: 'damageReduction'; mul: number } // dégâts reçus × mul ce round
+  | { kind: 'dodgeBonus'; add: number } // + chance d'esquive ce round
+  | { kind: 'immuneConfusion' } // pas de confusion ce round
+  // — instants armés (libérés à la voix) —
+  | { kind: 'armCounterMul'; mul: number } // prochain contre × mul
+  | { kind: 'armCheerHype'; amount: number } // prochain encouragement +Hype
+  | { kind: 'armAttackFrenzy'; mul: number; duration: number } // « attaque ! » → dégâts × mul pendant N s
+  // — instants pari (conditionnels) —
+  | { kind: 'lowHpHypeFull'; threshold: number } // sous X % PV → Hype pleine
+  | { kind: 'provoke'; duration: number } // l'adversaire démarre agressif N s
+  | { kind: 'counterHype'; amount: number } // prochain contre réussi → +Hype
+  | { kind: 'hitsTakenHype'; hits: number; amount: number } // encaisser N coups → +Hype
+  | { kind: 'halveEnemySpecial' } // premier spécial adverse ÷ 2
+
 export interface CoachCard {
   id: CardId
   name: string
   timing: CardTiming
-  /** coût en Souffle (le budget de la pause) */
+  /** coût en Souffle — calculé depuis les effets (budget de puissance) */
   cost: number
   icon: string
   desc: string
+  effects: EffectPrimitive[]
   /** id du perso dont c'est la carte signature (débloquée par le Lien) */
   signatureOf?: string
 }
 
-/** Effets de cartes en attente / actifs sur le perso du joueur */
+/**
+ * État runtime GÉNÉRIQUE des effets de cartes actifs côté joueur — alimenté
+ * par les primitives (types.EffectPrimitive), lu par le moteur de combat.
+ * Expire à la fin du round (sauf provokedUntil/frenzyUntil, temporels).
+ */
 export interface CardMods {
-  perfectCounter: boolean
-  warCry: boolean
-  ironGuard: boolean
-  lastChance: boolean
-  /** l'ennemi est provoqué : posture agressive verrouillée jusqu'à ce t */
-  provokedUntil: number
-  // — signatures —
-  /** Cœur Vaillant : compteur de coups encaissés ce round */
-  kentaHeart: boolean
-  hitsTakenThisRound: number
-  /** Orgueil du Rival : le prochain contre remplit 50 % de la Hype */
-  reiCounterHype: boolean
-  /** Concentration Absolue : immunisée à la confusion ce round */
-  yunaFocus: boolean
-  /** Leçon d'Expérience : premier spécial adverse du round divisé par 2 */
-  goroLesson: boolean
-  /** Frénésie : armée par la carte, déclenchée par « attaque ! » */
-  fangFrenzy: boolean
+  /** dégâts reçus × mul (1 = aucun effet) */
+  damageReductionMul: number
+  /** + chance d'esquive */
+  dodgeBonus: number
+  /** immunisé à la confusion ce round */
+  immuneConfusion: boolean
+  /** prochain contre × mul (0 = non armé) */
+  armedCounterMul: number
+  /** prochain encouragement : +Hype (0 = non armé) */
+  armedCheerHype: number
+  /** « attaque ! » → dégâts × mul pendant duration s (0 = non armé) */
+  armedFrenzyMul: number
+  armedFrenzyDuration: number
   frenzyUntil: number
-  /** Pas de l'Ombre : +15 % d'esquive ce round */
-  nyxShadow: boolean
+  /** sous X % PV → Hype pleine (0 = off) */
+  lowHpThreshold: number
+  /** l'ennemi est provoqué : agressif verrouillé jusqu'à ce t (-1 = au prochain round) */
+  provokedUntil: number
+  /** prochain contre réussi → +Hype (0 = off) */
+  counterHypeAmount: number
+  /** encaisser N coups → +Hype */
+  hitsTakenTarget: number
+  hitsTakenHype: number
+  hitsTakenCount: number
+  /** premier spécial adverse ÷ 2 */
+  halveEnemySpecial: boolean
 }
 
 export interface CoachInput {

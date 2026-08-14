@@ -99,8 +99,12 @@ portraits du roster qu'après accord explicite de l'utilisateur.
 - [ ] Deck-builder : collection, 2-3 copies max par carte, deck 30-60
 - [ ] L'IA adverse joue son propre deck (→ cartes d'interaction :
       bloquer/saboter la carte adverse, façon « Douche Froide » étendue)
-- [ ] Effets de cartes paramétrés en données (DSL) pour monter à des
-      dizaines/centaines de cartes testées par simulation
+- [x] Effets de cartes paramétrés en données (DSL) — 14 primitives
+      (soins, Hype, sabotage, réductions, armements vocaux, paris),
+      coût en Souffle calculé par budget de puissance (reproduit
+      exactement les 15 coûts existants — test de régression), bornes
+      clampEffect prêtes pour les cartes générées par prompt. Le moteur
+      lit un état générique, plus aucun effet codé en dur par carte.
 - [ ] Nouvelles cartes par vagues de 5-10, équilibrées via scripts/sim.ts
 
 ## v1 — Mode Cinématique (voir GAME_DESIGN.md §7)
@@ -139,6 +143,14 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 
 ## Journal
 
+- 2026-08-14 (routine) : DSL d'effets — les 15 cartes deviennent des
+  données (EffectPrimitive[14 types] + computeCost par budget de
+  puissance + clampEffect). CardMods refondu en état générique ;
+  applyCardEffects remplace le switch par carte ; expiration de fin de
+  round = freshMods() (provoke conservé, temporel). Sim : coûts
+  recalculés = coûts déclarés sur 15/15 cartes, tous tests verts,
+  équilibre inchangé. Prochaine brique v2 débloquée : cartes par prompt
+  = habillage libre + primitives choisies par l'IA + clamp + coût auto.
 - 2026-08-14 (routine) : Boucle Vie d'Écurie bouclée — bondLevelFor
   (victoires + soin : 3 envies comblées = 1 victoire), paliers « choisis
   1 parmi 2 » (tirage déterministe FNV par perso+palier, +1 copie au

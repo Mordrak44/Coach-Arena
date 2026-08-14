@@ -38,8 +38,8 @@ function runMatch(opts: SimOptions): { winner: 'player' | 'enemy'; cardProcs: nu
       // Coach simulé : varie ses appels pour exercer contres, cris et spéciaux.
       if (m.player.ulti >= 100 && !m.player.ultiUsed) command = 'ulti'
       else if (m.player.hype >= 100) command = 'special'
-      else if (m.mods.perfectCounter) command = 'counter'
-      else if (m.mods.warCry) command = 'cheer'
+      else if (m.mods.armedCounterMul > 0) command = 'counter'
+      else if (m.mods.armedCheerHype > 0) command = 'cheer'
       else command = Math.random() < 0.6 ? 'attack' : 'cheer'
       lastCmdAt = m.t
     }
@@ -158,7 +158,7 @@ function makeFightingMatch(playerIdx: number): MatchState {
 // Signatures : Concentration Absolue (Yuna) bloque la confusion.
 {
   const m = makeFightingMatch(2)
-  m.mods.yunaFocus = true
+  m.mods.immuneConfusion = true
   tick(m, 1 / 60, { command: 'defend', voiceEnergy: 0.3, faceEnergy: 0 })
   tick(m, 1 / 60, { command: 'attack', voiceEnergy: 0.3, faceEnergy: 0 }) // spam volontaire
   if (m.player.confusedUntil > m.t) throw new Error('yunaFocus : la confusion aurait dû être bloquée')
@@ -168,10 +168,11 @@ function makeFightingMatch(playerIdx: number): MatchState {
 // Signatures : Frénésie (Fang) armée puis déclenchée par « attaque ! ».
 {
   const m = makeFightingMatch(4)
-  m.mods.fangFrenzy = true
+  m.mods.armedFrenzyMul = 1.5
+  m.mods.armedFrenzyDuration = 5
   // premier ordre ignoré ? Fang est sanguin, pas têtu — l'ordre passe.
   tick(m, 1 / 60, { command: 'attack', voiceEnergy: 0.7, faceEnergy: 0 })
-  if (m.mods.frenzyUntil <= m.t - 1 || m.mods.fangFrenzy)
+  if (m.mods.frenzyUntil <= m.t - 1 || m.mods.armedFrenzyDuration !== 0)
     throw new Error('fangFrenzy : « attaque ! » aurait dû déclencher la Frénésie')
   console.log('Signature Frénésie OK (armée par la carte, déclenchée à la voix)')
 }
@@ -203,6 +204,17 @@ function makeFightingMatch(playerIdx: number): MatchState {
   if (m.phase === 'fighting' && m.player.stance !== 'defensive')
     throw new Error('sulky : le second ordre aurait dû passer (Kenta n’est pas têtu)')
   console.log('Vie d’Écurie OK (Hype de départ + bouderie du premier ordre)')
+}
+
+// DSL d'effets : le coût calculé de chaque carte correspond au coût déclaré.
+{
+  const { CARD_POOL, SIGNATURE_CARDS, computeCost } = await import('../src/game/cards')
+  for (const c of [...CARD_POOL, ...SIGNATURE_CARDS]) {
+    const computed = computeCost(c.effects)
+    if (computed !== c.cost)
+      throw new Error(`coût DSL incohérent pour ${c.id} : déclaré ${c.cost}, calculé ${computed}`)
+  }
+  console.log(`DSL OK : coût budgétisé = coût déclaré pour ${CARD_POOL.length + SIGNATURE_CARDS.length} cartes`)
 }
 
 // Paliers de Lien : options de récompense déterministes et distinctes.
