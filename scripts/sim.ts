@@ -56,7 +56,17 @@ function runMatch(opts: SimOptions): { winner: 'player' | 'enemy'; cardProcs: nu
     if (m.phase === 'fighting' && m.t - roundStart > ROUND_TIME_LIMIT) forceRoundTimeout(m)
     if (m.phase === 'tactics') {
       if (m.plan === null) chooseTacticPlan(m, 'pressure')
-      if (!m.cardPlayedThisCorner && m.hand.length) playCard(m, m.hand[0])
+      // Joue tant que le Souffle le permet (première carte abordable de la main).
+      let played = true
+      while (played) {
+        played = false
+        for (const id of [...m.hand]) {
+          if (playCard(m, id)) {
+            played = true
+            break
+          }
+        }
+      }
     }
     if (m.phase === 'matchEnd') {
       return { winner: m.playerWins >= 2 ? 'player' : 'enemy', cardProcs }
@@ -71,7 +81,8 @@ let idleWins = 0
 let deckWins = 0
 let totalProcs = 0
 
-const testDeck: CardId[] = ['perfectCounter', 'warCry', 'lastChance']
+import { buildStarterDeck } from '../src/game/cards'
+const testDeck: CardId[] = buildStarterDeck(null)
 
 for (let i = 0; i < N; i++) {
   if (runMatch({ coached: true }).winner === 'player') coachedWins++

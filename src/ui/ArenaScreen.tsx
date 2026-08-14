@@ -2,15 +2,17 @@ import { useEffect, useRef, useState } from 'react'
 import type { CardId, Character, CoachCommand, MatchState, TacticPlan } from '../game/types'
 import {
   ROUND_TIME_LIMIT,
+  SOUFFLE_PER_CORNER,
   addSpeechHype,
   chooseTacticPlan,
   createMatch,
   forceRoundTimeout,
+  mulligan,
   playCard,
   tick,
   HYPE_MAX,
 } from '../game/combat'
-import { FAMILY_LABEL, getCard } from '../game/cards'
+import { TIMING_LABEL, getCard } from '../game/cards'
 import { ArenaRenderer, CANVAS_H, CANVAS_W } from '../render/arenaRenderer'
 import { VoiceCoach } from '../systems/voice'
 import { FaceCoach } from '../systems/facecam'
@@ -93,8 +95,11 @@ export default function ArenaScreen({
   const [micOk, setMicOk] = useState<boolean | null>(null)
   const [camOk, setCamOk] = useState(false)
   const [plan, setPlan] = useState<TacticPlan | null>(null)
-  const [hand, setHand] = useState<CardId[]>(deck)
-  const [cardPlayed, setCardPlayed] = useState(false)
+  const [hand, setHand] = useState<CardId[]>([])
+  const [souffle, setSouffle] = useState(SOUFFLE_PER_CORNER)
+  const [mullMode, setMullMode] = useState(false)
+  const [mullSel, setMullSel] = useState<number[]>([])
+  const [mullUsed, setMullUsed] = useState(false)
   const [tacticsLeft, setTacticsLeft] = useState(0)
   const [speechEnergy, setSpeechEnergy] = useState(0)
   const [specialReady, setSpecialReady] = useState(false)
@@ -181,7 +186,10 @@ export default function ArenaScreen({
         if (m.phase === 'tactics') {
           setPlan(null)
           setHand([...m.hand])
-          setCardPlayed(false)
+          setSouffle(m.souffle)
+          setMullMode(false)
+          setMullSel([])
+          setMullUsed(false)
         }
       }
       setSpecialReady(m.player.hype >= HYPE_MAX)
@@ -311,10 +319,26 @@ export default function ArenaScreen({
   }
 
   const onPlayCard = (id: CardId) => {
-    if (playCard(matchRef.current, id)) {
-      setHand([...matchRef.current.hand])
-      setCardPlayed(true)
+    const m = matchRef.current
+    if (playCard(m, id)) {
+      setHand([...m.hand])
+      setSouffle(m.souffle)
     }
+  }
+
+  const toggleMullSel = (idx: number) => {
+    setMullSel(sel => (sel.includes(idx) ? sel.filter(i => i !== idx) : [...sel, idx]))
+  }
+
+  const doMulligan = () => {
+    const m = matchRef.current
+    const ids = mullSel.map(i => hand[i]).filter(Boolean)
+    if (mulligan(m, ids)) {
+      setHand([...m.hand])
+      setMullUsed(true)
+    }
+    setMullMode(false)
+    setMullSel([])
   }
 
   const toggleMute = () => {
@@ -391,29 +415,55 @@ export default function ArenaScreen({
           </div>
           {hand.length > 0 && (
             <>
-              <h2 style={{ fontSize: '0.95rem' }}>🃏 Carnet du Coach</h2>
+              <h2 style={{ fontSize: '0.95rem' }}>
+                🃏 Ta main{' '}
+                <span style={{ color: 'var(--violet)' }}>
+                  {'●'.repeat(souffle)}
+                  {'○'.repeat(Math.max(0, SOUFFLE_PER_CORNER - souffle))} Souffle
+                </span>
+              </h2>
               <div className="planGrid">
-                {hand.map(id => {
+                {hand.map((id, idx) => {
                   const c = getCard(id)
+                  const affordable = souffle >= c.cost
+                  const selected = mullMode && mullSel.includes(idx)
                   return (
                     <button
-                      key={id}
-                      className="planCard"
-                      disabled={cardPlayed}
-                      style={cardPlayed ? { opacity: 0.4 } : undefined}
-                      onClick={() => onPlayCard(id)}
+                      key={`${id}-${idx}`}
+                      className={`planCard${selected ? ' selected' : ''}`}
+                      disabled={!mullMode && !affordable}
+                      style={!mullMode && !affordable ? { opacity: 0.45 } : undefined}
+                      onClick={() => (mullMode ? toggleMullSel(idx) : onPlayCard(id))}
                     >
                       <b>
-                        {c.icon} {c.name}
+                        {c.icon} {c.name}{' '}
+                        <span style={{ color: 'var(--violet)' }}>{'●'.repeat(c.cost)}</span>
                       </b>
                       <span>
-                        [{FAMILY_LABEL[c.family]}] {c.desc}
+                        [{TIMING_LABEL[c.timing]}] {c.desc}
                       </span>
                     </button>
                   )
                 })}
               </div>
-              {cardPlayed && <span className="permNote">Carte jouée — une seule par coin du ring.</span>}
+              {!mullUsed ? (
+                mullMode ? (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn secondary" onClick={doMulligan} disabled={mullSel.length === 0}>
+                      Échanger {mullSel.length || ''} carte{mullSel.length > 1 ? 's' : ''}
+                    </button>
+                    <button className="btn secondary" onClick={() => { setMullMode(false); setMullSel([]) }}>
+                      Annuler
+                    </button>
+                  </div>
+                ) : (
+                  <button className="btn secondary" onClick={() => setMullMode(true)}>
+                    🔄 Échanger des cartes (1 fois)
+                  </button>
+                )
+              ) : (
+                <span className="permNote">Échange utilisé pour cette pause.</span>
+              )}
             </>
           )}
           <div className="speechMeter">

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { CardId, Character } from './game/types'
 import { pickOpponent } from './game/characters'
-import { DEFAULT_DECK } from './game/cards'
+import { buildStarterDeck } from './game/cards'
 import { applyBond, recordResult } from './game/progression'
 import { useRef } from 'react'
 import TitleScreen from './ui/TitleScreen'
@@ -18,7 +18,7 @@ export default function App() {
   const [enemy, setEnemy] = useState<Character | null>(null)
   const [outcome, setOutcome] = useState<MatchOutcome | null>(null)
   const [matchKey, setMatchKey] = useState(0)
-  const [deck, setDeck] = useState<CardId[]>(DEFAULT_DECK)
+  const [deck, setDeck] = useState<CardId[]>(() => buildStarterDeck(null))
 
   const streamRef = useRef<MediaStream | null>(null)
 

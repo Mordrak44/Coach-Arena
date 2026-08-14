@@ -9,7 +9,7 @@ import type {
   Stance,
   TacticPlan,
 } from './types'
-import { DEFAULT_DECK, getCard } from './cards'
+import { buildStarterDeck, getCard, shuffle } from './cards'
 
 // ---------------------------------------------------------------------------
 // Constantes d'équilibrage
@@ -22,6 +22,8 @@ export const TACTICS_DURATION = 20
 export const HYPE_MAX = 100
 export const CONFUSION_ORDER_WINDOW = 2 // s : deux ordres à moins de 2 s = confusion
 export const CONFUSION_DURATION = 3
+export const HAND_SIZE = 5
+export const SOUFFLE_PER_CORNER = 3
 
 /** Dégâts de base d'un coup normal — calibré pour des rounds de 45-60 s. */
 function baseDamage(atk: number): number {
@@ -73,9 +75,10 @@ function makeFighter(char: Character, side: 'player' | 'enemy'): FighterState {
 export function createMatch(
   playerChar: Character,
   enemyChar: Character,
-  deck: CardId[] = DEFAULT_DECK,
+  deckList?: CardId[],
 ): MatchState {
-  return {
+  const deck = shuffle(deckList ?? buildStarterDeck(null))
+  const m: MatchState = {
     player: makeFighter(playerChar, 'player'),
     enemy: makeFighter(enemyChar, 'enemy'),
     round: 1,
@@ -85,8 +88,11 @@ export function createMatch(
     t: 0,
     phaseUntil: INTRO_DURATION,
     plan: null,
-    hand: [...deck],
-    cardPlayedThisCorner: false,
+    deck,
+    hand: [],
+    discard: [],
+    souffle: SOUFFLE_PER_CORNER,
+    mulliganUsed: false,
     mods: {
       perfectCounter: false,
       warCry: false,
@@ -104,24 +110,72 @@ export function createMatch(
     },
     events: [{ kind: 'roundStart', t: 0, round: 1 }],
   }
+  drawCards(m, HAND_SIZE)
+  return m
 }
 
 // ---------------------------------------------------------------------------
-// Carnet du Coach
+// Le Deck du Coach : pioche, Souffle, mulligan
 // ---------------------------------------------------------------------------
 
-/** Joue une carte pendant la phase tactique. Une seule par coin du ring. */
+export function drawCards(m: MatchState, n: number): void {
+  while (n-- > 0 && m.hand.length < HAND_SIZE) {
+    if (m.deck.length === 0) {
+      // La défausse redevient la pioche (mélangée).
+      if (m.discard.length === 0) return
+      m.deck = shuffle(m.discard)
+      m.discard = []
+    }
+    m.hand.push(m.deck.shift()!)
+  }
+}
+
+/**
+ * Mulligan : échange 1 à 5 cartes de la main contre autant de pioches.
+ * Une seule fois par coin du ring.
+ */
+export function mulligan(m: MatchState, ids: CardId[]): boolean {
+  if (m.phase !== 'tactics' || m.mulliganUsed || ids.length === 0) return false
+  const discarded: CardId[] = []
+  for (const id of ids) {
+    const idx = m.hand.indexOf(id)
+    if (idx !== -1) {
+      m.hand.splice(idx, 1)
+      discarded.push(id)
+    }
+  }
+  if (discarded.length === 0) return false
+  m.mulliganUsed = true
+  const count = discarded.length
+  drawCards(m, count)
+  m.discard.push(...discarded) // défaussées APRÈS la pioche : on ne les repioche pas
+  return true
+}
+
+/** Joue une carte pendant la phase tactique, si le Souffle le permet. */
 export function playCard(m: MatchState, id: CardId): boolean {
-  if (m.phase !== 'tactics' || m.cardPlayedThisCorner) return false
+  if (m.phase !== 'tactics') return false
+  const card = getCard(id)
+  if (m.souffle < card.cost) return false
   const idx = m.hand.indexOf(id)
   if (idx === -1) return false
   m.hand.splice(idx, 1)
-  m.cardPlayedThisCorner = true
-  m.events.push({ kind: 'card', t: m.t, name: getCard(id).name })
+  m.discard.push(id)
+  m.souffle -= card.cost
+  m.events.push({ kind: 'card', t: m.t, name: card.name })
 
   switch (id) {
     case 'secondWind':
       m.player.hp = Math.min(m.player.maxHp, m.player.hp + Math.round(m.player.maxHp * 0.2))
+      break
+    case 'massage':
+      m.player.hp = Math.min(m.player.maxHp, m.player.hp + Math.round(m.player.maxHp * 0.08))
+      break
+    case 'focus':
+      m.player.hype = Math.min(HYPE_MAX, m.player.hype + 15)
+      break
+    case 'coldShower':
+      m.enemy.hype = Math.max(0, m.enemy.hype - 30)
       break
     case 'ironGuard':
       m.mods.ironGuard = true
@@ -423,7 +477,10 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
         } else {
           m.phase = 'tactics'
           m.phaseUntil = m.t + TACTICS_DURATION
-          m.cardPlayedThisCorner = false
+          // Nouveau coin du ring : Souffle rechargé, main recomplétée.
+          m.souffle = SOUFFLE_PER_CORNER
+          m.mulliganUsed = false
+          drawCards(m, HAND_SIZE - m.hand.length)
         }
       }
       return

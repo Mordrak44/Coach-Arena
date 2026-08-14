@@ -3,10 +3,11 @@ import type { CardId, Character } from '../game/types'
 import { ROSTER, TRAIT_INFO, createFromPrompt } from '../game/characters'
 import {
   CARD_POOL,
-  DEFAULT_DECK,
-  FAMILY_LABEL,
+  DECK_COPIES,
+  TIMING_LABEL,
   SIGNATURE_BOND_LEVEL,
   SIGNATURE_CARDS,
+  buildStarterDeck,
 } from '../game/cards'
 import { bondLevel, bondTitle, getProgress, loadCustoms, saveCustom } from '../game/progression'
 
@@ -68,13 +69,6 @@ export default function CharacterSelect({
   const [selected, setSelected] = useState<Character | null>(null)
   const [prompt, setPrompt] = useState('')
   const [customs, setCustoms] = useState<Character[]>(() => loadCustoms())
-  const [deck, setDeck] = useState<CardId[]>(DEFAULT_DECK)
-
-  const toggleCard = (id: CardId) => {
-    setDeck(d =>
-      d.includes(id) ? d.filter(x => x !== id) : d.length < 3 ? [...d, id] : d,
-    )
-  }
 
   // Carte signature du perso sélectionné (visible verrouillée tant que le
   // Lien est insuffisant — on montre la carotte).
@@ -82,16 +76,10 @@ export default function CharacterSelect({
   const signatureUnlocked =
     !!selected && !!signature && bondLevel(getProgress(selected.id).wins) >= SIGNATURE_BOND_LEVEL
 
-  const pickChar = (c: Character) => {
-    setSelected(c)
-    // Une signature d'un autre perso ne peut pas rester dans le carnet.
-    setDeck(d =>
-      d.filter(id => {
-        const card = SIGNATURE_CARDS.find(s => s.id === id)
-        return !card || card.signatureOf === c.id
-      }),
-    )
-  }
+  const pickChar = (c: Character) => setSelected(c)
+
+  // Deck de départ auto-construit (le deck-builder complet viendra en v1).
+  const deck: CardId[] = buildStarterDeck(signatureUnlocked && signature ? signature.id : null)
 
   const forge = () => {
     if (prompt.trim().length < 3) return
@@ -127,60 +115,49 @@ export default function CharacterSelect({
       </div>
 
       <h2 style={{ fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--accent)' }}>
-        🃏 Ton Carnet du Coach ({deck.length}/3)
+        🃏 Ton Deck de Coach ({deck.length} cartes)
       </h2>
       <p className="permNote">
-        3 cartes, jouables une par une au coin du ring entre les rounds.
+        Tu pioches 5 cartes ; à chaque pause : 3 points de Souffle à dépenser et un échange
+        possible. Deck de départ auto ({DECK_COPIES} copies par carte) — le deck-builder arrive.
       </p>
       <div className="roster">
         {signature && (
-          <button
+          <div
             key={signature.id}
-            className={`charCard${deck.includes(signature.id) ? ' selected' : ''}`}
-            disabled={!signatureUnlocked}
+            className="charCard"
             style={
-              signatureUnlocked
-                ? { borderColor: '#fd79a8' }
-                : { opacity: 0.55, cursor: 'default' }
+              signatureUnlocked ? { borderColor: '#fd79a8' } : { opacity: 0.55 }
             }
-            onClick={() => signatureUnlocked && toggleCard(signature.id)}
           >
             <div className="cname" style={{ color: '#fd79a8' }}>
               {signatureUnlocked ? signature.icon : '🔒'} {signature.name}
             </div>
-            <div className="ctitle">Signature · {FAMILY_LABEL[signature.family]}</div>
+            <div className="ctitle">Signature · {TIMING_LABEL[signature.timing]}</div>
             <div style={{ fontSize: '0.7rem', marginTop: 4, color: 'var(--muted)' }}>
               {signatureUnlocked
                 ? signature.desc
                 : `Se débloque au Lien niv. ${SIGNATURE_BOND_LEVEL} (« Protégé ») avec ${selected?.name}.`}
             </div>
-          </button>
+          </div>
         )}
         {CARD_POOL.map(c => (
-          <button
-            key={c.id}
-            className={`charCard${deck.includes(c.id) ? ' selected' : ''}`}
-            onClick={() => toggleCard(c.id)}
-          >
+          <div key={c.id} className="charCard">
             <div className="cname">
-              {c.icon} {c.name}
+              {c.icon} {c.name} <span style={{ color: 'var(--violet)' }}>{'●'.repeat(c.cost)}</span>
             </div>
-            <div className="ctitle">{FAMILY_LABEL[c.family]}</div>
+            <div className="ctitle">{TIMING_LABEL[c.timing]}</div>
             <div style={{ fontSize: '0.7rem', marginTop: 4, color: 'var(--muted)' }}>{c.desc}</div>
-          </button>
+          </div>
         ))}
       </div>
 
       <button
         className="btn"
-        disabled={!selected || deck.length !== 3}
+        disabled={!selected}
         onClick={() => selected && onConfirm(selected, deck)}
       >
-        {!selected
-          ? 'Sélectionne un perso'
-          : deck.length !== 3
-            ? `Choisis ${3 - deck.length} carte(s)`
-            : `Coacher ${selected.name} !`}
+        {!selected ? 'Sélectionne un perso' : `Coacher ${selected.name} !`}
       </button>
     </div>
   )

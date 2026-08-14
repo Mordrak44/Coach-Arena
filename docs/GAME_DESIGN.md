@@ -80,18 +80,29 @@ effets courts) ; **entre les rounds = la stratégie** (choix posés, effets
 durables). Pas de cartes à jouer pendant l'action — la voix et le visage
 sont la manette, on ne la dilue pas.
 
-### Le Carnet du Coach (cartes, jouées au coin du ring)
+### Le Deck du Coach (système TCG, décidé le 2026-08-14)
 
-- Carnet de 3 cartes composé avant le match ; 1 carte jouable par coin du
-  ring.
-- Trois familles :
-  - **Directes** : effet immédiat simple (*Second Souffle* : +20 % PV).
-  - **Armées** : préparent un déclencheur vocal du prochain round —
-    préparation × exécution (*Contre Parfait* : le prochain « contre ! »
-    crié inflige des dégâts doublés).
-  - **Conditionnelles** : pari sur le scénario du round (*Dernière
-    Chance* : sous 15 % PV, Hype remplie d'un coup ; *Provocation* :
-    l'adversaire démarre agressif — tu sais ce qui arrive).
+- **Deck** de 18 cartes en v0 (cible 30-60 avec la collection), mélangé ;
+  **main de 5** piochée au début du match, recomplétée à chaque pause.
+- **Souffle** : 3 points par coin du ring ; chaque carte coûte 1-2. Jouer
+  plusieurs petites cartes ou une grosse, c'est l'arbitrage du coach.
+- **Mulligan** : une fois par pause, échanger 1 à 5 cartes de sa main
+  contre autant de pioches — s'adapter à ce qu'on vient de voir.
+- Défausse remélangée dans la pioche quand elle est vide.
+- Trois familles par **timing** (les mains ne touchent jamais les cartes
+  pendant le round — la voix reste la manette) :
+  - **Coach** (pause) : effet immédiat au coin du ring (*Second Souffle*
+    +20 % PV, *Massage Éclair*, *Mise au Point* +Hype, *Douche Froide*
+    −30 Hype adverse, *Garde de Fer*).
+  - **Instant armé** : préchargé à la pause, **libéré à la voix** pendant
+    le round (*Contre Parfait* : le prochain « CONTRE ! » crié double les
+    dégâts ; *Cri de Guerre*).
+  - **Instant pari** : déclenché par le scénario du round (*Dernière
+    Chance*, *Provocation*, la plupart des signatures).
+- v1 : deck-builder (collection, 2-3 copies max par carte, deck 30-60),
+  cartes d'interaction (bloquer/saboter la carte adverse quand l'IA
+  jouera son propre deck), effets paramétrés en données pour passer à
+  des dizaines puis centaines de cartes sans risque.
 
 ### Traits d'écoute (personnalité des persos)
 

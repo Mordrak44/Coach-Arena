@@ -75,6 +75,15 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       du perso, fallback boutons/clavier assumé si refus
 - [ ] Tests unitaires du moteur de combat (vitest)
 
+## v1 — Deck & collection (voir GAME_DESIGN.md §4 bis)
+
+- [ ] Deck-builder : collection, 2-3 copies max par carte, deck 30-60
+- [ ] L'IA adverse joue son propre deck (→ cartes d'interaction :
+      bloquer/saboter la carte adverse, façon « Douche Froide » étendue)
+- [ ] Effets de cartes paramétrés en données (DSL) pour monter à des
+      dizaines/centaines de cartes testées par simulation
+- [ ] Nouvelles cartes par vagues de 5-10, équilibrées via scripts/sim.ts
+
 ## v1 — Mode Cinématique (voir GAME_DESIGN.md §7)
 
 Le match devient un épisode d'anime : scènes Kling générées en asynchrone
@@ -161,3 +170,11 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
   l'arène avec explication de chaque capteur et fallback affiché,
   rappel du trait d'écoute du perso, bouton « Faire sonner le gong ».
   Le flux médias est acquis au Vestiaire et transmis à l'arène.
+- 2026-08-14 : Le Carnet devient le Deck du Coach (demande utilisateur,
+  format TCG) : deck mélangé (18 cartes v0), main de 5, pioche à chaque
+  pause, coût en Souffle (3/pause), mulligan 1-5 cartes une fois par
+  pause, défausse remélangée. 3 nouvelles cartes Coach (Massage Éclair,
+  Mise au Point, Douche Froide — première interaction anti-adversaire).
+  Familles reformulées par timing : Coach / Instant·voix / Instant·pari.
+  Équilibrage sain : le deck naïf n'est plus un auto-win (93 % vs 94 %
+  sans cartes) — la valeur est dans le choix, plus dans la possession.

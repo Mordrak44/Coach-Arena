@@ -62,15 +62,24 @@ export type TacticPlan = 'pressure' | 'concrete' | 'counterplay' | 'coldblood'
 
 // --- Carnet du Coach -------------------------------------------------------
 
-export type CardFamily = 'direct' | 'armed' | 'conditional'
+/**
+ * Timing d'une carte :
+ * - pause : carte Coach, effet immédiat au coin du ring
+ * - armed : instant préchargé, libéré PAR LA VOIX pendant le round suivant
+ * - condition : instant pari, déclenché par le scénario du round
+ */
+export type CardTiming = 'pause' | 'armed' | 'condition'
 
 export type CardId =
-  | 'secondWind' // direct : +20 % PV
-  | 'ironGuard' // direct : garde renforcée au prochain round
-  | 'perfectCounter' // armée : le prochain « contre ! » crié fait ×2 dégâts
-  | 'warCry' // armée : le prochain encouragement crié remplit fort la Hype
-  | 'lastChance' // conditionnelle : sous 15 % PV → Hype pleine (une fois)
-  | 'provocation' // conditionnelle : l'adversaire démarre le round agressif
+  | 'secondWind' // pause : +20 % PV
+  | 'massage' // pause : +8 % PV, coût 1
+  | 'focus' // pause : +15 Hype
+  | 'coldShower' // pause : l'adversaire perd 30 Hype
+  | 'ironGuard' // pause : garde renforcée au prochain round
+  | 'perfectCounter' // armed : le prochain « contre ! » crié fait ×2 dégâts
+  | 'warCry' // armed : le prochain encouragement crié remplit fort la Hype
+  | 'lastChance' // condition : sous 15 % PV → Hype pleine (une fois)
+  | 'provocation' // condition : l'adversaire démarre le round agressif
   // Cartes signatures (une par perso du roster, débloquées par le Lien)
   | 'sigKenta' // Cœur Vaillant : encaisser 3 coups → +40 Hype
   | 'sigRei' // Orgueil du Rival : le prochain contre remplit 50 % de la Hype
@@ -82,7 +91,9 @@ export type CardId =
 export interface CoachCard {
   id: CardId
   name: string
-  family: CardFamily
+  timing: CardTiming
+  /** coût en Souffle (le budget de la pause) */
+  cost: number
   icon: string
   desc: string
   /** id du perso dont c'est la carte signature (débloquée par le Lien) */
@@ -165,10 +176,16 @@ export interface MatchState {
   phaseUntil: number
   /** plan tactique actif du joueur pour le round courant */
   plan: TacticPlan | null
-  /** cartes encore en main (carnet de 3 au départ) */
+  /** pioche (deck mélangé, face cachée) */
+  deck: CardId[]
+  /** main du coach (jusqu'à HAND_SIZE cartes) */
   hand: CardId[]
-  /** une seule carte jouable par coin du ring */
-  cardPlayedThisCorner: boolean
+  /** défausse */
+  discard: CardId[]
+  /** points de Souffle restants pour cette pause */
+  souffle: number
+  /** un seul échange (mulligan) par coin du ring */
+  mulliganUsed: boolean
   /** effets de cartes actifs côté joueur */
   mods: CardMods
   events: CombatEvent[]
