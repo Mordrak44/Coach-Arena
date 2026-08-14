@@ -196,6 +196,12 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [x] FIX mobile découvert par la capture : sur les écrans plus étroits
       que 9:16, l'aspect du .stage cassait et le canvas rognait le HUD
       (height: min(100vh, 100vw·16/9)).
+- [x] Écran titre « attract mode » : un combat IA vs IA (Hype de départ
+      60, phases tactiques sautées, nouveau matchup en boucle) tourne
+      derrière le titre comme une borne d'arcade, voile dégradé (texte
+      lisible en haut, ring visible en bas). Le funnel TikTok voit du
+      gameplay AVANT le premier clic. shot.mjs capture désormais tout le
+      funnel (titre, sélection, arène ×2).
 - [x] Silhouettes v2 « encrées » : contours manga sur toutes les formes,
       membres courbés en 2 segments (coude/genou implicites), torse
       habillé (épaules→taille, col en V, ceinture nouée), gants et pieds,
@@ -252,6 +258,15 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-14 (routine) : Attract mode sur l'écran titre — capture du
+  funnel d'entrée (titre/sélection) : la sélection tient la route, le
+  titre était un mur sombre. Il est maintenant une borne d'arcade :
+  combat IA vs IA en boucle derrière le titre (le moteur complet tourne,
+  matchup aléatoire à chaque fin de match), voile dégradé pour la
+  lisibilité, UI remontée pour laisser le ring visible. Vérifié en
+  capture : Gorō vs Fang se battent sous le bouton « Entrer dans
+  l'arène ».
 
 - 2026-08-14 (routine) : Silhouettes v2 encrées — les bonshommes-bâtons
   deviennent des personnages : contour manga systématique (formes

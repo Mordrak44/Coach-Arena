@@ -18,8 +18,17 @@ try {
     args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'],
   })
   const page = await browser.newPage({ viewport: { width: 430, height: 932 } })
+
+  // Le funnel d'entrée : titre puis sélection
+  await page.goto(`http://localhost:${PORT}/`)
+  await page.waitForTimeout(1200)
+  await page.screenshot({ path: `${outDir}/title.png` })
+  await page.click('button')
+  await page.waitForTimeout(1200)
+  await page.screenshot({ path: `${outDir}/select.png` })
+
+  // L'arène en mode démo — deux instants différents du match
   await page.goto(`http://localhost:${PORT}/?demo`)
-  // intro 3 s puis combat — deux instants différents du match
   await page.waitForTimeout(4500)
   await page.screenshot({ path: `${outDir}/arena-1.png` })
   await page.waitForTimeout(6000)
