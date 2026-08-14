@@ -244,6 +244,8 @@ export interface MatchState {
   souffle: number
   /** un seul échange (mulligan) par coin du ring */
   mulliganUsed: boolean
+  /** une seule consigne parlée comprise par coin du ring */
+  consigneUsed: boolean
   /** humeur basse : le premier ordre du match est boudé (Vie d'Écurie) */
   sulky: boolean
   /** effets de cartes actifs côté joueur */

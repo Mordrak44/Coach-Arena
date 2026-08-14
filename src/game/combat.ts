@@ -11,7 +11,7 @@ import type {
   Stance,
   TacticPlan,
 } from './types'
-import { buildStarterDeck, getCard, shuffle, signatureFor } from './cards'
+import { buildStarterDeck, clampEffect, getCard, shuffle, signatureFor } from './cards'
 
 // ---------------------------------------------------------------------------
 // Constantes d'équilibrage
@@ -141,6 +141,7 @@ export function createMatch(
     discard: [],
     souffle: SOUFFLE_PER_CORNER,
     mulliganUsed: false,
+    consigneUsed: false,
     sulky: opts.sulky ?? false,
     mods: freshMods(),
     enemyDeck: shuffle(buildStarterDeck(signatureFor(enemyChar.id))),
@@ -304,6 +305,19 @@ export function playCard(m: MatchState, id: CardId): boolean {
   m.events.push({ kind: 'card', t: m.t, name: card.name })
 
   applyCardEffects(m, card.effects, 'player')
+  return true
+}
+
+/**
+ * Consigne parlée comprise au coin du ring (discours → primitives DSL,
+ * voir speechTactics.ts). Gratuite mais bornée (clampEffect) et une seule
+ * par pause : la parole est la ressource, pas le Souffle.
+ */
+export function applyConsigne(m: MatchState, effects: EffectPrimitive[], label: string): boolean {
+  if (m.phase !== 'tactics' || m.consigneUsed || effects.length === 0) return false
+  m.consigneUsed = true
+  applyCardEffects(m, effects.slice(0, 2).map(clampEffect), 'player')
+  m.events.push({ kind: 'card', t: m.t, name: `🎤 ${label}` })
   return true
 }
 
@@ -719,6 +733,7 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
           m.plan = null
           m.souffle = SOUFFLE_PER_CORNER
           m.mulliganUsed = false
+          m.consigneUsed = false
           drawCards(m, HAND_SIZE - m.hand.length)
           enemyCornerPlay(m)
         }

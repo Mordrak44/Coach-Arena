@@ -5,6 +5,7 @@ import {
   ROUND_TIME_LIMIT,
   SOUFFLE_PER_CORNER,
   addSpeechHype,
+  applyConsigne,
   chooseTacticPlan,
   createMatch,
   forceRoundTimeout,
@@ -13,6 +14,7 @@ import {
   tick,
   HYPE_MAX,
 } from '../game/combat'
+import { parseConsigne } from '../game/speechTactics'
 import { TIMING_LABEL, getCard } from '../game/cards'
 import { Commentator } from '../game/commentator'
 import { ArenaRenderer, CANVAS_H, CANVAS_W } from '../render/arenaRenderer'
@@ -110,6 +112,8 @@ export default function ArenaScreen({
   const [mullUsed, setMullUsed] = useState(false)
   const [tacticsLeft, setTacticsLeft] = useState(0)
   const [speechEnergy, setSpeechEnergy] = useState(0)
+  const [consigne, setConsigne] = useState<string | null>(null)
+  const lastFinalSeq = useRef(0)
   const [specialReady, setSpecialReady] = useState(false)
   const [ultiReady, setUltiReady] = useState(false)
   const [muted, setMuted] = useState(false)
@@ -182,12 +186,21 @@ export default function ArenaScreen({
       if (prevPhase !== 'fighting' && m.phase === 'fighting') roundStart = m.t
       if (m.phase === 'fighting' && m.t - roundStart > ROUND_TIME_LIMIT) forceRoundTimeout(m)
 
-      // Pendant la phase tactique, le discours du coach charge la Hype.
+      // Pendant la phase tactique, le discours du coach charge la Hype…
       if (m.phase === 'tactics') {
         const e = sys.voice.state.energy * 0.7 + sys.face.state.energy * 0.3
         if (e > 0.2) addSpeechHype(m, e * dt * 18)
         setTacticsLeft(Math.max(0, Math.ceil(m.phaseUntil - m.t)))
         setSpeechEnergy(sys.voice.state.energy)
+        // …et chaque phrase finale peut devenir une CONSIGNE comprise
+        // (une par pause — voir speechTactics.ts).
+        if (sys.voice.state.finalSeq !== lastFinalSeq.current) {
+          lastFinalSeq.current = sys.voice.state.finalSeq
+          if (!m.consigneUsed) {
+            const c = parseConsigne(sys.voice.state.lastFinal)
+            if (c && applyConsigne(m, c.effects, c.label)) setConsigne(c.label)
+          }
+        }
       }
 
       if (m.phase !== prevPhase) {
@@ -199,6 +212,9 @@ export default function ArenaScreen({
           setMullMode(false)
           setMullSel([])
           setMullUsed(false)
+          setConsigne(null)
+          // Ignore les phrases prononcées pendant le round écoulé.
+          lastFinalSeq.current = sys.voice.state.finalSeq
         }
       }
       setSpecialReady(m.player.hype >= HYPE_MAX)
@@ -437,6 +453,16 @@ export default function ArenaScreen({
             Choisis le plan du prochain round — et <b>parle à ton perso</b> : ton discours de coach
             charge sa Hype !
           </p>
+          {consigne ? (
+            <p className="permNote" style={{ color: '#ffd166' }}>
+              🎤 Consigne comprise : <b>{consigne}</b>
+            </p>
+          ) : (
+            <p className="permNote">
+              🎤 Donne une consigne à voix haute — « s'il sort son spécial, esquive ! », « garde
+              haute », « chauffe-le »…
+            </p>
+          )}
           <div className="planGrid">
             {PLANS.map(p => (
               <button

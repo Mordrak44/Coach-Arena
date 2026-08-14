@@ -145,11 +145,15 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 - [ ] Scènes image-to-video : entrée dans l'arène, moment fort du round, KO
 - [ ] Montage final du match (concat des clips + habillage) exportable 9:16
 - [ ] Génération de perso via API Claude (stats + lore + nom du spécial)
-- [ ] Le discours du coin du ring COMPRIS par Claude : consigne libre
-      (« s'il balance son spécial, esquive et contre ») → primitives DSL
-      réelles (plan + armements conditionnels), comme une carte invisible
-      forgée par la parole. Pendant le round : mots-clés assumés (latence
-      + réalisme boxe : codes courts en combat, stratégie à la pause).
+- [x] Le discours du coin du ring COMPRIS — v0 locale : parseur de
+      consignes (speechTactics.ts, 9 règles dont conditionnelles « s'il
+      sort son spécial… esquive »), phrases finales de la reco captées
+      pendant la pause, 1 consigne gratuite par pause (max 2 primitives
+      clampées, plus faibles que les cartes — la parole est la
+      ressource), événement 🎤 + affichage dans l'overlay tactique.
+      v1 : API Claude à la place du parseur (vraie compréhension), ce
+      parseur devient le fallback hors-ligne. Pendant le round :
+      mots-clés assumés (latence + réalisme boxe).
 - [ ] Émotions MediaPipe FaceLandmarker (sourire/cri/colère → bonus distincts)
 - [ ] Export mp4 (transcodage) + partage natif (Web Share API)
 - [ ] i18n (fr/en)
@@ -177,6 +181,16 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-14 (routine) : Les consignes parlées v0 — réponse au constat
+  utilisateur « ce qu'on dit n'a pas d'impact » : au coin du ring, chaque
+  phrase finale de la reco vocale passe au parseur de consignes
+  (9 familles, conditionnelles comprises) ; si comprise → primitives DSL
+  gratuites mais bornées et plus faibles que les cartes, 1/pause,
+  événement 🎤 annoncé + confirmation dans l'overlay. VoiceCoach expose
+  désormais lastFinal/finalSeq (les phrases stabilisées). Tests sim :
+  parsing conditionnel, combo 2 primitives, rejet du bruit, application
+  unique par pause. La v1 Claude remplacera le parseur, même contrat.
 
 - 2026-08-14 (routine) : Le coin adverse joue un VRAI deck — enemyDeck/
   enemyHand/enemySouffle symétriques, applyCardEffects paramétré par camp,

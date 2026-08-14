@@ -11,6 +11,10 @@ export interface VoiceState {
   energy: number
   /** dernier texte entendu (affiché dans le HUD pour le feedback) */
   lastHeard: string
+  /** dernière phrase FINALE (résultat stabilisé) — pour les consignes de pause */
+  lastFinal: string
+  /** incrémenté à chaque phrase finale : permet de détecter les nouvelles */
+  finalSeq: number
   supported: boolean
   listening: boolean
 }
@@ -39,6 +43,8 @@ export class VoiceCoach {
     pendingCommand: null,
     energy: 0,
     lastHeard: '',
+    lastFinal: '',
+    finalSeq: 0,
     supported: false,
     listening: false,
   }
@@ -103,6 +109,10 @@ export class VoiceCoach {
       const text: string = res[0].transcript.trim()
       if (!text) return
       this.state.lastHeard = text
+      if (res.isFinal) {
+        this.state.lastFinal = text
+        this.state.finalSeq++
+      }
       const cmd = matchCommand(text)
       // Les résultats finaux ET intermédiaires déclenchent (réactivité) ;
       // la dédup se fait côté jeu via la fenêtre anti-spam.

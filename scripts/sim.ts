@@ -291,6 +291,32 @@ function makeFightingMatch(playerIdx: number): MatchState {
   console.log('Coin adverse (vrai deck) OK : sabotage, soin, mods symétriques, provocation')
 }
 
+// Consignes parlées au coin du ring (parseur local v0, futur fallback Claude).
+{
+  const { parseConsigne } = await import('../src/game/speechTactics')
+  const { applyConsigne } = await import('../src/game/combat')
+
+  const c1 = parseConsigne("s'il sort son spécial tu esquives d'accord")
+  if (!c1 || !c1.effects.some(e => e.kind === 'halveEnemySpecial'))
+    throw new Error('consigne : le spécial adverse aurait dû être anticipé')
+  const c2 = parseConsigne('respire un bon coup et garde haute surtout')
+  if (!c2 || c2.effects.length !== 2)
+    throw new Error(`consigne : heal + garde attendus (reçu ${c2?.effects.length ?? 0})`)
+  if (parseConsigne('euh') !== null) throw new Error('consigne : le bruit court devrait être ignoré')
+  if (parseConsigne('il fait beau ce soir non ?') !== null)
+    throw new Error('consigne : une phrase sans mot-clé devrait être ignorée')
+
+  const m = createMatch(ROSTER[0], ROSTER[1], [])
+  m.phase = 'tactics'
+  if (!applyConsigne(m, c1.effects, c1.label)) throw new Error('consigne : application refusée')
+  if (!m.mods.halveEnemySpecial) throw new Error('consigne : mod non appliqué')
+  const ev = m.events[m.events.length - 1]
+  if (ev.kind !== 'card' || !ev.name.startsWith('🎤'))
+    throw new Error('consigne : événement 🎤 manquant')
+  if (applyConsigne(m, c2.effects, c2.label)) throw new Error('consigne : une seule par pause')
+  console.log(`Consignes parlées OK (« ${c1.label} », une par pause)`)
+}
+
 // Forge de cartes : prompt → primitives bornées + coût budgétisé + jouable en match.
 {
   const { forgeCard } = await import('../src/game/cardForge')
