@@ -311,7 +311,13 @@ export default function ArenaScreen({
 
     const onKey = (e: KeyboardEvent) => {
       const cmd = KEYMAP[e.key.toLowerCase()]
-      if (cmd) pendingCmd.current = cmd
+      if (cmd) {
+        // Sans preventDefault, Espace réactive aussi le dernier bouton
+        // cliqué (focus) → deux ordres dans la fenêtre anti-spam → fausse
+        // Confusion. (Et Espace ne doit pas faire défiler la page.)
+        e.preventDefault()
+        pendingCmd.current = cmd
+      }
     }
     window.addEventListener('keydown', onKey)
 

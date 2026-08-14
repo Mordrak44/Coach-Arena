@@ -30,9 +30,13 @@ export default function App() {
 
   const streamRef = useRef<MediaStream | null>(null)
   const matchOptsRef = useRef<MatchOpts>({})
+  // Perso de BASE (non modifié) : la Revanche repart toujours de lui, sinon
+  // les bonus de Lien/entraînement s'empileraient à chaque match.
+  const baseCharRef = useRef<Character | null>(null)
 
   const startMatch = (char: Character, chosenDeck?: CardId[]) => {
     if (chosenDeck) setDeck(chosenDeck)
+    baseCharRef.current = char
     let fighter = applyBond(char) // le Lien booste le Cœur du perso
     // Vie d'Écurie : humeur → Hype de départ / bouderie ; entraînement → +1 stat.
     const stable = getStable(char.id, char.trait)
@@ -86,7 +90,7 @@ export default function App() {
           <ResultsScreen
             player={player}
             outcome={outcome}
-            onReplay={() => startMatch(player)}
+            onReplay={() => startMatch(baseCharRef.current ?? player)}
             onNewChar={() => setScreen('select')}
           />
         )}

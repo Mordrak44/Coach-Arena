@@ -502,16 +502,18 @@ function enemyCoachAI(m: MatchState, dt: number): void {
     e.stance = 'aggressive'
     return
   }
-  if (e.ulti >= ULTI_MAX && !e.ultiUsed && Math.random() < 0.015) {
+  // Probabilités en taux PAR SECONDE (× dt) : la difficulté ne doit pas
+  // dépendre du refresh de l'écran (144 Hz ≠ 2,4× plus d'ultis qu'à 60 Hz).
+  if (e.ulti >= ULTI_MAX && !e.ultiUsed && Math.random() < 0.9 * dt) {
     fireUlti(m, 'enemy')
     return
   }
-  if (e.hype >= HYPE_MAX && Math.random() < 0.02) {
+  if (e.hype >= HYPE_MAX && Math.random() < 1.2 * dt) {
     fireSpecial(m, 'enemy')
     return
   }
   // Change de posture selon la situation (lecture du match).
-  if (Math.random() < 0.015) {
+  if (Math.random() < 0.9 * dt) {
     const hpRatio = e.hp / e.maxHp
     const pHpRatio = m.player.hp / m.player.maxHp
     if (hpRatio < 0.3) e.stance = pick(['defensive', 'evasive', 'counter'])
@@ -545,7 +547,10 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
         } else {
           m.phase = 'tactics'
           m.phaseUntil = m.t + TACTICS_DURATION
-          // Nouveau coin du ring : Souffle rechargé, main recomplétée.
+          // Nouveau coin du ring : Souffle rechargé, main recomplétée,
+          // et le plan REMIS À ZÉRO — sinon l'ancien plan est silencieusement
+          // reconduit alors que l'UI affiche « aucun plan choisi ».
+          m.plan = null
           m.souffle = SOUFFLE_PER_CORNER
           m.mulliganUsed = false
           drawCards(m, HAND_SIZE - m.hand.length)
@@ -631,19 +636,11 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
   m.player.x += drift
   m.enemy.x -= drift
 
-  // --- Fin de round ---
-  const roundElapsed = m.t // approximation : timer affiché géré côté UI par roundStartT
-  void roundElapsed
+  // --- Fin de round --- (le timer de round est tenu par l'UI/sim)
   if (m.player.hp <= 0 || m.enemy.hp <= 0) {
     const winner = m.player.hp <= 0 ? 'enemy' : 'player'
     endRound(m, winner)
   }
-}
-
-let roundStartT = 0
-
-export function getRoundElapsed(m: MatchState): number {
-  return m.t - roundStartT
 }
 
 function endRound(m: MatchState, winner: 'player' | 'enemy'): void {
@@ -695,7 +692,6 @@ export function addSpeechHype(m: MatchState, amount: number): void {
 
 function startNextRound(m: MatchState, plan: TacticPlan): void {
   m.round++
-  roundStartT = m.t
   const eff = PLAN_EFFECTS[plan]
 
   const p = m.player

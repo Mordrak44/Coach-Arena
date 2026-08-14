@@ -69,7 +69,9 @@ export class VoiceCoach {
         this.analyser.getByteFrequencyData(this.volBuf as any)
         let sum = 0
         for (let i = 0; i < this.volBuf.length; i++) sum += this.volBuf[i]
-        const raw = sum / this.volBuf.length / 140 // ~0..1, crier sature
+        // Borné à 1 : la moyenne peut atteindre ~255, et tout le jeu
+        // (gains de Hype, jauge de discours) suppose energy ∈ [0..1].
+        const raw = Math.min(1, sum / this.volBuf.length / 140)
         // Lissage asymétrique : monte vite, redescend doucement.
         this.state.energy =
           raw > this.state.energy

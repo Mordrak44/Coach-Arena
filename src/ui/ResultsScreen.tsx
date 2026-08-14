@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from 'react'
 import type { Character } from '../game/types'
 import { MatchRecorder } from '../systems/recorder'
 import { bondLevel, bondTitle, getProgress } from '../game/progression'
@@ -17,6 +18,17 @@ export default function ResultsScreen({
   const won = outcome.winner === 'player'
   const prog = getProgress(player.id)
   const level = bondLevel(prog.wins)
+  // URL créée UNE fois (pas à chaque rendu — sinon fuite mémoire de blobs
+  // multi-Mo et vidéo qui redémarre), révoquée au démontage.
+  const highlightUrl = useMemo(
+    () => (outcome.highlight ? URL.createObjectURL(outcome.highlight) : null),
+    [outcome.highlight],
+  )
+  useEffect(() => {
+    return () => {
+      if (highlightUrl) URL.revokeObjectURL(highlightUrl)
+    }
+  }, [highlightUrl])
   return (
     <div className="screen">
       <div className={`bigResult ${won ? 'win' : 'lose'}`}>
@@ -32,10 +44,10 @@ export default function ResultsScreen({
           : `${player.name} s'est bien battu. Un vrai coach revient toujours. Retournes-y.`}
       </p>
 
-      {outcome.highlight ? (
+      {highlightUrl ? (
         <>
           <video
-            src={URL.createObjectURL(outcome.highlight)}
+            src={highlightUrl}
             controls
             autoPlay
             muted

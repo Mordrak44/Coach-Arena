@@ -92,28 +92,44 @@ export function desireText(char: Character, state: StableState): string | null {
 /** Charge l'état d'écurie d'un perso, en appliquant dérive douce + reset du jour + envie. */
 export function getStable(charId: string, trait: ListenTrait, now = Date.now()): StableState {
   const all = readAll()
-  let s = all[charId] ?? freshState(now)
+  const existed = charId in all
+  const s = all[charId] ?? freshState(now)
+  let changed = !existed
+  // Première rencontre : le perso arrive avec une envie du jour.
+  if (!existed) {
+    const pool = DESIRES[trait]
+    s.desire = pool[Math.floor(Math.random() * pool.length)].action
+  }
 
   // Dérive DOUCE vers Neutre (50) : 4 points par jour d'absence, jamais en dessous.
   const days = Math.floor((now - s.updatedAt) / 86_400_000)
   if (days > 0 && s.mood !== 50) {
     const drift = Math.min(days * 4, Math.abs(s.mood - 50))
     s.mood += s.mood > 50 ? -drift : drift
+    s.updatedAt = now
+    changed = true
   }
 
-  // Nouveau jour : les actions se rechargent, une envie peut naître.
+  // Nouveau jour : les actions se rechargent, et une envie (au plus une par
+  // jour) peut naître. Une envie comblée ne renaît PAS dans la journée —
+  // sinon le « c'était exactement ce qu'il voulait » est aussitôt remplacé
+  // par une nouvelle exigence.
   if (s.dayKey !== dayKeyOf(now)) {
     s.dayKey = dayKeyOf(now)
     s.actionsToday = 0
-  }
-  if (!s.desire) {
-    const pool = DESIRES[trait]
-    s.desire = pool[Math.floor(Math.random() * pool.length)].action
+    if (!s.desire) {
+      const pool = DESIRES[trait]
+      s.desire = pool[Math.floor(Math.random() * pool.length)].action
+    }
+    changed = true
   }
 
-  s.updatedAt = now
-  all[charId] = s
-  writeAll(all)
+  // Écriture uniquement si quelque chose a changé : getStable est appelé
+  // pendant le rendu React, un write systématique y serait un effet de bord.
+  if (changed) {
+    all[charId] = s
+    writeAll(all)
+  }
   return s
 }
 

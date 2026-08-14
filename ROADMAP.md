@@ -136,6 +136,21 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 
 ## Journal
 
+- 2026-08-14 : AUDIT COMPLET (demande utilisateur) — 10 bugs confirmés et
+  corrigés, dont 3 critiques : (1) clips de moment fort corrompus au-delà
+  de 14 s (chunk de l'ancien MediaRecorder poussé dans le tableau du
+  nouveau segment — fix par closure) ; (2) « Revanche » qui ré-appliquait
+  Lien + entraînement sur le perso déjà boosté (stats qui s'empilaient —
+  fix : la revanche repart du perso de base) ; (3) pistes micro clonées
+  jamais stoppées → capture micro active après le match (fix :
+  releaseTracks dans les deux recorders). Aussi : IA adverse dépendante
+  du framerate (probas → taux × dt), plan tactique reconduit en silence
+  (reset au coin du ring), Espace qui réactivait le bouton focus (fausse
+  Confusion), envie d'écurie qui renaissait dans la seconde (max 1/jour)
+  + write localStorage pendant le rendu React (write-si-changement),
+  énergie vocale non bornée (> 1), URLs de blob jamais révoquées
+  (useMemo + revoke), code mort roundStartT inter-matchs supprimé.
+
 - 2026-08-13 : v0 complète — scaffold, moteur, rendu, voix, facecam,
   tactique, export clip. Routine horaire créée (trig_012H6NK4CC6ekSeL29xiBnph,
   toutes les heures à h:19).
