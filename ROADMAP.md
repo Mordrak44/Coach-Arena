@@ -187,6 +187,15 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
   Familles reformulées par timing : Coach / Instant·voix / Instant·pari.
   Équilibrage sain : le deck naïf n'est plus un auto-win (93 % vs 94 %
   sans cartes) — la valeur est dans le choix, plus dans la possession.
+- 2026-08-14 : Jauge d'Ulti (demande utilisateur) — jauge de match
+  conservée entre rounds, chargée par le combat (encaisser ×2, rounds
+  perdus +15 : comeback), Ultime unique par perso (6 noms roster +
+  génération prompt « X : Zénith »), déclenchée UNIQUEMENT par le coach
+  (« ULTIME ! », touche U, bouton dédié rouge) — pas d'initiative auto,
+  contrairement au spécial. HUD 3e jauge, mise en scène dédiée (zoom
+  long, bannière ★, son double-riser, foule en folie), commentateur.
+  Sim : coach 83 %, sans coach 27 % (l'Ulti ne sort jamais sans coach —
+  assumé), rounds ~35 s. Migration des persos custom sauvegardés.
 - 2026-08-14 (routine) : Commentateur shōnen v0 (templates FR, poids
   1-3 pilotant taille/durée d'affichage, bandeau dessiné dans le canvas
   → visible dans les clips exportés). Test sim : 21 lignes sur un

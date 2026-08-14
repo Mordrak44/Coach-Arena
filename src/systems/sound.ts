@@ -155,6 +155,16 @@ export class SoundSystem {
     this.crowdRoar(1)
   }
 
+  /** L'Ultime : double riser, explosion plus grave, la foule perd la tête. */
+  ulti() {
+    this.tone(100, 0.9, 0.3, { type: 'sawtooth', slideTo: 1200 })
+    this.tone(101, 0.9, 0.2, { type: 'square', slideTo: 1180 })
+    this.tone(50, 1.4, 0.8, { slideTo: 24, delay: 0.85 })
+    this.noiseHit(0.9, 500, 0.6)
+    this.tone(45, 1.0, 0.4, { slideTo: 30, delay: 1.3 })
+    this.crowdRoar(1.6)
+  }
+
   gong() {
     this.tone(180, 1.6, 0.4, { type: 'triangle' })
     this.tone(182.5, 1.6, 0.25, { type: 'sine' }) // battement de gong

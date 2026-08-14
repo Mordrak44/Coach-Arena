@@ -1,5 +1,5 @@
 import type { CombatEvent, FighterState, MatchState } from '../game/types'
-import { HYPE_MAX } from '../game/combat'
+import { HYPE_MAX, ULTI_MAX } from '../game/combat'
 
 // Rendu canvas 9:16 style manga : silhouettes vectorielles dynamiques,
 // speed lines, onomatopées flottantes, flash d'impact, HUD de combat.
@@ -98,6 +98,20 @@ export class ArenaRenderer {
         this.zoomStart = now
         this.zoomUntil = now + 1.5
         this.zoomFocusX = (ev.by === 'player' ? m.player.x : m.enemy.x) * CANVAS_W
+        break
+      case 'ulti':
+        this.specialBannerText = '★ ' + ev.name.toUpperCase() + ' ★'
+        this.specialBannerUntil = now + 2.4
+        this.floats.push({ text: ev.onoma, x: CANVAS_W / 2, y: 500, t0: now + 0.5, life: 1.5, size: 84, color: '#ff3366', angle: -0.06 })
+        this.floats.push({ text: `-${ev.dmg}`, x: CANVAS_W / 2, y: 560, t0: now + 0.9, life: 1.2, size: 44, color: '#ff3366', angle: 0.05 })
+        this.flash(now, '#ff3366', 0.22)
+        this.shake(now, 34)
+        this.zoomStart = now
+        this.zoomUntil = now + 2.2
+        this.zoomFocusX = (ev.by === 'player' ? m.player.x : m.enemy.x) * CANVAS_W
+        break
+      case 'ultiReady':
+        this.floats.push({ text: '⚡ ULTI PRÊT ⚡', x: fx(ev.who), y: 360, t0: now, life: 1.4, size: 36, color: '#ff3366', angle: 0 })
         break
       case 'card':
         this.floats.push({ text: `🃏 ${ev.name.toUpperCase()}`, x: CANVAS_W / 2, y: 520, t0: now, life: 1.4, size: 34, color: '#7ec8ff', angle: -0.05 })
@@ -579,10 +593,23 @@ export class ArenaRenderer {
     ctx.fillStyle = hr >= 1 ? '#ffdd00' : '#8f6bff'
     if (rightAlign) ctx.fillRect(x0 + w * (1 - hr), y + h + 5, w * hr, 8)
     else ctx.fillRect(x0, y + h + 5, w * hr, 8)
-    if (hr >= 1) {
+    // Ulti : jauge de match, sous la Hype
+    ctx.fillStyle = '#222'
+    ctx.fillRect(x0, y + h + 16, w, 5)
+    if (!f.ultiUsed) {
+      const ur = f.ulti / ULTI_MAX
+      ctx.fillStyle = ur >= 1 ? '#ff3366' : '#b3541e'
+      if (rightAlign) ctx.fillRect(x0 + w * (1 - ur), y + h + 16, w * ur, 5)
+      else ctx.fillRect(x0, y + h + 16, w * ur, 5)
+    }
+    if (hr >= 1 || (!f.ultiUsed && f.ulti >= ULTI_MAX)) {
       ctx.font = 'bold 11px sans-serif'
-      ctx.fillStyle = '#ffdd00'
-      ctx.fillText(rightAlign ? 'SPÉCIAL PRÊT ◀' : '▶ SPÉCIAL PRÊT', x, y + h + 25)
+      const ready =
+        !f.ultiUsed && f.ulti >= ULTI_MAX
+          ? 'ULTI PRÊT — CRIE-LE !'
+          : 'SPÉCIAL PRÊT'
+      ctx.fillStyle = !f.ultiUsed && f.ulti >= ULTI_MAX ? '#ff3366' : '#ffdd00'
+      ctx.fillText(rightAlign ? `${ready} ◀` : `▶ ${ready}`, x, y + h + 33)
     }
   }
 

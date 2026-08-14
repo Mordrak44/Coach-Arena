@@ -52,6 +52,14 @@ const T = {
     'La jauge de {W} EXPLOSE ! Le spécial est prêt !',
     '{W} brûle d’énergie — coach, c’est le moment !',
   ],
+  ultiReady: [
+    'L’AURA DE {W} DEVIENT ÉCARLATE… L’ULTIME EST PRÊT !!',
+    'Tout le stade le sent : {W} peut TOUT finir, là, maintenant !',
+  ],
+  ulti: [
+    'ÇA NE SE PRODUIT QU’UNE FOIS PAR MATCH !!! {S} !!!',
+    'L’ARÈNE S’EFFONDRE !! {A} LIBÈRE {S} !!!',
+  ],
   confused: [
     '{W} ne sait plus qui écouter… le coin s’emmêle !',
     'Trop d’ordres ! {W} est perdu(e) !',
@@ -139,6 +147,14 @@ export class Commentator {
         })
       case 'hypeFull':
         return this.emit(m, this.pick(T.hypeFull), 2, { ...base, W: ev.who === 'player' ? P : E })
+      case 'ultiReady':
+        return this.emit(m, this.pick(T.ultiReady), 3, { ...base, W: ev.who === 'player' ? P : E })
+      case 'ulti':
+        return this.emit(m, this.pick(T.ulti), 3, {
+          ...base,
+          A: ev.by === 'player' ? P : E,
+          S: ev.name,
+        })
       case 'confused':
         return this.emit(m, this.pick(T.confused), 1, { ...base, W: ev.who === 'player' ? P : E })
       case 'card':

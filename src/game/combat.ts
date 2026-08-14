@@ -30,6 +30,42 @@ function baseDamage(atk: number): number {
   return 2 + atk * 0.6
 }
 
+export const ULTI_MAX = 100
+
+/**
+ * Charge d'Ulti par les dégâts : encaisser charge deux fois plus que
+ * frapper (mécanique de comeback). Calibrée pour un Ulti disponible vers le
+ * round 2-3.
+ */
+function chargeUlti(m: MatchState, f: FighterState, dmg: number, took: boolean): void {
+  if (f.ultiUsed) return
+  const wasFull = f.ulti >= ULTI_MAX
+  f.ulti = Math.min(ULTI_MAX, f.ulti + (dmg / f.maxHp) * (took ? 46 : 23))
+  if (!wasFull && f.ulti >= ULTI_MAX) {
+    m.events.push({ kind: 'ultiReady', t: m.t, who: f === m.player ? 'player' : 'enemy' })
+  }
+}
+
+function fireUlti(m: MatchState, side: 'player' | 'enemy'): void {
+  const a = side === 'player' ? m.player : m.enemy
+  const d = side === 'player' ? m.enemy : m.player
+  a.ulti = 0
+  a.ultiUsed = true
+  a.anim = { kind: 'special', until: m.t + 1.6 }
+  // L'Ultime perce tout : ni garde ni esquive, dégâts sur la vie max cible.
+  const dmg = Math.round(d.maxHp * (0.32 + a.char.ulti.power * 0.035))
+  d.hp = Math.max(0, d.hp - dmg)
+  d.anim = { kind: 'hurt', until: m.t + 1.2 }
+  m.events.push({
+    kind: 'ulti',
+    t: m.t,
+    by: side,
+    name: a.char.ulti.name,
+    onoma: a.char.ulti.onomatopoeia,
+    dmg,
+  })
+}
+
 const STANCE_MODS: Record<Stance, { atk: number; def: number; dodge: number }> = {
   neutral: { atk: 1, def: 1, dodge: 0.08 },
   aggressive: { atk: 1.45, def: 0.7, dodge: 0.05 },
@@ -59,6 +95,8 @@ function makeFighter(char: Character, side: 'player' | 'enemy'): FighterState {
     hp,
     maxHp: hp,
     hype: 0,
+    ulti: 0,
+    ultiUsed: false,
     stance: 'neutral',
     confusedUntil: 0,
     counterUntil: 0,
@@ -256,6 +294,13 @@ function applyCommand(m: MatchState, cmd: CoachCommand, voiceEnergy: number): vo
     return
   }
 
+  if (cmd === 'ulti') {
+    if (f.ulti >= ULTI_MAX && !f.ultiUsed && m.t >= f.confusedUntil) {
+      fireUlti(m, 'player')
+    }
+    return
+  }
+
   // Ordres de posture : détection du spam d'ordres contradictoires.
   // (Concentration Absolue : Yuna ne peut pas être confuse.)
   if (m.t - f.lastOrderAt < CONFUSION_ORDER_WINDOW && m.t >= f.confusedUntil && !m.mods.yunaFocus) {
@@ -379,6 +424,8 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
   d.anim = { kind: 'hurt', until: m.t + 0.35 }
   a.hype = Math.min(HYPE_MAX, a.hype + (crit ? 10 : 6))
   d.hype = Math.min(HYPE_MAX, d.hype + 3) // encaisser fait monter la rage
+  chargeUlti(m, a, dmg, false)
+  chargeUlti(m, d, dmg, true)
   // Cœur Vaillant (Kenta) : la douleur le nourrit.
   if (defSide === 'player' && m.mods.kentaHeart) {
     m.mods.hitsTakenThisRound++
@@ -410,6 +457,7 @@ function fireSpecial(m: MatchState, side: 'player' | 'enemy'): void {
   }
   d.hp = Math.max(0, d.hp - Math.round(dmg))
   d.anim = { kind: 'hurt', until: m.t + 0.8 }
+  chargeUlti(m, d, dmg, true) // encaisser un spécial charge fort l'Ulti
   m.events.push({
     kind: 'special',
     t: m.t,
@@ -436,6 +484,10 @@ function enemyCoachAI(m: MatchState, dt: number): void {
   // Provoqué : agressif verrouillé, n'écoute plus son coach.
   if (m.t < m.mods.provokedUntil) {
     e.stance = 'aggressive'
+    return
+  }
+  if (e.ulti >= ULTI_MAX && !e.ultiUsed && Math.random() < 0.015) {
+    fireUlti(m, 'enemy')
     return
   }
   if (e.hype >= HYPE_MAX && Math.random() < 0.02) {
@@ -530,6 +582,9 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
   } else {
     p.hypeFullSince = 0
   }
+  // L'Ultime n'a PAS d'initiative automatique : c'est le cri du coach qui
+  // le libère (bouton/clavier en secours). Un Ulti gâché sans le coach
+  // n'aurait aucune saveur — et l'IA adverse, elle, n'attend personne.
 
   // Dernière Chance : sous 15 % PV, la Hype se remplit d'un coup (une fois).
   if (m.mods.lastChance && p.hp > 0 && p.hp < p.maxHp * 0.15) {
@@ -579,6 +634,13 @@ function endRound(m: MatchState, winner: 'player' | 'enemy'): void {
   if (winner === 'player') m.playerWins++
   else m.enemyWins++
   const loser = winner === 'player' ? m.enemy : m.player
+  // Perdre un round nourrit l'Ulti : le comeback est dans l'ADN du jeu.
+  if (!loser.ultiUsed) {
+    const wasFull = loser.ulti >= ULTI_MAX
+    loser.ulti = Math.min(ULTI_MAX, loser.ulti + 15)
+    if (!wasFull && loser.ulti >= ULTI_MAX)
+      m.events.push({ kind: 'ultiReady', t: m.t, who: loser === m.player ? 'player' : 'enemy' })
+  }
   loser.anim = { kind: 'ko', until: m.t + ROUND_END_DURATION }
   // Les effets « durée d'un round » expirent.
   m.mods.ironGuard = false

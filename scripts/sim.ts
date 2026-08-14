@@ -36,7 +36,8 @@ function runMatch(opts: SimOptions): { winner: 'player' | 'enemy'; cardProcs: nu
     let command: any = null
     if (opts.coached && m.phase === 'fighting' && m.t - lastCmdAt > 4) {
       // Coach simulé : varie ses appels pour exercer contres, cris et spéciaux.
-      if (m.player.hype >= 100) command = 'special'
+      if (m.player.ulti >= 100 && !m.player.ultiUsed) command = 'ulti'
+      else if (m.player.hype >= 100) command = 'special'
       else if (m.mods.perfectCounter) command = 'counter'
       else if (m.mods.warCry) command = 'cheer'
       else command = Math.random() < 0.6 ? 'attack' : 'cheer'

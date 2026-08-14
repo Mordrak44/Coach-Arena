@@ -20,7 +20,8 @@ const COMMAND_PATTERNS: Array<[RegExp, CoachCommand]> = [
   [/défend|garde|protège|recule|bloque/i, 'defend'],
   [/esquive|bouge|évite|danse/i, 'dodge'],
   [/contre|contr[- ]?attaque|punis/i, 'counter'],
-  [/spécial|special|maintenant|finis[- ]?le|ultime/i, 'special'],
+  [/ultime|ulti|ach[èe]ve[- ]?le|termine[- ]?le/i, 'ulti'],
+  [/spécial|special|maintenant|finis[- ]?le/i, 'special'],
   [/allez|allé|bravo|meilleur|champion|t'es le|tu peux|courage|plus fort|ouais|oui !/i, 'cheer'],
 ]
 

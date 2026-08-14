@@ -97,7 +97,18 @@ export function applyBond(char: Character): Character {
 // --- Persos créés par prompt : sauvegarde locale ---------------------------
 
 export function loadCustoms(): Character[] {
-  return readJson<Character[]>(CUSTOM_KEY, [])
+  const customs = readJson<Character[]>(CUSTOM_KEY, [])
+  // Migration : les persos sauvegardés avant l'Ulti n'en ont pas.
+  for (const c of customs) {
+    if (!c.ulti) {
+      c.ulti = {
+        name: `${c.special?.name ?? 'Frappe Légendaire'} : Zénith`,
+        power: 6.0,
+        onomatopoeia: 'KABOOOOM!!!',
+      }
+    }
+  }
+  return customs
 }
 
 export function saveCustom(char: Character) {

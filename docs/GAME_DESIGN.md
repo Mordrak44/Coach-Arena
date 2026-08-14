@@ -72,6 +72,26 @@ ailleurs.
 - Se remplit via : coups réussis, encouragements vocaux, énergie facecam.
 - Pleine → le coach peut appeler la **technique spéciale** (cinématique manga,
   gros dégâts). La crier au bon moment, c'est le skill du jeu.
+- Si le coach reste muet 6 s jauge pleine, le perso prend l'**initiative** et
+  tire seul — le skill du coach est le timing, pas l'accès.
+
+### Jauge d'Ulti (décidée le 2026-08-14)
+
+Deux jauges, deux temporalités : *la Hype, c'est le coach ; l'Ulti, c'est
+le combattant.*
+
+- Jauge de **match entier**, conservée entre les rounds. Chargée par le
+  combat : coups donnés, coups **encaissés ×2** (comeback), spéciaux subis,
+  rounds perdus (+15) — celui qui souffre charge plus vite, remontada shōnen.
+- Pleine → **l'Ultime** : finisher unique du match, propre à chaque perso
+  (Éruption du Cœur Brisé, Nuit Sans Aube, Apocalypse Sauvage…), perce
+  garde et esquive, ~50-55 % de la vie max.
+- **Pas d'initiative automatique** : seul le cri du coach (« ULTIME ! »,
+  bouton/clavier en secours) le libère. Sans coach, l'Ulti ne sort jamais —
+  c'est la déclaration de design du jeu. L'IA adverse, elle, n'attend
+  personne.
+- Moment cinématique par excellence : zoom long, bannière écarlate, son
+  dédié — et plus tard LA scène générée du montage.
 
 ## 4 bis. Profondeur : instinct vs stratégie (décidé le 2026-08-13)
 

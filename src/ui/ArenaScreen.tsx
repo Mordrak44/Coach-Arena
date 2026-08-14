@@ -41,6 +41,7 @@ const KEYMAP: Record<string, CoachCommand> = {
   e: 'dodge',
   c: 'counter',
   s: 'special',
+  u: 'ulti',
   ' ': 'cheer',
 }
 
@@ -106,6 +107,7 @@ export default function ArenaScreen({
   const [tacticsLeft, setTacticsLeft] = useState(0)
   const [speechEnergy, setSpeechEnergy] = useState(0)
   const [specialReady, setSpecialReady] = useState(false)
+  const [ultiReady, setUltiReady] = useState(false)
   const [muted, setMuted] = useState(false)
 
   // -- setup : médias + boucle de jeu ---------------------------------------
@@ -196,6 +198,7 @@ export default function ArenaScreen({
         }
       }
       setSpecialReady(m.player.hype >= HYPE_MAX)
+      setUltiReady(m.player.ulti >= 100 && !m.player.ultiUsed)
       setHeard(sys.voice.state.lastHeard)
 
       // --- Bande-son : consomme les nouveaux événements du match ---
@@ -216,6 +219,12 @@ export default function ArenaScreen({
             break
           case 'special':
             sys.sound.special()
+            break
+          case 'ulti':
+            sys.sound.ulti()
+            break
+          case 'ultiReady':
+            sys.sound.hypeFull()
             break
           case 'confused':
             sys.sound.confused()
@@ -395,9 +404,19 @@ export default function ArenaScreen({
         <button onClick={() => sendCmd('defend')}>🛡 Défends</button>
         <button onClick={() => sendCmd('dodge')}>💨 Esquive</button>
         <button onClick={() => sendCmd('counter')}>↩ Contre</button>
-        <button className="special" disabled={!specialReady} onClick={() => sendCmd('special')}>
-          ★ SPÉCIAL
-        </button>
+        {ultiReady ? (
+          <button
+            className="special"
+            style={{ background: 'var(--accent2)', color: '#fff' }}
+            onClick={() => sendCmd('ulti')}
+          >
+            ⚡ ULTIME
+          </button>
+        ) : (
+          <button className="special" disabled={!specialReady} onClick={() => sendCmd('special')}>
+            ★ SPÉCIAL
+          </button>
+        )}
       </div>
 
       {phase === 'tactics' && (

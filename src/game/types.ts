@@ -47,6 +47,8 @@ export interface Character {
   color2: string
   stats: Stats
   special: Special
+  /** l'Ultime : finisher unique du match, débloqué par la jauge d'Ulti */
+  ulti: Special
   trait: ListenTrait
   lore: string
 }
@@ -55,7 +57,7 @@ export interface Character {
 export type Stance = 'neutral' | 'aggressive' | 'defensive' | 'evasive' | 'counter'
 
 /** Commandes que le coach peut donner (voix ou boutons) */
-export type CoachCommand = 'attack' | 'defend' | 'dodge' | 'counter' | 'special' | 'cheer'
+export type CoachCommand = 'attack' | 'defend' | 'dodge' | 'counter' | 'special' | 'ulti' | 'cheer'
 
 /** Plan tactique choisi entre les rounds */
 export type TacticPlan = 'pressure' | 'concrete' | 'counterplay' | 'coldblood'
@@ -140,6 +142,13 @@ export interface FighterState {
   maxHp: number
   /** jauge de Hype 0..100 ; pleine → technique spéciale disponible */
   hype: number
+  /**
+   * jauge d'Ulti 0..100, conservée entre les rounds — chargée par le combat
+   * (coups donnés, coups encaissés ×2, rounds perdus). Pleine → l'Ultime,
+   * une fois par match.
+   */
+  ulti: number
+  ultiUsed: boolean
   stance: Stance
   /** timestamp de combat (s) jusqu'auquel le perso est Confus (ordres spammés) */
   confusedUntil: number
@@ -197,6 +206,8 @@ export type CombatEvent =
   | { kind: 'dodged'; t: number; target: 'player' | 'enemy' }
   | { kind: 'countered'; t: number; by: 'player' | 'enemy'; dmg: number }
   | { kind: 'special'; t: number; by: 'player' | 'enemy'; name: string; onoma: string; dmg: number }
+  | { kind: 'ulti'; t: number; by: 'player' | 'enemy'; name: string; onoma: string; dmg: number }
+  | { kind: 'ultiReady'; t: number; who: 'player' | 'enemy' }
   | { kind: 'confused'; t: number; who: 'player' | 'enemy' }
   | { kind: 'roundEnd'; t: number; winner: 'player' | 'enemy' }
   | { kind: 'matchEnd'; t: number; winner: 'player' | 'enemy' }
