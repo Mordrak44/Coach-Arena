@@ -93,6 +93,14 @@ export function createMatch(
       ironGuard: false,
       lastChance: false,
       provokedUntil: 0,
+      kentaHeart: false,
+      hitsTakenThisRound: 0,
+      reiCounterHype: false,
+      yunaFocus: false,
+      goroLesson: false,
+      fangFrenzy: false,
+      frenzyUntil: 0,
+      nyxShadow: false,
     },
     events: [{ kind: 'roundStart', t: 0, round: 1 }],
   }
@@ -130,6 +138,25 @@ export function playCard(m: MatchState, id: CardId): boolean {
     case 'provocation':
       // Prend effet au démarrage du round suivant (voir startNextRound).
       m.mods.provokedUntil = -1
+      break
+    case 'sigKenta':
+      m.mods.kentaHeart = true
+      m.mods.hitsTakenThisRound = 0
+      break
+    case 'sigRei':
+      m.mods.reiCounterHype = true
+      break
+    case 'sigYuna':
+      m.mods.yunaFocus = true
+      break
+    case 'sigGoro':
+      m.mods.goroLesson = true
+      break
+    case 'sigFang':
+      m.mods.fangFrenzy = true
+      break
+    case 'sigNyx':
+      m.mods.nyxShadow = true
       break
   }
   return true
@@ -176,7 +203,8 @@ function applyCommand(m: MatchState, cmd: CoachCommand, voiceEnergy: number): vo
   }
 
   // Ordres de posture : détection du spam d'ordres contradictoires.
-  if (m.t - f.lastOrderAt < CONFUSION_ORDER_WINDOW && m.t >= f.confusedUntil) {
+  // (Concentration Absolue : Yuna ne peut pas être confuse.)
+  if (m.t - f.lastOrderAt < CONFUSION_ORDER_WINDOW && m.t >= f.confusedUntil && !m.mods.yunaFocus) {
     f.confusedUntil = m.t + CONFUSION_DURATION
     m.events.push({ kind: 'confused', t: m.t, who: 'player' })
     f.lastOrderAt = m.t
@@ -207,6 +235,12 @@ function applyCommand(m: MatchState, cmd: CoachCommand, voiceEnergy: number): vo
     }
     f.stance = stance
     if (cmd === 'counter') f.counterUntil = m.t + 2.5
+    // Frénésie (Fang) : l'ordre d'attaque lâche la bête.
+    if (cmd === 'attack' && m.mods.fangFrenzy) {
+      m.mods.fangFrenzy = false
+      m.mods.frenzyUntil = m.t + 5
+      m.events.push({ kind: 'cardProc', t: m.t, text: 'FRÉNÉSIE !!' })
+    }
     f.hype = Math.min(HYPE_MAX, f.hype + orderHype)
   }
 }
@@ -238,6 +272,12 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
       counterMul *= 2
       m.events.push({ kind: 'cardProc', t: m.t, text: 'CONTRE PARFAIT !!' })
     }
+    // Orgueil du Rival (Rei) : humilier remplit la Hype.
+    if (defSide === 'player' && m.mods.reiCounterHype) {
+      m.mods.reiCounterHype = false
+      d.hype = Math.min(HYPE_MAX, d.hype + 50)
+      m.events.push({ kind: 'cardProc', t: m.t, text: 'ORGUEIL DU RIVAL !!' })
+    }
     const dmg = Math.round((3 + d.char.stats.atk * 0.7) * counterMul)
     a.hp = Math.max(0, a.hp - dmg)
     a.anim = { kind: 'hurt', until: m.t + 0.4 }
@@ -247,8 +287,10 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
     return
   }
 
-  // Esquive
-  const dodgeChance = dMod.dodge + d.char.stats.spd * 0.012 - (m.t < d.confusedUntil ? 0.08 : 0)
+  // Esquive (Pas de l'Ombre : +15 % pour le joueur)
+  const shadowBonus = defSide === 'player' && m.mods.nyxShadow ? 0.15 : 0
+  const dodgeChance =
+    dMod.dodge + shadowBonus + d.char.stats.spd * 0.012 - (m.t < d.confusedUntil ? 0.08 : 0)
   if (Math.random() < dodgeChance) {
     d.anim = { kind: 'dodge', until: m.t + 0.3 }
     d.hype = Math.min(HYPE_MAX, d.hype + 5)
@@ -267,6 +309,7 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
   dmg *= mitigation
   if (m.t < a.confusedUntil) dmg *= 0.7
   if (defSide === 'player' && m.mods.ironGuard) dmg *= 0.65 // Garde de Fer
+  if (atkSide === 'player' && m.t < m.mods.frenzyUntil) dmg *= 1.5 // Frénésie
 
   const blocked = d.stance === 'defensive' && Math.random() < 0.35
   if (blocked) {
@@ -282,6 +325,15 @@ function resolveAttack(m: MatchState, atkSide: 'player' | 'enemy'): void {
   d.anim = { kind: 'hurt', until: m.t + 0.35 }
   a.hype = Math.min(HYPE_MAX, a.hype + (crit ? 10 : 6))
   d.hype = Math.min(HYPE_MAX, d.hype + 3) // encaisser fait monter la rage
+  // Cœur Vaillant (Kenta) : la douleur le nourrit.
+  if (defSide === 'player' && m.mods.kentaHeart) {
+    m.mods.hitsTakenThisRound++
+    if (m.mods.hitsTakenThisRound >= 3) {
+      m.mods.kentaHeart = false
+      d.hype = Math.min(HYPE_MAX, d.hype + 40)
+      m.events.push({ kind: 'cardProc', t: m.t, text: 'CŒUR VAILLANT !!' })
+    }
+  }
   const onoma = crit ? pick(['DOKAN!!', 'BAKOOM!', 'GYAAA!']) : pick(['BAM!', 'PAF!', 'DOGO!', 'BISHI!'])
   m.events.push({ kind: 'hit', t: m.t, target: defSide, dmg: Math.round(dmg), crit, onoma })
 }
@@ -296,6 +348,12 @@ function fireSpecial(m: MatchState, side: 'player' | 'enemy'): void {
   // Un spécial est un haymaker : ~40-50 % de la vie d'un perso moyen.
   let dmg = baseDamage(a.char.stats.atk) * a.char.special.power * 2.2
   dmg *= 1 - Math.min(0.4, (d.char.stats.def * dMod.def) / 40) // les specials percent la garde
+  // Leçon d'Expérience (Gorō) : il a vu venir le premier spécial adverse.
+  if (side === 'enemy' && m.mods.goroLesson) {
+    m.mods.goroLesson = false
+    dmg *= 0.5
+    m.events.push({ kind: 'cardProc', t: m.t, text: "LEÇON D'EXPÉRIENCE !!" })
+  }
   d.hp = Math.max(0, d.hp - Math.round(dmg))
   d.anim = { kind: 'hurt', until: m.t + 0.8 }
   m.events.push({
@@ -470,6 +528,14 @@ function endRound(m: MatchState, winner: 'player' | 'enemy'): void {
   m.mods.perfectCounter = false
   m.mods.warCry = false
   m.mods.lastChance = false
+  m.mods.kentaHeart = false
+  m.mods.hitsTakenThisRound = 0
+  m.mods.reiCounterHype = false
+  m.mods.yunaFocus = false
+  m.mods.goroLesson = false
+  m.mods.fangFrenzy = false
+  m.mods.frenzyUntil = 0
+  m.mods.nyxShadow = false
   m.phase = 'roundEnd'
   m.phaseUntil = m.t + ROUND_END_DURATION
   m.events.push({ kind: 'roundEnd', t: m.t, winner })

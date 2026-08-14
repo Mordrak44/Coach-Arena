@@ -71,6 +71,13 @@ export type CardId =
   | 'warCry' // armée : le prochain encouragement crié remplit fort la Hype
   | 'lastChance' // conditionnelle : sous 15 % PV → Hype pleine (une fois)
   | 'provocation' // conditionnelle : l'adversaire démarre le round agressif
+  // Cartes signatures (une par perso du roster, débloquées par le Lien)
+  | 'sigKenta' // Cœur Vaillant : encaisser 3 coups → +40 Hype
+  | 'sigRei' // Orgueil du Rival : le prochain contre remplit 50 % de la Hype
+  | 'sigYuna' // Concentration Absolue : immunisée à la confusion ce round
+  | 'sigGoro' // Leçon d'Expérience : le premier spécial adverse du round est réduit de moitié
+  | 'sigFang' // Frénésie : le prochain « attaque ! » → +50 % dégâts pendant 5 s
+  | 'sigNyx' // Pas de l'Ombre : +15 % d'esquive ce round
 
 export interface CoachCard {
   id: CardId
@@ -78,6 +85,8 @@ export interface CoachCard {
   family: CardFamily
   icon: string
   desc: string
+  /** id du perso dont c'est la carte signature (débloquée par le Lien) */
+  signatureOf?: string
 }
 
 /** Effets de cartes en attente / actifs sur le perso du joueur */
@@ -88,6 +97,21 @@ export interface CardMods {
   lastChance: boolean
   /** l'ennemi est provoqué : posture agressive verrouillée jusqu'à ce t */
   provokedUntil: number
+  // — signatures —
+  /** Cœur Vaillant : compteur de coups encaissés ce round */
+  kentaHeart: boolean
+  hitsTakenThisRound: number
+  /** Orgueil du Rival : le prochain contre remplit 50 % de la Hype */
+  reiCounterHype: boolean
+  /** Concentration Absolue : immunisée à la confusion ce round */
+  yunaFocus: boolean
+  /** Leçon d'Expérience : premier spécial adverse du round divisé par 2 */
+  goroLesson: boolean
+  /** Frénésie : armée par la carte, déclenchée par « attaque ! » */
+  fangFrenzy: boolean
+  frenzyUntil: number
+  /** Pas de l'Ombre : +15 % d'esquive ce round */
+  nyxShadow: boolean
 }
 
 export interface CoachInput {

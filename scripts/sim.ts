@@ -143,4 +143,25 @@ function makeFightingMatch(playerIdx: number): MatchState {
   console.log('Trait Cérébral OK (hurler pénalise, le calme transcende)')
 }
 
+// Signatures : Concentration Absolue (Yuna) bloque la confusion.
+{
+  const m = makeFightingMatch(2)
+  m.mods.yunaFocus = true
+  tick(m, 1 / 60, { command: 'defend', voiceEnergy: 0.3, faceEnergy: 0 })
+  tick(m, 1 / 60, { command: 'attack', voiceEnergy: 0.3, faceEnergy: 0 }) // spam volontaire
+  if (m.player.confusedUntil > m.t) throw new Error('yunaFocus : la confusion aurait dû être bloquée')
+  console.log('Signature Concentration Absolue OK (pas de confusion)')
+}
+
+// Signatures : Frénésie (Fang) armée puis déclenchée par « attaque ! ».
+{
+  const m = makeFightingMatch(4)
+  m.mods.fangFrenzy = true
+  // premier ordre ignoré ? Fang est sanguin, pas têtu — l'ordre passe.
+  tick(m, 1 / 60, { command: 'attack', voiceEnergy: 0.7, faceEnergy: 0 })
+  if (m.mods.frenzyUntil <= m.t - 1 || m.mods.fangFrenzy)
+    throw new Error('fangFrenzy : « attaque ! » aurait dû déclencher la Frénésie')
+  console.log('Signature Frénésie OK (armée par la carte, déclenchée à la voix)')
+}
+
 console.log('OK — tous les matchs se terminent.')

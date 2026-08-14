@@ -49,9 +49,67 @@ export const CARD_POOL: CoachCard[] = [
   },
 ]
 
+// Cartes signatures — une par perso du roster, débloquées au palier de
+// Lien « Protégé » (niveau 2). Jouables uniquement en coachant ce perso.
+export const SIGNATURE_CARDS: CoachCard[] = [
+  {
+    id: 'sigKenta',
+    name: 'Cœur Vaillant',
+    family: 'conditional',
+    icon: '❤️‍🔥',
+    desc: 'Si Kenta encaisse 3 coups ce round, sa Hype bondit de +40. La douleur le nourrit.',
+    signatureOf: 'kenta',
+  },
+  {
+    id: 'sigRei',
+    name: "Orgueil du Rival",
+    family: 'armed',
+    icon: '🌑',
+    desc: 'Le prochain contre de Rei remplit 50 % de sa Hype. Humilier, c’est son art.',
+    signatureOf: 'rei',
+  },
+  {
+    id: 'sigYuna',
+    name: 'Concentration Absolue',
+    family: 'direct',
+    icon: '🎯',
+    desc: 'Yuna est immunisée à la confusion ce round. Crie ce que tu veux, elle reste limpide.',
+    signatureOf: 'yuna',
+  },
+  {
+    id: 'sigGoro',
+    name: "Leçon d'Expérience",
+    family: 'conditional',
+    icon: '🛡️',
+    desc: 'Le premier spécial adverse de ce round est réduit de moitié. Gorō l’a vu venir.',
+    signatureOf: 'goro',
+  },
+  {
+    id: 'sigFang',
+    name: 'Frénésie',
+    family: 'armed',
+    icon: '🩸',
+    desc: 'Le prochain « ATTAQUE ! » lâche la bête : +50 % de dégâts pendant 5 s.',
+    signatureOf: 'fang',
+  },
+  {
+    id: 'sigNyx',
+    name: "Pas de l'Ombre",
+    family: 'direct',
+    icon: '👤',
+    desc: 'Nyx gagne +15 % d’esquive ce round. Frapper la fumée, bonne chance.',
+    signatureOf: 'nyx',
+  },
+]
+
+const ALL_CARDS = [...CARD_POOL, ...SIGNATURE_CARDS]
+
 export function getCard(id: CardId): CoachCard {
-  return CARD_POOL.find(c => c.id === id)!
+  return ALL_CARDS.find(c => c.id === id)!
 }
+
+/** Palier de Lien requis pour débloquer la carte signature d'un perso. */
+export const SIGNATURE_BOND_LEVEL = 2
 
 export const DEFAULT_DECK: CardId[] = ['secondWind', 'perfectCounter', 'lastChance']
 

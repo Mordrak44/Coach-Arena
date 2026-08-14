@@ -46,7 +46,11 @@ portraits du roster qu'après accord explicite de l'utilisateur.
 - [x] Équilibrage passe 1 : coach parfait 80 % (cible 80-85), coach absent
       42 %, coach + carnet 93 %. Coach fantôme adverse renforcé (trickle de
       Hype + lecture des postures). Durée de round pas encore mesurée.
-- [ ] Cartes signatures par perso (débloquées par paliers de Lien)
+- [x] Cartes signatures par perso — 6 cartes uniques (Cœur Vaillant,
+      Orgueil du Rival, Concentration Absolue, Leçon d'Expérience,
+      Frénésie, Pas de l'Ombre), débloquées au Lien niv. 2 « Protégé »,
+      jouables uniquement avec leur perso, affichées verrouillées avant
+      (la carotte est visible). Persos custom : pas de signature en v0.
 - [x] Mesurer/ajuster la durée moyenne des rounds : 7 s → 36,5 s de
       moyenne (médiane 40 s, 22 % de décisions aux points à 60 s).
       Accepté comme « proche de la cible » ; à revoir après playtests réels.
@@ -143,3 +147,9 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
   segment du KO (ou le précédent s'il est < 6 s) devient le clip court,
   mis en avant en boucle sur l'écran de résultats. Le clip complet passe
   en bouton secondaire.
+- 2026-08-13 (routine h+7) : Cartes signatures — une par perso du roster,
+  liées à leur identité (Kenta se nourrit des coups, Rei humilie au
+  contre, Yuna ne panique jamais, Gorō voit venir le spécial, Fang entre
+  en frénésie sur ordre, Nyx devient fumée). Verrouillées sous Lien
+  niv. 2, filtrées du carnet si on change de perso. Micro-tests Yuna
+  (anti-confusion) et Fang (armée→voix) au vert.
