@@ -273,20 +273,30 @@ texte Claude < 0,02 €, match arcade = 0 €) :
 | Clip héroïque du KO (1 clip Kling) | ~0,30 € | 25 crédits |
 | Match cinématique complet (5-6 clips) | ~1,50 € | 120 crédits |
 
-**Structure de vente :**
+**Structure de vente (v2 — décision utilisateur 2026-08-14) :**
 
 - **Arcade gratuit pour tous, sans achat** — non négociable : la boucle
   virale TikTok (clic sur un clip → je joue immédiatement) meurt si
   l'entrée est payante.
-- **Pass Coach ~9,99 €** = mode histoire complet + 300 crédits de départ
-  + accès Forge. Les cinématiques du mode histoire sont générées **une
-  seule fois à l'écriture** et servies à tous les joueurs : coût fixe
-  amorti, pas un coût par joueur. Seul le contenu personnalisé (ton
-  perso, tes clips) coûte à l'unité. 300 crédits ≈ 3-4 créations de
-  persos + une poignée de clips héroïques, ou 2 matchs cinématiques.
-  Marge plancher : ~7 € nets (après commission store) − ~3,75 € de coût
-  si TOUS les crédits sont dépensés → toujours positif.
+- **Le jeu à ~14,90 €** = mode histoire complet avec les persos de base
+  + de quoi faire **~5 parties PvP cinématiques** (≈ 400 crédits) +
+  **création de SON perso débloquée en finissant l'histoire** (première
+  création offerte — la récompense de fin d'histoire, moment fort :
+  « maintenant, crée TON combattant et amène-le dans l'arène »).
+  Les cinématiques du mode histoire sont générées **une seule fois à
+  l'écriture** et servies à tous les joueurs : coût fixe amorti, pas un
+  coût par joueur. Seul le contenu personnalisé coûte à l'unité.
+  Marge plancher : ~10,40 € nets (après commission store) − ~5 € de coût
+  si TOUS les crédits partent en cinématique complète → toujours
+  positif ; confortable si les joueurs préfèrent le clip héroïque.
 - **Recharges** : 100 cr = 4,99 € · 250 cr = 9,99 € · 600 cr = 19,99 €.
+
+**Coût de l'analyse vocale (clarification)** : reconnaissance de
+commandes = Web Speech API du navigateur (0 €), volume/énergie = calcul
+local (0 €), prosodie/intonation = pitch local (0 €). Seule la
+*compréhension* fine du style de coaching (API Claude) coûte : ~1-3
+centimes/match, absorbée dans le prix du jeu. Le seul coût variable
+significatif reste la vidéo Kling.
 
 **Crédits gagnés en PvP — garde-fous obligatoires** (chaque crédit
 gagné est un coût réel quand il est dépensé) :
