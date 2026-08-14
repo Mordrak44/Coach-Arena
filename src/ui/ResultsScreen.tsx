@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Character } from '../game/types'
-import { MatchRecorder } from '../systems/recorder'
+import { MatchRecorder, fileExt, shareOrDownload } from '../systems/recorder'
 import { bondLevelFor, bondTitle, getProgress } from '../game/progression'
 import type { MatchOutcome } from './ArenaScreen'
 
@@ -18,6 +18,7 @@ export default function ResultsScreen({
   const won = outcome.winner === 'player'
   const prog = getProgress(player.id)
   const level = bondLevelFor(player.id)
+  const [shared, setShared] = useState(false)
   // URL créée UNE fois (pas à chaque rendu — sinon fuite mémoire de blobs
   // multi-Mo et vidéo qui redémarre), révoquée au démontage.
   const highlightUrl = useMemo(
@@ -57,18 +58,29 @@ export default function ResultsScreen({
           />
           <button
             className="btn"
-            onClick={() =>
-              MatchRecorder.download(outcome.highlight!, `coach-arena-KO-${player.name}.webm`)
-            }
+            onClick={async () => {
+              const how = await shareOrDownload(
+                outcome.highlight!,
+                `coach-arena-KO-${player.name}`,
+                `Mon KO en direct sur Coach Arena 🥊 #CoachArena`,
+              )
+              setShared(how === 'shared')
+            }}
           >
-            🔥 Le moment fort (clip court 9:16)
+            📤 Partager le KO (clip 9:16)
           </button>
+          {shared && <p className="permNote">Clip envoyé — beau match, coach ! 🥊</p>}
         </>
       ) : null}
       {outcome.clip ? (
         <button
           className="btn secondary"
-          onClick={() => MatchRecorder.download(outcome.clip!, `coach-arena-${player.name}.webm`)}
+          onClick={() =>
+            MatchRecorder.download(
+              outcome.clip!,
+              `coach-arena-${player.name}.${fileExt(outcome.clip!)}`,
+            )
+          }
         >
           ⬇ Match complet
         </button>

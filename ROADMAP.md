@@ -162,7 +162,12 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       parseur devient le fallback hors-ligne. Pendant le round :
       mots-clés assumés (latence + réalisme boxe).
 - [ ] Émotions MediaPipe FaceLandmarker (sourire/cri/colère → bonus distincts)
-- [ ] Export mp4 (transcodage) + partage natif (Web Share API)
+- [x] Export mp4 + partage natif — SANS transcodage : le conteneur est
+      choisi à la source (pickMimeType : mp4 si le navigateur sait
+      l'enregistrer — Safari/iOS, Chromium récents — sinon webm),
+      extensions de fichiers dynamiques, bouton « 📤 Partager le KO »
+      via Web Share API (feuille de partage mobile → TikTok direct),
+      repli téléchargement sur desktop. ffmpeg.wasm (~30 Mo) évité.
 - [ ] i18n (fr/en)
 - [ ] PWA installable mobile
 
@@ -185,7 +190,8 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       async §7), mp4 9:16 partageable — LE produit vendu
 - [ ] Génération perso + cartes via Claude API (serveur) + modération
       des prompts (les parseurs locaux deviennent les fallbacks)
-- [ ] Polish mobile/iOS : mp4, Web Share, Safari, budget batterie
+- [ ] Polish mobile/iOS : Safari (tests réels), budget batterie —
+      mp4 + Web Share faits (voir Mode Cinématique)
 - [ ] Légal : CGU/CGV, privacy policy (« tout en local » valorisé),
       watermark « généré par IA » (AI Act), paiement mineurs
 - [ ] Hébergement + analytics funnel (arrivée → match 1 → match 3 → achat)
@@ -220,6 +226,14 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-14 (routine) : mp4 + partage natif sans transcodage — les deux
+  enregistreurs choisissent le meilleur conteneur supporté À la source
+  (mp4 prioritaire : TikTok/iOS le veulent ; webm en repli), extensions
+  dynamiques, et l'écran de résultats gagne « 📤 Partager le KO » via la
+  Web Share API (feuille de partage mobile, repli téléchargement).
+  Le chemin viral mobile est complet : jouer → KO → feuille de partage →
+  TikTok, sans quitter le navigateur ni convertir quoi que ce soit.
 
 - 2026-08-14 (reprise technique) : Le Réalisateur — le jeu écrit lui-même
   les prompts des scènes cinématiques de chaque match (entrée, meilleurs

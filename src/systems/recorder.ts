@@ -1,5 +1,48 @@
-// Enregistrement du match : canvas 9:16 + micro → webm partageable.
+// Enregistrement du match : canvas 9:16 + micro → clip partageable.
 // v0.5 : composite avec la facecam incrustée directement dans le clip.
+// v1 : mp4 natif quand le navigateur sait l'enregistrer (Safari/iOS,
+// Chromium récents) — TikTok et le partage mobile veulent du mp4 ; webm en
+// repli. Pas de transcodage : on choisit le bon conteneur À la source.
+
+/** Meilleur conteneur supporté — mp4 d'abord, webm sinon. */
+export function pickMimeType(): string | undefined {
+  return [
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4',
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm',
+  ].find(m => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m))
+}
+
+export function fileExt(blob: Blob): 'mp4' | 'webm' {
+  return blob.type.includes('mp4') ? 'mp4' : 'webm'
+}
+
+/**
+ * Partage natif (feuille de partage mobile → TikTok/Shorts direct) si le
+ * navigateur sait partager des fichiers, sinon téléchargement classique.
+ */
+export async function shareOrDownload(
+  blob: Blob,
+  baseName: string,
+  text: string,
+): Promise<'shared' | 'downloaded'> {
+  const file = new File([blob], `${baseName}.${fileExt(blob)}`, {
+    type: blob.type || 'video/webm',
+  })
+  const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean }
+  if (nav.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: 'Coach Arena', text })
+      return 'shared'
+    } catch {
+      // partage annulé ou refusé → repli téléchargement
+    }
+  }
+  MatchRecorder.download(blob, file.name)
+  return 'downloaded'
+}
 
 export class MatchRecorder {
   private recorder: MediaRecorder | null = null
@@ -14,9 +57,7 @@ export class MatchRecorder {
         for (const track of micStream.getAudioTracks()) stream.addTrack(track.clone())
       }
       this.mixStream = stream
-      const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(
-        m => MediaRecorder.isTypeSupported(m),
-      )
+      const mime = pickMimeType()
       this.chunks = []
       this.recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
       this.recorder.ondataavailable = e => {
@@ -88,9 +129,7 @@ export class HighlightRecorder {
       if (micStream) {
         for (const track of micStream.getAudioTracks()) this.stream.addTrack(track.clone())
       }
-      this.mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(
-        m => MediaRecorder.isTypeSupported(m),
-      )
+      this.mime = pickMimeType()
       this.startSegment()
       this.rotateTimer = window.setInterval(() => this.rotate(), this.segmentMs)
       return true
