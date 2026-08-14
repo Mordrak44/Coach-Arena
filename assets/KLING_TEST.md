@@ -25,7 +25,23 @@ committer ici pour les conserver.
 
 **Total consommé par le test : 16 crédits / 3000 (solde vérifié avant).**
 
+## Résultat vidéo
+
+- Générée en **80 s** — compatible avec le pipeline asynchrone du design
+  (les scènes se génèrent pendant les phases de coaching, qui durent
+  20 s + un round ≈ 35-60 s : une scène par round est tenable).
+- Vidéo (sans watermark) :
+  `https://v15-kling.klingai.com/bs2/upload-ylab-stunt-sgp/0081b1dc-e99e-4ae1-90c0-c9e8932ed8b8-tjgVx_COjxGhvcd4qrViJg-output.mp4?x-kcdn-pid=112372`
+- Couverture :
+  `https://s15-kling.klingai.com/kimg/EMXN1y8qYwoGdXBsb2FkEg55bGFiLXN0dW50LXNncBpJMDA4MWIxZGMtZTk5ZS00YWUxLTkwYzAtYzllODkzMmVkOGI4LXRqZ1Z4X0NPanhHaHZjZDRxclZpSmctb3V0cHV0X2ZmLmpwZw.origin?x-kcdn-pid=112372`
+
 ## Verdict
 
-(à compléter à la réception de la vidéo : cohérence du perso, qualité du
-mouvement, utilisabilité pour les scènes d'entrée/replays/montage)
+- **Pipeline validé techniquement** : portrait 24 s / 1 crédit, vidéo 5 s
+  en 80 s / 15 crédits → ~16 crédits par « scène + référence », et les
+  scènes suivantes réutilisent le portrait (15 crédits/scène). Budget
+  match complet (entrée + 2-3 replays + KO) ≈ 60-75 crédits.
+- **Cohérence visuelle perso** : à juger À L'ŒIL par l'utilisateur (la
+  session de dev ne peut pas visionner la vidéo — proxy). Si le perso
+  reste fidèle au portrait : GO pour générer les 5 autres portraits du
+  roster et industrialiser (file asynchrone, ROADMAP v1 cinématique).
