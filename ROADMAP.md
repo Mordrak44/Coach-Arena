@@ -78,7 +78,11 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       l'arène : annonce VS shōnen, demande des capteurs avec explication,
       état micro/caméra/reco vocale, conseil de coaching selon le trait
       du perso, fallback boutons/clavier assumé si refus
-- [ ] Tests unitaires du moteur de combat (vitest)
+- [x] Tests unitaires du moteur de combat (vitest) — 19 tests
+      (src/game/engine.test.ts, `npm test`) : coûts DSL, clamps,
+      signatures, deck-builder, confusion, Ulti/spécial, mulligan,
+      Souffle, coin adverse symétrique, consignes, forge, réalisateur.
+      scripts/sim.ts reste l'outil d'équilibrage (winrates, durées).
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -169,7 +173,11 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       via Web Share API (feuille de partage mobile → TikTok direct),
       repli téléchargement sur desktop. ffmpeg.wasm (~30 Mo) évité.
 - [ ] i18n (fr/en)
-- [ ] PWA installable mobile
+- [x] PWA installable mobile — manifest (portrait, standalone), icônes
+      générées (192/512/maskable/apple-touch, monogramme CA arcade),
+      service worker (cache-first sur les assets hashés, network-first
+      ailleurs avec repli hors-ligne — le jeu 100 % client tourne sans
+      réseau), meta iOS. Enregistré en prod uniquement.
 
 ## Vers la version vendable (gap analysis 2026-08-14)
 
@@ -226,6 +234,15 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-14 (autonome) : PWA + vitest — le jeu s'installe sur l'écran
+  d'accueil (manifest, icônes CA générées, service worker offline
+  raisonné, meta iOS) et le moteur a sa suite `npm test` (19 tests
+  vitest sur les invariants : coûts DSL, clamps anti-triche, confusion,
+  Ulti unique sur ordre, symétrie du coin adverse, consignes, forge,
+  réalisateur). sim.ts garde le rôle équilibrage. Fix : vite-env.d.ts
+  manquant (import.meta.env). Dernier item v0.5 clos — la section v0.5
+  est COMPLÈTE.
 
 - 2026-08-14 (routine) : mp4 + partage natif sans transcodage — les deux
   enregistreurs choisissent le meilleur conteneur supporté À la source
