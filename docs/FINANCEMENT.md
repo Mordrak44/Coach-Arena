@@ -9,12 +9,21 @@ dossiers : on candidate avec la preuve, pas la promesse.
 2. **CNC / FAJV** — subventions cumulables par phase :
    - *Écriture* (création de PI) : univers, mode histoire, bible.
      Sessions à dates fixes (une session le 19/01/2026 — surveiller le
-     calendrier CNC).
+     calendrier CNC). ⚠️ Éligibilité : auteurs indépendants ET au moins
+     un déposant avec formation jeu vidéo OU expérience significative
+     sur un jeu — sinon, co-déposer avec un auteur expérimenté.
    - *Pré-production* : jusqu'à 50 % des dépenses de prototypage
      (bible finale, charte artistique — nos planches Kling —, étude
      technique, prototype jouable). Soutien moyen ~80 k€/phase ;
-     30-70 % du budget selon l'étape.
+     30-70 % du budget selon l'étape. Éligibilité : studio français
+     indépendant (société même jeune, ≥ 50 % des droits, dirigeants
+     FR/EEE) — AUCUN diplôme ni jeu déjà sorti exigé ; concours sur
+     dossier, le prototype parle. Obligations récentes : formation
+     VSS/VHSS, prévisionnel carbone (Jyros).
    - *Production* : phase suivante, studio structuré.
+
+   💡 Track record maison : sortir l'arcade web gratuit AVANT le dépôt
+   = un jeu live + métriques + communauté au dossier, sans diplôme.
 3. **Bpifrance** : Bourse French Tech (~30 k€ amorçage), CII, statut
    JEI. Angle innovation : coaching vocal temps réel, DSL de cartes
    bornée pour l'UGC, pipeline génératif.
