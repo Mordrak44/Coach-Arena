@@ -159,6 +159,38 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 - [ ] i18n (fr/en)
 - [ ] PWA installable mobile
 
+## Vers la version vendable (gap analysis 2026-08-14)
+
+Ordre de priorité réel vers le premier euro (canal web d'abord).
+
+### Tier 0 — prouver le fun
+- [ ] Playtests humains (10-20 personnes) : fun au 15e match ? points de
+      décrochage ? → ajuster avant tout investissement
+- [ ] Intégrer les illustrations Kling au jeu : portraits roster à la
+      sélection / Vestiaire / HUD / bannières de spécial — le saut de
+      qualité visible le plus rentable (planches déjà générées)
+
+### Tier 1 — MVP vendable (recharges de crédits, web)
+- [ ] Backend minimal : auth légère, sauvegarde cloud, portefeuille de
+      crédits (le chantier structurant — tout le reste s'y branche)
+- [ ] Paiement Stripe + boutique de recharges
+- [ ] Pipeline Kling serveur : clip héroïque du KO généré en jeu (file
+      async §7), mp4 9:16 partageable — LE produit vendu
+- [ ] Génération perso + cartes via Claude API (serveur) + modération
+      des prompts (les parseurs locaux deviennent les fallbacks)
+- [ ] Polish mobile/iOS : mp4, Web Share, Safari, budget batterie
+- [ ] Légal : CGU/CGV, privacy policy (« tout en local » valorisé),
+      watermark « généré par IA » (AI Act), paiement mineurs
+- [ ] Hébergement + analytics funnel (arrivée → match 1 → match 3 → achat)
+
+### Tier 2 — Édition Histoire 14,90 € (stores)
+- [ ] Mode histoire : arc shōnen, adversaires/decks dédiés, cinématiques
+      pré-générées UNE fois, création de perso en récompense finale
+- [ ] Wrapper Capacitor/Electron + pages stores
+
+### Tier 3 — PvP (rétention long terme, après premiers revenus)
+- [ ] Serveur d'autorité, matchmaking, Éclats
+
 ## v2
 
 - [ ] L'Écurie : 3 combattants, remplacement au coin du ring (format
