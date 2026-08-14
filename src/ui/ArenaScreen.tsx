@@ -62,8 +62,13 @@ export default function ArenaScreen({
     renderer: ArenaRenderer
     sound: SoundSystem
     stream: MediaStream | null
+    /** canvas caché : jeu + facecam + watermark — c'est LUI qui est enregistré */
+    composite: HTMLCanvasElement
   }>()
   if (!sysRef.current) {
+    const composite = document.createElement('canvas')
+    composite.width = CANVAS_W
+    composite.height = CANVAS_H
     sysRef.current = {
       voice: new VoiceCoach(),
       face: new FaceCoach(),
@@ -71,6 +76,7 @@ export default function ArenaScreen({
       renderer: new ArenaRenderer(),
       sound: new SoundSystem(),
       stream: null,
+      composite,
     }
   }
 
@@ -127,7 +133,7 @@ export default function ArenaScreen({
           camRef.current.play().catch(() => {})
         }
       }
-      if (canvasRef.current) sys.recorder.start(canvasRef.current, hasAudio ? stream : null)
+      sys.recorder.start(sys.composite, hasAudio ? stream : null)
     }
     setup()
 
@@ -216,6 +222,38 @@ export default function ArenaScreen({
       if (ctx) {
         const timeLeft = ROUND_TIME_LIMIT - (m.t - roundStart)
         sys.renderer.draw(ctx, m, m.t, timeLeft)
+      }
+
+      // Composite pour le clip : jeu + facecam incrustée + watermark
+      const cctx = sys.composite.getContext('2d')
+      if (cctx && canvasRef.current) {
+        cctx.drawImage(canvasRef.current, 0, 0)
+        const video = sys.face.video
+        if (sys.face.state.active && video.readyState >= 2) {
+          const w = CANVAS_W * 0.27
+          const h = (w * 4) / 3
+          const x = CANVAS_W - w - 14
+          const y = CANVAS_H - h - 120
+          cctx.save()
+          // miroir façon selfie
+          cctx.translate(x + w, y)
+          cctx.scale(-1, 1)
+          cctx.drawImage(video, 0, 0, w, h)
+          cctx.restore()
+          cctx.strokeStyle = '#ffdd00'
+          cctx.lineWidth = 4
+          cctx.strokeRect(x, y, w, h)
+          cctx.fillStyle = '#ff3366'
+          cctx.font = 'bold 15px sans-serif'
+          cctx.fillText('● COACH', x + 6, y + h + 20)
+        }
+        cctx.font = '900 italic 20px sans-serif'
+        cctx.textAlign = 'left'
+        cctx.strokeStyle = '#111'
+        cctx.lineWidth = 4
+        cctx.strokeText('COACH ARENA', 14, CANVAS_H - 18)
+        cctx.fillStyle = '#ffdd00'
+        cctx.fillText('COACH ARENA', 14, CANVAS_H - 18)
       }
 
       // Fin de match : on coupe l'enregistreur et on sort.

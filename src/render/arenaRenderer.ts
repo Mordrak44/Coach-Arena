@@ -28,6 +28,15 @@ export class ArenaRenderer {
   private specialBannerText = ''
   private lastEventIndex = 0
   private speedLineSeed = Math.random() * 1000
+  /** zoom dramatique (spécial) : actif jusqu'à cet instant, centré sur focusX */
+  private zoomUntil = 0
+  private zoomStart = 0
+  private zoomFocusX = CANVAS_W / 2
+  /** écran fissuré (KO) */
+  private crackUntil = 0
+  private crackX = CANVAS_W / 2
+  private crackY = 600
+  private crackSeed = 1
 
   /** Consomme les nouveaux events du match pour déclencher les FX. */
   ingestEvents(m: MatchState, now: number) {
@@ -81,6 +90,10 @@ export class ArenaRenderer {
         this.floats.push({ text: ev.onoma, x: CANVAS_W / 2, y: 500, t0: now + 0.4, life: 1.1, size: 76, color: '#ffdd00', angle: -0.08 })
         this.flash(now, '#fff', 0.16)
         this.shake(now, 22)
+        // Zoom dramatique sur celui qui déclenche
+        this.zoomStart = now
+        this.zoomUntil = now + 1.5
+        this.zoomFocusX = (ev.by === 'player' ? m.player.x : m.enemy.x) * CANVAS_W
         break
       case 'card':
         this.floats.push({ text: `🃏 ${ev.name.toUpperCase()}`, x: CANVAS_W / 2, y: 520, t0: now, life: 1.4, size: 34, color: '#7ec8ff', angle: -0.05 })
@@ -102,13 +115,22 @@ export class ArenaRenderer {
       case 'roundStart':
         this.floats.push({ text: `ROUND ${ev.round}`, x: CANVAS_W / 2, y: 440, t0: now, life: 1.6, size: 64, color: '#ffffff', angle: 0 })
         break
-      case 'roundEnd':
+      case 'roundEnd': {
         this.floats.push({
           text: ev.winner === 'player' ? 'ROUND GAGNÉ !' : 'ROUND PERDU…',
           x: CANVAS_W / 2, y: 460, t0: now, life: 2, size: 46,
           color: ev.winner === 'player' ? '#ffdd00' : '#8899aa', angle: 0,
         })
+        // KO (et pas décision aux points) → l'écran se fissure sur le perdant
+        const loser = ev.winner === 'player' ? m.enemy : m.player
+        if (loser.hp <= 0) {
+          this.crackUntil = now + 1.4
+          this.crackX = loser.x * CANVAS_W
+          this.crackY = 600
+          this.crackSeed = Math.floor(now * 997) % 1000 || 1
+        }
         break
+      }
       case 'matchEnd':
         this.flash(now, ev.winner === 'player' ? '#ffdd00' : '#223', 0.3)
         break
@@ -135,6 +157,18 @@ export class ArenaRenderer {
       ctx.translate((Math.random() - 0.5) * this.shakeMag * k, (Math.random() - 0.5) * this.shakeMag * k)
     }
 
+    // Zoom dramatique (spécial) : pousse vite, relâche doucement
+    if (now < this.zoomUntil) {
+      const total = this.zoomUntil - this.zoomStart
+      const p = (now - this.zoomStart) / total
+      const intensity = p < 0.2 ? p / 0.2 : 1 - (p - 0.2) / 0.8
+      const scale = 1 + 0.32 * intensity
+      const fy = 560
+      ctx.translate(this.zoomFocusX, fy)
+      ctx.scale(scale, scale)
+      ctx.translate(-this.zoomFocusX, -fy)
+    }
+
     this.drawBackground(ctx, m, now)
     this.drawRing(ctx)
 
@@ -143,6 +177,7 @@ export class ArenaRenderer {
     this.drawFighter(ctx, m.enemy, now, true)
 
     this.drawFloats(ctx, now)
+    this.drawCracks(ctx, now)
     this.drawHUD(ctx, m, roundTimeLeft)
     this.drawSpecialBanner(ctx, now)
 
@@ -401,6 +436,44 @@ export class ArenaRenderer {
       ctx.fillText(f.text, 0, 0)
       ctx.restore()
     }
+  }
+
+  // -- écran fissuré (KO) ---------------------------------------------------
+
+  private drawCracks(ctx: CanvasRenderingContext2D, now: number) {
+    if (now >= this.crackUntil) return
+    const k = this.crackUntil - now
+    const appear = Math.min(1, (1.4 - k) * 8) // les fissures jaillissent
+    // pseudo-aléatoire déterministe : les fissures ne scintillent pas
+    const rnd = (i: number) => {
+      const x = Math.sin(i * 127.1 + this.crackSeed * 311.7) * 43758.5453
+      return x - Math.floor(x)
+    }
+    ctx.save()
+    ctx.globalAlpha = Math.min(1, k * 2)
+    for (let i = 0; i < 9; i++) {
+      const angle = (i / 9) * Math.PI * 2 + rnd(i) * 0.6
+      const len = (140 + rnd(i + 50) * 260) * appear
+      let x = this.crackX
+      let y = this.crackY
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+      const segs = 4
+      for (let s = 1; s <= segs; s++) {
+        const r = (len / segs) * s
+        const jitter = (rnd(i * 10 + s) - 0.5) * 40
+        x = this.crackX + Math.cos(angle) * r + Math.cos(angle + Math.PI / 2) * jitter
+        y = this.crackY + Math.sin(angle) * r + Math.sin(angle + Math.PI / 2) * jitter
+        ctx.lineTo(x, y)
+      }
+      ctx.strokeStyle = '#0a0a12'
+      ctx.lineWidth = 5
+      ctx.stroke()
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 2
+      ctx.stroke()
+    }
+    ctx.restore()
   }
 
   // -- HUD ------------------------------------------------------------------

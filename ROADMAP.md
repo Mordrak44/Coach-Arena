@@ -54,9 +54,12 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       complète (impacts/crit, garde, esquive, contre, riser+explosion de
       spécial, gong battant, KO, jingle Hype, cartes, foule liée à la
       Hype), bouton muet dans l'arène
-- [ ] FX supplémentaires : zoom dramatique sur special, écran fissuré au KO
+- [x] FX supplémentaires : zoom dramatique sur special, écran fissuré au KO
+      (fissures uniquement sur vrai KO, pas sur décision aux points)
 - [ ] Replay du moment fort en fin de match (buffer des 8 dernières secondes)
-- [ ] Incruster la facecam DANS le clip exporté (composite canvas)
+- [x] Incruster la facecam DANS le clip exporté (composite canvas caché :
+      jeu + facecam miroir bordée « ● COACH » + watermark COACH ARENA —
+      c'est le composite qui est enregistré, l'écran de jeu reste inchangé)
 - [ ] Meilleure silhouette des persos (poses d'attaque/garde/esquive distinctes)
 - [ ] Onboarding permissions micro/caméra (fallback clavier si refus)
 - [ ] Tests unitaires du moteur de combat (vitest)
@@ -125,3 +128,9 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
   du coach devient le timing. Résultats : coach parfait 88 %, sans coach
   40 %, avec carnet 97 % (cartes à surveiller). Auto-motivation de Hype
   symétrique pour les deux camps.
+- 2026-08-13 (routine h+5) : le combo viral — clip exporté = composite
+  jeu + facecam incrustée en miroir (badge ● COACH, watermark COACH
+  ARENA) via un canvas caché branché sur le MediaRecorder. FX : zoom
+  dramatique centré sur le lanceur de spécial (poussée rapide, relâche
+  lente), écran fissuré au KO (fissures déterministes, pas de
+  scintillement). Sim stable : 91 % / 32 % / 94 %, rounds ~35 s.
