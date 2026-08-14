@@ -166,6 +166,12 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       re-clamp au rechargement (anti-triche localStorage), 1 copie de
       chaque forgée dans le deck. v1 : parseur → API Claude, mêmes
       garde-fous.
+- [ ] Figurine 3D du perso (prompt-to-3D Meshy/Tripo : modèle riggé en
+      ~1 min, ~centimes) — trophée rotatif dans l'Écurie, façon Little
+      Legends : de l'attachement cosmétique, le combat reste 2D manga.
+      État de l'art 2026 vérifié : auto-rig + banques d'animations
+      existent ; on n'y va PAS pour le combat (animations génériques vs
+      notre mise en scène shōnen, cohérence de style, réécriture rendu).
 - [ ] Prosodie vocale (intonation, pas seulement volume)
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
