@@ -32,24 +32,39 @@ export default function ResultsScreen({
           : `${player.name} s'est bien battu. Un vrai coach revient toujours. Retournes-y.`}
       </p>
 
-      {outcome.clip ? (
+      {outcome.highlight ? (
         <>
           <video
-            src={URL.createObjectURL(outcome.clip)}
+            src={URL.createObjectURL(outcome.highlight)}
             controls
+            autoPlay
+            muted
+            loop
             playsInline
-            style={{ width: '80%', borderRadius: 12, border: '3px solid var(--accent)' }}
+            style={{ width: '72%', borderRadius: 12, border: '3px solid var(--accent2)' }}
           />
           <button
             className="btn"
-            onClick={() => MatchRecorder.download(outcome.clip!, `coach-arena-${player.name}.webm`)}
+            onClick={() =>
+              MatchRecorder.download(outcome.highlight!, `coach-arena-KO-${player.name}.webm`)
+            }
           >
-            ⬇ Télécharger le clip (9:16)
+            🔥 Le moment fort (clip court 9:16)
           </button>
-          <p className="permNote">
-            Format vertical prêt pour TikTok / Shorts — poste ton match, tague #CoachArena 🥊
-          </p>
         </>
+      ) : null}
+      {outcome.clip ? (
+        <button
+          className="btn secondary"
+          onClick={() => MatchRecorder.download(outcome.clip!, `coach-arena-${player.name}.webm`)}
+        >
+          ⬇ Match complet
+        </button>
+      ) : null}
+      {outcome.clip || outcome.highlight ? (
+        <p className="permNote">
+          Format vertical prêt pour TikTok / Shorts — poste ton KO, tague #CoachArena 🥊
+        </p>
       ) : (
         <p className="permNote">Pas de clip pour ce match (enregistrement indisponible).</p>
       )}

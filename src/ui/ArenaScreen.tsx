@@ -14,12 +14,15 @@ import { FAMILY_LABEL, getCard } from '../game/cards'
 import { ArenaRenderer, CANVAS_H, CANVAS_W } from '../render/arenaRenderer'
 import { VoiceCoach } from '../systems/voice'
 import { FaceCoach } from '../systems/facecam'
-import { MatchRecorder } from '../systems/recorder'
+import { HighlightRecorder, MatchRecorder } from '../systems/recorder'
 import { SoundSystem } from '../systems/sound'
 
 export interface MatchOutcome {
   winner: 'player' | 'enemy'
+  /** match complet */
   clip: Blob | null
+  /** moment fort : les dernières secondes (le KO) */
+  highlight: Blob | null
 }
 
 const PLANS: Array<{ id: TacticPlan; name: string; desc: string }> = [
@@ -59,6 +62,7 @@ export default function ArenaScreen({
     voice: VoiceCoach
     face: FaceCoach
     recorder: MatchRecorder
+    highlight: HighlightRecorder
     renderer: ArenaRenderer
     sound: SoundSystem
     stream: MediaStream | null
@@ -73,6 +77,7 @@ export default function ArenaScreen({
       voice: new VoiceCoach(),
       face: new FaceCoach(),
       recorder: new MatchRecorder(),
+      highlight: new HighlightRecorder(),
       renderer: new ArenaRenderer(),
       sound: new SoundSystem(),
       stream: null,
@@ -134,6 +139,7 @@ export default function ArenaScreen({
         }
       }
       sys.recorder.start(sys.composite, hasAudio ? stream : null)
+      sys.highlight.start(sys.composite, hasAudio ? stream : null)
     }
     setup()
 
@@ -261,8 +267,8 @@ export default function ArenaScreen({
         finished = true
         const winner = m.playerWins >= 2 ? 'player' : 'enemy'
         setTimeout(async () => {
-          const clip = await sys.recorder.stop()
-          if (!disposed) onFinish({ winner, clip })
+          const [clip, highlight] = await Promise.all([sys.recorder.stop(), sys.highlight.stop()])
+          if (!disposed) onFinish({ winner, clip, highlight })
         }, 1800) // laisse la pose de victoire à l'écran (et dans le clip)
       }
 
@@ -283,6 +289,7 @@ export default function ArenaScreen({
       sys.voice.stop()
       sys.face.stop()
       sys.recorder.stop()
+      sys.highlight.stop()
       sys.sound.stop()
       sys.stream?.getTracks().forEach(t => t.stop())
     }

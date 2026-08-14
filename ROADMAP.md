@@ -56,7 +56,11 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       Hype), bouton muet dans l'arène
 - [x] FX supplémentaires : zoom dramatique sur special, écran fissuré au KO
       (fissures uniquement sur vrai KO, pas sur décision aux points)
-- [ ] Replay du moment fort en fin de match (buffer des 8 dernières secondes)
+- [x] Replay du moment fort en fin de match — segments webm rotatifs de
+      14 s (chacun autonome avec son en-tête, pas de découpe a
+      posteriori) ; à la fin, le segment contenant le KO devient le clip
+      court, affiché en boucle sur l'écran de résultats avec son propre
+      bouton de téléchargement, le match complet en secondaire
 - [x] Incruster la facecam DANS le clip exporté (composite canvas caché :
       jeu + facecam miroir bordée « ● COACH » + watermark COACH ARENA —
       c'est le composite qui est enregistré, l'écran de jeu reste inchangé)
@@ -134,3 +138,8 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
   dramatique centré sur le lanceur de spécial (poussée rapide, relâche
   lente), écran fissuré au KO (fissures déterministes, pas de
   scintillement). Sim stable : 91 % / 32 % / 94 %, rounds ~35 s.
+- 2026-08-13 (routine h+6) : Replay du moment fort — HighlightRecorder à
+  segments rotatifs de 14 s sur le composite (facecam incluse) ; le
+  segment du KO (ou le précédent s'il est < 6 s) devient le clip court,
+  mis en avant en boucle sur l'écran de résultats. Le clip complet passe
+  en bouton secondaire.
