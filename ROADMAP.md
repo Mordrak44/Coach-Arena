@@ -258,6 +258,13 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       + mini-barre de PV, croix rouge si KO) des deux côtés — les clips
       montrent que c'est un combat d'équipe. Démo avec équipes.
 - [ ] Wrapper Capacitor/Electron + pages stores
+- [ ] Édition PC / layout paysage 16:9 (pour Steam) : arène élargie au
+      centre, cams des deux coachs sur les CÔTÉS façon plateau TV de
+      boxe (la visio des coachs s'y prête déjà). Canvas/moteur
+      inchangés — travail de composition d'écran. Angle stratégique :
+      le joueur PC type est un streamer, le jeu est un format Twitch
+      par nature. Déjà jouable sur PC aujourd'hui : navigateur +
+      clavier (A/D/E/C/S/U/espace) + PWA desktop, colonne 9:16 assumée.
 
 ### Tier 3 — PvP (rétention long terme, après premiers revenus)
 - [ ] Serveur d'autorité, matchmaking, Éclats
