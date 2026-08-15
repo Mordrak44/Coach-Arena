@@ -5,6 +5,69 @@
 > **à la facecam**, comme un vrai coach au bord du ring. L'IA analyse ta voix et
 > ton visage : ton énergie devient la sienne.
 
+## 0. Vision produit finale — le parcours joueur, bout en bout
+
+Synthèse (2026-08-15) de toutes les décisions prises depuis le début du
+projet, pour garder le cap pendant qu'on creuse les détails.
+
+**Découverte.** Un clip TikTok : quelqu'un hurle des ordres à son perso
+en plein combat, un KO en ralenti, un Ultime qui explose l'écran. Clic →
+le jeu charge dans le navigateur en moins de 15 s, zéro installation.
+
+**Création.** Trois questions guidées (style/tempérament/univers) ou un
+prompt libre composent le perso ; ou choix dans le roster de 6
+archétypes. Permissions micro/caméra expliquées clairement au Vestiaire
+— tout reste local, jamais envoyé nulle part.
+
+**Le combat.** Rendu vectoriel manga en continu (2.5D, encré,
+expressif) — c'est le socle qui tourne TOUJOURS, zéro coût, zéro
+latence. Par-dessus, dès que la bibliothèque de templates existe : à
+chaque instant RÉSOLU par la simulation (un coup qui touche, une
+esquive, un spécial), un cut vidéo swappé avec l'identité du perso
+s'affiche — y compris pour un perso tout juste créé par prompt, grâce à
+la bibliothèque partagée de sa catégorie (archétype). Rien ne bloque
+jamais la voix du coach : la simulation tourne en continu, les cuts ne
+font qu'habiller ce qui vient de se décider.
+
+**Coacher.** Ordres vocaux (attaque/garde/esquive/contre/spécial/
+ultime/encourage), intonation et énergie facecam modulées par le trait
+d'écoute du perso (sanguin/cérébral/têtu/fusionnel). Entre les rounds :
+plan tactique, deck de cartes (guerre des coins incluse — bloquer ou
+drainer le coin adverse), relève d'équipier (PV/Hype/Ulti conservés),
+et conseils parlés librement transformés en effets réels. Le coach
+adverse est un vrai miroir (son propre deck, sa propre équipe), visible
+en tuile façon appel vidéo — demain, la vraie facecam d'un adversaire
+humain en PvP.
+
+**Fin de match.** Clip du KO enregistré automatiquement, partagé en un
+tap vers la feuille de partage native. #CoachArena.
+
+**Progression.** La Vie d'Écurie (humeur, envies, entraînement — jamais
+punitive) nourrit le Lien avec chaque perso, débloque cartes signatures
+et paliers de récompense. Le Mode Histoire (« Le Grand Hurlement »,
+8 chapitres) donne un arc complet, des adversaires thématiques, un boss
+final inédit — et débloque à terme la création de son propre champion
+en récompense finale.
+
+**Plateformes.** Mobile-first (web + PWA installable) ; plateau TV en
+paysage sur PC (les cams des coachs sur les côtés — cœur de cible :
+les streamers) ; wrapper natif pour les stores plus tard, même code.
+
+**Économie.** L'arcade reste gratuit et illimité, pour toujours — le
+moteur de viralité ne doit jamais coûter un centime à personne.
+L'Édition Histoire (~14,90 €, vendue sur stores) et les recharges de
+crédits (web, Stripe) financent le contenu cinématique — jamais de
+pay-to-win, les Éclats du PvP restent bornés au cosmétique.
+
+**Ce qui est réel aujourd'hui vs l'ambition** : tout le gameplay ci-dessus
+tourne déjà (moteur, deck, Écurie, Histoire, voix, prosodie). Le rendu
+est 100 % vectoriel — aucun cut vidéo n'existe encore (bibliothèque
+vide par construction). L'architecture pour les recevoir est prête et
+testée (Réalisateur, Séquenceur de cuts, bibliothèque de clips, lecteur
+en direct) ; il manque le contenu (templates produits, swap branché) et
+le backend (comptes, paiement, hébergement) pour que cette vision soit
+la réalité jouée. Voir ROADMAP.md pour l'état détaillé, tier par tier.
+
 ## 1. Concept
 
 - **Genre** : auto-battler coaché en temps réel, esthétique manga/shōnen.
