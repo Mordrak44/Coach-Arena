@@ -284,6 +284,33 @@ vidéo — fabriquer des « moules » et y couler les persos.
   un plan devient « template X + swap(planche du perso) » au lieu d'un
   prompt de génération complète.
 
+### Le combat en cuts (vision utilisateur 2026-08-15) — templates+swap
+appliqués AU COMBAT lui-même
+
+**Clé de voûte : la grammaire du découpage anime évite la combinatoire.**
+Un cut ne montre qu'UN personnage (attaque en gros plan → flash d'impact
+→ contrechamp de réaction). Chaque perso n'a donc besoin que de SA banque
+de cuts (attaques, réactions, esquive, garde, KO, célébration…) — jamais
+de paires attaquant×défenseur à générer.
+
+- **Banque de gestuelles par perso, générée HORS match** : à la création
+  (planche de réf + templates de mouvement + swap), en asynchrone,
+  stockée une fois. Centimes par cut (API) à ~0 (auto-hébergé).
+- **L'entraînement débloque les gestes** (Vie d'Écurie) : entraîner
+  l'ATK débloque un nouveau cut d'attaque, le Lien débloque l'entrée
+  personnalisée — l'écurie enrichit littéralement le film des matchs.
+  Gestuelles premium achetables (cosmétiques vidéo).
+- **Le match = séquençage, zéro génération** : le moteur arcade reste
+  l'autorité (simulation, coaching voix, cartes) ; ses événements —
+  qui pilotent déjà renderer/commentateur/Réalisateur — pilotent un
+  lecteur de cuts. Instantané, hors-ligne, coût marginal nul.
+- **Contrainte** : templates standardisés (cadrage fixe par type de cut)
+  + transitions manga (flash, speed lines — déjà dans le renderer) pour
+  masquer les raccords, comme l'animation limitée japonaise.
+- Trois niveaux de spectacle sur le même moteur : arcade vectoriel
+  (gratuit) → cinéma de cuts (banque amortie, gratuit à l'usage) →
+  générations Kling uniques (TON Ulti, TON KO — premium).
+
 ### Modèle de monétisation (proposition chiffrée)
 
 Coûts réels mesurés par action (base : clip Kling 5 s ≈ 0,30 €, appel
