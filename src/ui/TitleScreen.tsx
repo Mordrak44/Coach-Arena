@@ -7,7 +7,13 @@ import { ArenaRenderer, CANVAS_H, CANVAS_W } from '../render/arenaRenderer'
 // derrière le titre, comme une borne d'arcade. Premier contact du visiteur
 // TikTok — le jeu doit bouger avant même le premier clic.
 
-export default function TitleScreen({ onStart }: { onStart: () => void }) {
+export default function TitleScreen({
+  onStart,
+  onStory,
+}: {
+  onStart: () => void
+  onStory: () => void
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -102,6 +108,9 @@ export default function TitleScreen({ onStart }: { onStart: () => void }) {
         </p>
         <button className="btn" onClick={onStart}>
           Entrer dans l'arène
+        </button>
+        <button className="btn secondary" onClick={onStory}>
+          📖 Le Grand Hurlement (Histoire)
         </button>
         <p className="permNote">
           🎙️ + 📷 Le jeu demande le micro et la caméra : c'est toi, le coach à l'écran. Refuse si tu

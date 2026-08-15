@@ -17,8 +17,10 @@ import CharacterSelect from './ui/CharacterSelect'
 import ReadyScreen from './ui/ReadyScreen'
 import ArenaScreen, { type MatchOutcome } from './ui/ArenaScreen'
 import ResultsScreen from './ui/ResultsScreen'
+import StoryScreen from './ui/StoryScreen'
+import { type StoryChapter, chapterOpponent, chapterOpponentTeam, markCleared } from './game/story'
 
-type Screen = 'title' | 'select' | 'ready' | 'arena' | 'results'
+type Screen = 'title' | 'story' | 'select' | 'ready' | 'arena' | 'results'
 
 // Mode démo (?demo) : saute directement dans l'arène sans capteurs — pour
 // les captures d'écran, le press kit et les tests visuels automatisés.
@@ -38,6 +40,8 @@ export default function App() {
   // les bonus de Lien/entraînement s'empileraient à chaque match.
   const baseCharRef = useRef<Character | null>(null)
   const baseTeamRef = useRef<Character[]>([])
+  /** chapitre d'Histoire en cours (null = match rapide) */
+  const storyRef = useRef<StoryChapter | null>(null)
 
   const startMatch = (char: Character, chosenDeck?: CardId[], team: Character[] = baseTeamRef.current) => {
     if (chosenDeck) setDeck(chosenDeck)
@@ -53,12 +57,16 @@ export default function App() {
         stats: { ...fighter.stats, [trained]: Math.min(12, fighter.stats[trained] + 1) },
       }
     }
-    // L'Écurie en match : chaque équipier monte avec SON Lien ; l'adversaire
-    // aligne une équipe de même taille (roster, sans doublons).
+    // L'Écurie en match : chaque équipier monte avec SON Lien. En Histoire,
+    // l'adversaire et son équipe sont ceux du chapitre ; sinon l'adversaire
+    // aligne une équipe de même taille que la tienne (roster, sans doublons).
     const teamFighters = team.map(t => applyBond(t))
-    const opponent = pickOpponent(char.id)
+    const story = storyRef.current
+    const opponent = story ? chapterOpponent(story) : pickOpponent(char.id)
     const pool = ROSTER.filter(r => r.id !== opponent.id)
-    const enemyTeam = [...pool].sort(() => Math.random() - 0.5).slice(0, teamFighters.length)
+    const enemyTeam = story
+      ? chapterOpponentTeam(story)
+      : [...pool].sort(() => Math.random() - 0.5).slice(0, teamFighters.length)
     matchOptsRef.current = {
       startHype: moodStartHype(stable.mood),
       sulky: moodIgnoresFirstOrder(stable.mood),
@@ -79,7 +87,24 @@ export default function App() {
   return (
     <div className="app">
       <div className="stage">
-        {screen === 'title' && <TitleScreen onStart={() => setScreen('select')} />}
+        {screen === 'title' && (
+          <TitleScreen
+            onStart={() => {
+              storyRef.current = null
+              setScreen('select')
+            }}
+            onStory={() => setScreen('story')}
+          />
+        )}
+        {screen === 'story' && (
+          <StoryScreen
+            onPick={ch => {
+              storyRef.current = ch
+              setScreen('select')
+            }}
+            onBack={() => setScreen('title')}
+          />
+        )}
         {screen === 'select' && <CharacterSelect onConfirm={startMatch} />}
         {screen === 'ready' && player && enemy && (
           <ReadyScreen player={player} enemy={enemy} onGo={enterArena} />
@@ -96,6 +121,7 @@ export default function App() {
             onFinish={o => {
               recordResult(player.id, o.winner === 'player')
               recordMatchMood(player.id, o.winner === 'player')
+              if (storyRef.current && o.winner === 'player') markCleared(storyRef.current.id)
               setOutcome(o)
               setScreen('results')
             }}
@@ -105,8 +131,11 @@ export default function App() {
           <ResultsScreen
             player={player}
             outcome={outcome}
+            storyOutro={
+              storyRef.current && outcome.winner === 'player' ? storyRef.current.outro : null
+            }
             onReplay={() => startMatch(baseCharRef.current ?? player)}
-            onNewChar={() => setScreen('select')}
+            onNewChar={() => setScreen(storyRef.current ? 'story' : 'select')}
           />
         )}
       </div>

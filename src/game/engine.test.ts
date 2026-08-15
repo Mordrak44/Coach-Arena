@@ -266,6 +266,40 @@ describe('consignes parlées', () => {
   })
 })
 
+describe('mode Histoire', () => {
+  it('8 chapitres, adversaires valides, difficulté croissante', async () => {
+    const { STORY_CHAPTERS, chapterOpponent, chapterOpponentTeam, isUnlocked } = await import('./story')
+    expect(STORY_CHAPTERS.length).toBe(8)
+    let prevHp = 0
+    for (const ch of STORY_CHAPTERS) {
+      const o = chapterOpponent(ch)
+      expect(o.stats.atk).toBeGreaterThanOrEqual(1)
+      expect(o.stats.atk).toBeLessThanOrEqual(12)
+      expect(o.stats.hp).toBeGreaterThan(0)
+      expect(o.lore).toBe(ch.taunt)
+      const team = chapterOpponentTeam(ch)
+      expect(team.length).toBe(ch.opponentTeamIds.length)
+      if (ch.num >= 5) expect(team.length).toBeGreaterThan(0) // fin d'arc = équipes
+      prevHp = o.stats.hp
+    }
+    expect(prevHp).toBeGreaterThan(chapterOpponent(STORY_CHAPTERS[0]).stats.hp)
+    // déverrouillage en chaîne
+    expect(isUnlocked(STORY_CHAPTERS[0], new Set())).toBe(true)
+    expect(isUnlocked(STORY_CHAPTERS[1], new Set())).toBe(false)
+    expect(isUnlocked(STORY_CHAPTERS[1], new Set(['ch1']))).toBe(true)
+  })
+
+  it("un match de chapitre se joue avec l'équipe adverse du chapitre", async () => {
+    const { STORY_CHAPTERS, chapterOpponent, chapterOpponentTeam } = await import('./story')
+    const ch = STORY_CHAPTERS[6] // le mur de trois
+    const m = createMatch(ROSTER[0], chapterOpponent(ch), [], {
+      enemyTeam: chapterOpponentTeam(ch),
+    })
+    expect(m.enemyBench.length).toBe(2)
+    expect(m.enemy.char.name).toBeTruthy()
+  })
+})
+
 describe('création par prompt & réalisateur', () => {
   it('createFromPrompt produit un perso complet', () => {
     const c = createFromPrompt('un samouraï cérébral de glace nommé Frimas')

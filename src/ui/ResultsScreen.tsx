@@ -7,11 +7,14 @@ import type { MatchOutcome } from './ArenaScreen'
 export default function ResultsScreen({
   player,
   outcome,
+  storyOutro,
   onReplay,
   onNewChar,
 }: {
   player: Character
   outcome: MatchOutcome
+  /** narration de victoire du chapitre d'Histoire (null hors Histoire) */
+  storyOutro?: string | null
   onReplay: () => void
   onNewChar: () => void
 }) {
@@ -44,6 +47,19 @@ export default function ResultsScreen({
           ? `${player.name} a tout donné — mais c'est TON coaching qui a fait la différence, coach.`
           : `${player.name} s'est bien battu. Un vrai coach revient toujours. Retournes-y.`}
       </p>
+      {storyOutro && (
+        <p
+          className="tagline"
+          style={{
+            border: '1px solid var(--accent)',
+            borderRadius: 10,
+            padding: '8px 12px',
+            fontStyle: 'italic',
+          }}
+        >
+          📖 {storyOutro}
+        </p>
+      )}
 
       {highlightUrl ? (
         <>

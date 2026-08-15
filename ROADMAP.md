@@ -238,8 +238,15 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Hébergement + analytics funnel (arrivée → match 1 → match 3 → achat)
 
 ### Tier 2 — Édition Histoire 14,90 € (stores)
-- [ ] Mode histoire : arc shōnen, adversaires/decks dédiés, cinématiques
-      pré-générées UNE fois, création de perso en récompense finale
+- [x] Mode histoire v0 « Le Grand Hurlement » : 8 chapitres écrits
+      (narration + réplique d'avant-match + outro de victoire),
+      adversaires dédiés à difficulté croissante (scale 0.85 → 1.30,
+      stats bornées), équipes adverses aux chapitres 5-8, boss final
+      inédit (Shion, le Champion Muet — variante prodigy), progression
+      persistée avec déverrouillage en chaîne, écran Histoire + entrée
+      depuis le titre, outro narrative aux résultats. v1 : cinématiques
+      pré-générées par chapitre, création de perso en récompense finale,
+      decks adverses thématiques.
 - [ ] Wrapper Capacitor/Electron + pages stores
 
 ### Tier 3 — PvP (rétention long terme, après premiers revenus)
@@ -272,6 +279,16 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-14 (routine) : Mode Histoire v0 — « Le Grand Hurlement »,
+  l'arc shōnen en 8 chapitres qui donne un but au solo et le socle de
+  l'Édition Histoire : narration écrite (intro/taunt/outro par
+  chapitre), adversaires en variante scalée du roster, équipes aux
+  chapitres 5+ (la relève Écurie sert enfin contre l'IA), boss final
+  inédit (Shion, guidé par un coach muet — miroir thématique du
+  joueur), progression localStorage, déverrouillage en chaîne. La
+  Revanche rejoue le chapitre perdu ; la victoire affiche l'outro.
+  2 tests vitest (28 au total), capture de l'écran au vert.
 
 - 2026-08-14 (routine) : L'Écurie v0 — le format switch demandé (« comme
   un combat pokemon, le coach devient maître de gladiateurs ») : jusqu'à
