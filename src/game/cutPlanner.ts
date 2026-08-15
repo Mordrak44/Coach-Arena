@@ -75,7 +75,7 @@ function eventScore(e: CombatEvent): number {
 }
 
 /** Cuts produits par un événement de combat (grammaire du découpage). */
-function cutsFor(e: CombatEvent, nameOf: (side: 'player' | 'enemy') => string): Cut[] {
+export function cutsForEvent(e: CombatEvent, nameOf: (side: 'player' | 'enemy') => string): Cut[] {
   switch (e.kind) {
     case 'hit': {
       const attacker = nameOf(e.target === 'player' ? 'enemy' : 'player')
@@ -149,7 +149,7 @@ export function planCuts(
       .sort((a, b) => eventScore(b) - eventScore(a))
       .slice(0, maxEventsPerRound)
       .sort((a, b) => a.t - b.t)
-    for (const e of kept) cuts.push(...cutsFor(e, nameOf))
+    for (const e of kept) cuts.push(...cutsForEvent(e, nameOf))
     roundEvents = []
   }
 
@@ -179,6 +179,46 @@ export function planCuts(
   }
   flushRound()
   return cuts
+}
+
+/**
+ * Consommation INCRÉMENTALE des cuts, événement par événement — le
+ * lecteur de cuts EN DIRECT pendant le round, par opposition à planCuts
+ * (qui monte un récap a posteriori sur tout le match terminé). Même
+ * contrat que ArenaRenderer.ingestEvents : ne renvoie que les cuts
+ * NOUVEAUX depuis le dernier appel.
+ *
+ * C'est la pièce qui garde le combat en cuts fidèle au principe fondateur
+ * (§7 GAME_DESIGN) : un cut illustre un événement qui vient RÉELLEMENT
+ * de se produire dans la simulation — il ne remplace jamais la décision
+ * du coach par une vidéo déjà jouée d'avance. Le préchargement pendant
+ * le coin du ring (voir cutLibrary.ts) porte sur le matchup et les
+ * techniques débloquées, JAMAIS sur le déroulé du round à venir : ça,
+ * personne ne le connaît avant que le coach n'agisse.
+ */
+export class CutSequencer {
+  private lastEventIndex = 0
+  private active: { player: string; enemy: string }
+
+  constructor(player: Character, enemy: Character) {
+    this.active = { player: player.name, enemy: enemy.name }
+  }
+
+  /** Cuts apparus depuis le dernier appel — à transmettre tels quels au lecteur. */
+  ingest(m: MatchState): Cut[] {
+    const out: Cut[] = []
+    for (; this.lastEventIndex < m.events.length; this.lastEventIndex++) {
+      const e = m.events[this.lastEventIndex]
+      if (e.kind === 'switch') {
+        // La relève change QUI sera swappé dans les cuts suivants — ce
+        // n'est pas elle-même un moment filmable (pas de cut associé).
+        this.active[e.side] = e.name
+        continue
+      }
+      out.push(...cutsForEvent(e, side => this.active[side]))
+    }
+    return out
+  }
 }
 
 /**

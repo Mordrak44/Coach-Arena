@@ -168,6 +168,15 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       docs/TEMPLATES_SPEC.md : les ~16 templates à produire, priorisés,
       avec les 3 tests de validation (n°1 bloquant : counter-exchange
       + swap de paire). 3 tests vitest.
+- [x] CutSequencer + cutLibrary (suite à la discussion « round vidéo
+      pré-construite vs direct ») : lecture INCRÉMENTALE des cuts,
+      même contrat que ArenaRenderer.ingestEvents — préserve le principe
+      fondateur (le coach coache le direct, jamais un résultat déjà
+      joué). cutLibrary.ts pose le contrat de préchargement pendant le
+      coin du ring (stub aujourd'hui, signature stable pour demain) ;
+      bibliothèque vide = silence, jamais un crash. 3 tests vitest
+      (39 au total). Reste à ajouter au modèle : techniques débloquées
+      par perso (accroche Lien/entraînement déjà en place).
 - [ ] File de génération asynchrone (jobs Kling en arrière-plan, affichage
       quand prêt, fallback arcade si échec/retard)
 - [ ] Portrait de référence par perso (Kling image) — ⚠️ crédits, accord requis

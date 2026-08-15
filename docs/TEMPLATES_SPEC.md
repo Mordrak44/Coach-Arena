@@ -40,6 +40,30 @@ aux couleurs du perso (paramètre du node de swap).
 | `ulti-cast` — 1 par archétype du roster (6) | 1 | ~3,2 s | Débloqués par les chapitres d'Histoire (ch. vaincu → le style d'Ulti de son adversaire). FX re-teintables, le NOM de l'Ulti vient du jeu. |
 | Entrées en scène, célébrations premium | 1 | 3-5 s | Cosmétiques vendables (boutique / Écurie / Lien). |
 
+## Lecture EN DIRECT, pas de rendu a posteriori (décision 2026-08-15)
+
+Le round s'affiche comme une SUITE de cuts déclenchés par les événements
+réels de la simulation au moment où ils se produisent (`CutSequencer`,
+même contrat que `ArenaRenderer.ingestEvents`) — jamais comme une seule
+vidéo pré-construite pour tout le round. C'est ce qui préserve le
+principe fondateur §7 : le coach coache toujours du direct, la vidéo
+n'est qu'une peau posée sur ce qui vient de se décider.
+
+Le **préchargement pendant le coin du ring** (`cutLibrary.prefetchForMatchup`,
+appelé pendant le timer de la phase tactique) porte sur ce qui EST connu
+à cet instant — le matchup, les techniques débloquées de chaque perso —
+jamais sur le déroulé du round à venir, qui n'existe pas encore. Si un
+clip demandé en direct n'est pas encore en cache, le lecteur reste
+silencieux et le rendu vectoriel comble l'instant (même garde-fou que le
+mode Cinématique : un clip en retard ne manque jamais au gameplay).
+
+**« Techniques débloquées »** (l'idée tamagotchi de l'Écurie appliquée
+aux gestes) implique un état par perso qui n'existe pas encore dans le
+modèle (`Character` n'a pas de liste de mouvements débloqués) — à
+ajouter quand la bibliothèque de gestuelles sera réellement produite ;
+s'accroche naturellement au Lien / à l'entraînement déjà en place
+(`progression.ts`, `stable.ts`).
+
 ## Validation avant production de masse
 
 1. **Test n°1 (bloquant)** : `counter-exchange` + swap Kenta/Rei — le

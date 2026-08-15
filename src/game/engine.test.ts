@@ -415,6 +415,42 @@ describe('séquenceur de cuts (EDL)', () => {
   })
 })
 
+describe('CutSequencer (lecture de cuts EN DIRECT, pas a posteriori)', () => {
+  it('ne renvoie que les cuts nouveaux, incrément par incrément', async () => {
+    const { CutSequencer } = await import('./cutPlanner')
+    const m = freshMatch()
+    const seq = new CutSequencer(ROSTER[0], ROSTER[1])
+    expect(seq.ingest(m)).toEqual([]) // rien encore
+    m.events.push({ kind: 'hit', t: 1, target: 'enemy', dmg: 5, crit: false, onoma: 'BAM!' })
+    const first = seq.ingest(m)
+    expect(first.length).toBeGreaterThan(0)
+    expect(seq.ingest(m)).toEqual([]) // déjà consommé, pas de doublon
+    m.events.push({ kind: 'dodged', t: 2, target: 'player' })
+    const second = seq.ingest(m)
+    expect(second.length).toBeGreaterThan(0)
+  })
+
+  it('une relève change le perso swappé sans produire de cut elle-même', async () => {
+    const { CutSequencer } = await import('./cutPlanner')
+    const m = freshMatch()
+    const seq = new CutSequencer(ROSTER[0], ROSTER[1])
+    m.events.push({ kind: 'switch', t: 1, side: 'enemy', name: 'Nyx' })
+    expect(seq.ingest(m)).toEqual([]) // la relève n'est pas filmable ici
+    m.events.push({ kind: 'special', t: 2, by: 'enemy', name: 'Test', onoma: 'ZAP!', dmg: 10 })
+    const cast = seq.ingest(m).find(c => c.kind === 'special-cast')!
+    expect(cast.chars).toEqual(['Nyx'])
+  })
+})
+
+describe('bibliothèque de clips (stub — aucun pipeline branché)', () => {
+  it('renvoie toujours null tant qu’aucun clip n’existe : silence, pas un crash', async () => {
+    const { EMPTY_CUT_LIBRARY, prefetchForMatchup } = await import('./cutLibrary')
+    expect(EMPTY_CUT_LIBRARY.getClip('attack-solo', ['Kenta'])).toBeNull()
+    const lib = await prefetchForMatchup(ROSTER[0], ROSTER[1], ['attack-solo'])
+    expect(lib.getClip('attack-solo', ['Kenta'])).toBeNull()
+  })
+})
+
 describe('création par prompt & réalisateur', () => {
   it('createFromPrompt produit un perso complet', () => {
     const c = createFromPrompt('un samouraï cérébral de glace nommé Frimas')
