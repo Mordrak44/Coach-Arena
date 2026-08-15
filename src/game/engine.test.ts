@@ -357,6 +357,64 @@ describe('mode Histoire', () => {
   })
 })
 
+describe('séquenceur de cuts (EDL)', () => {
+  async function syntheticMatch() {
+    const m = freshMatch()
+    m.events.push(
+      { kind: 'hit', t: 5, target: 'enemy', dmg: 12, crit: false, onoma: 'BAM!' },
+      { kind: 'hit', t: 7, target: 'player', dmg: 9, crit: true, onoma: 'DOKAN!!' },
+      { kind: 'countered', t: 9, by: 'player', dmg: 15 },
+      { kind: 'dodged', t: 10, target: 'enemy' },
+      { kind: 'blocked', t: 11, target: 'player', dmg: 3 },
+      { kind: 'hit', t: 12, target: 'enemy', dmg: 8, crit: false, onoma: 'PAF!' },
+      { kind: 'roundEnd', t: 30, winner: 'player' },
+      { kind: 'roundStart', t: 34, round: 2 },
+      { kind: 'switch', t: 34, side: 'enemy', name: 'Nyx' },
+      { kind: 'ulti', t: 50, by: 'enemy', name: 'Valse des Reflets', onoma: 'ZWISH!', dmg: 60 },
+      { kind: 'roundEnd', t: 55, winner: 'enemy' },
+      { kind: 'matchEnd', t: 55, winner: 'enemy' },
+    )
+    const { planCuts, templateShoppingList } = await import('./cutPlanner')
+    return { m, planCuts, templateShoppingList }
+  }
+
+  it('intro d’abord, KO et pose de victoire à la fin, budget par round', async () => {
+    const { m, planCuts } = await syntheticMatch()
+    const cuts = planCuts(m, ROSTER[0], ROSTER[1], 3)
+    expect(cuts[0].kind).toBe('intro-faceoff')
+    expect(cuts[0].chars).toEqual([ROSTER[0].name, ROSTER[1].name])
+    const kinds = cuts.map(c => c.kind)
+    expect(kinds.filter(k => k === 'ko-down').length).toBe(2) // 2 fins de round
+    expect(kinds[kinds.length - 2]).toBe('victory-pose')
+    // budget : 6 events de combat au round 1, 3 gardés max
+    const r1Attacks = cuts.filter(c => c.t < 30 && c.kind === 'attack-solo').length
+    expect(r1Attacks).toBeLessThanOrEqual(3)
+  })
+
+  it('la relève réattribue les cuts au bon perso, le contre est un échange à deux', async () => {
+    const { m, planCuts } = await syntheticMatch()
+    const cuts = planCuts(m, ROSTER[0], ROSTER[1])
+    const ulti = cuts.find(c => c.kind === 'ulti-cast')!
+    expect(ulti.chars).toEqual(['Nyx']) // après la relève adverse
+    expect(ulti.overlay).toContain('Valse des Reflets')
+    const counter = cuts.find(c => c.kind === 'counter-exchange')!
+    expect(counter.chars.length).toBe(2)
+    const victory = cuts.find(c => c.kind === 'victory-pose')!
+    expect(victory.chars).toEqual(['Nyx'])
+  })
+
+  it('la liste de courses des templates est cohérente', async () => {
+    const { m, planCuts, templateShoppingList } = await syntheticMatch()
+    const list = templateShoppingList(planCuts(m, ROSTER[0], ROSTER[1]))
+    for (const item of list) {
+      expect(item.uses).toBeGreaterThan(0)
+      expect([0, 1, 2]).toContain(item.chars)
+    }
+    expect(list.find(i => i.kind === 'counter-exchange')?.chars).toBe(2)
+    expect(list.find(i => i.kind === 'impact-flash')?.chars).toBe(0)
+  })
+})
+
 describe('création par prompt & réalisateur', () => {
   it('createFromPrompt produit un perso complet', () => {
     const c = createFromPrompt('un samouraï cérébral de glace nommé Frimas')

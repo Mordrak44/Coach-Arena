@@ -159,6 +159,15 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       toujours), dessinée dans le canvas donc présente dans les clips.
       Toutes les lignes sont datées et conservées → nourriront les
       prompts des scènes Kling et le montage. API Claude ensuite.
+- [x] Le Séquenceur de cuts (cutPlanner.ts) — le contrat du « combat en
+      cuts » en code : événements du match → EDL (liste de cuts avec
+      template, persos à swapper, habillage, durées), grammaire anime
+      (solos / échanges à deux / neutres), budget de cuts par round
+      (sélection par score), relèves rejouées pour attribuer chaque cut
+      au bon perso, templateShoppingList (cahier des charges dérivé).
+      docs/TEMPLATES_SPEC.md : les ~16 templates à produire, priorisés,
+      avec les 3 tests de validation (n°1 bloquant : counter-exchange
+      + swap de paire). 3 tests vitest.
 - [ ] File de génération asynchrone (jobs Kling en arrière-plan, affichage
       quand prêt, fallback arcade si échec/retard)
 - [ ] Portrait de référence par perso (Kling image) — ⚠️ crédits, accord requis
@@ -313,6 +322,17 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : Le Séquenceur de cuts — les décisions de design
+  de la veille (templates + swap, combat en cuts, échanges par matchup)
+  deviennent du code testé : planCuts(match) → EDL complète (intro,
+  budget de moments forts par round, KO, victoire), avec la grammaire
+  anime encodée (attack-solo → impact-flash → hit-reaction ; le contre
+  en échange à deux ; foule et flashs neutres sans swap) et les relèves
+  correctement rejouées. templateShoppingList dérive la liste de courses
+  du pipeline d'assets depuis n'importe quel match. TEMPLATES_SPEC.md :
+  cahier des charges de production (~16 clips, 3 tests de validation
+  dont le swap de paire, bloquant). 36 tests verts.
 
 - 2026-08-14 : La visio des coachs (vision utilisateur : « comme une
   petite conversation, en bas à droite et gauche les cams des joueurs,
