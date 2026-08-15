@@ -94,9 +94,11 @@ function BondLine({ charId }: { charId: string }) {
 export default function CharacterSelect({
   onConfirm,
 }: {
-  onConfirm: (char: Character, deck: CardId[]) => void
+  onConfirm: (char: Character, deck: CardId[], team: Character[]) => void
 }) {
   const [selected, setSelected] = useState<Character | null>(null)
+  /** l'Écurie en match : jusqu'à 2 équipiers de relève */
+  const [teammates, setTeammates] = useState<Character[]>([])
   const [prompt, setPrompt] = useState('')
   const [customs, setCustoms] = useState<Character[]>(() => loadCustoms())
   const [creationMode, setCreationMode] = useState<'guided' | 'expert'>('guided')
@@ -315,6 +317,50 @@ export default function CharacterSelect({
         ))}
       </div>
 
+      {selected && (
+        <div
+          style={{
+            width: '100%',
+            background: 'var(--panel2)',
+            borderRadius: 12,
+            padding: '10px 14px',
+            textAlign: 'left',
+            fontSize: '0.78rem',
+          }}
+        >
+          <div style={{ fontWeight: 900, textTransform: 'uppercase', fontSize: '0.72rem', color: 'var(--accent)' }}>
+            ⚔️ Ton équipe — jusqu'à 2 équipiers de relève (échange au coin du ring, 1 Souffle)
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+            {[...customs, ...ROSTER]
+              .filter(c => c.id !== selected.id)
+              .map(c => {
+                const inTeam = teammates.some(t => t.id === c.id)
+                return (
+                  <button
+                    key={c.id}
+                    style={chip(inTeam)}
+                    disabled={!inTeam && teammates.length >= 2}
+                    onClick={() =>
+                      setTeammates(prev =>
+                        inTeam ? prev.filter(t => t.id !== c.id) : [...prev, c],
+                      )
+                    }
+                  >
+                    {inTeam ? '✓ ' : '＋'}
+                    {c.name}
+                  </button>
+                )
+              })}
+          </div>
+          <div style={{ marginTop: 6, color: 'var(--muted)' }}>
+            {teammates.length === 0
+              ? 'Sans équipiers : duel classique. Avec : leur PV/Hype/Ulti sont conservés entre les relèves.'
+              : `Relève : ${teammates.map(t => t.name).join(' + ')}`}
+          </div>
+        </div>
+      )}
+
       {selected && stable && (
         <div
           style={{
@@ -504,7 +550,15 @@ export default function CharacterSelect({
       <button
         className="btn"
         disabled={!selected || !tplValid}
-        onClick={() => selected && tplValid && onConfirm(selected, deck)}
+        onClick={() =>
+          selected &&
+          tplValid &&
+          onConfirm(
+            selected,
+            deck,
+            teammates.filter(t => t.id !== selected.id),
+          )
+        }
       >
         {!selected
           ? 'Sélectionne un perso'

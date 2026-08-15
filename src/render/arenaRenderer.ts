@@ -121,6 +121,19 @@ export class ArenaRenderer {
         this.flash(now, '#7ec8ff', 0.1)
         this.shake(now, 10)
         break
+      case 'switch':
+        this.floats.push({
+          text: `🔁 ${ev.name.toUpperCase()} MONTE SUR LE RING !`,
+          x: CANVAS_W / 2,
+          y: 500,
+          t0: now,
+          life: 1.6,
+          size: 36,
+          color: ev.side === 'player' ? '#ffdd00' : '#ff7788',
+          angle: -0.04,
+        })
+        this.flash(now, '#ffffff', 0.08)
+        break
       case 'trait':
         this.floats.push({ text: ev.text, x: m.player.x * CANVAS_W, y: 390, t0: now, life: 1.2, size: 26, color: ev.color, angle: -0.04 })
         break

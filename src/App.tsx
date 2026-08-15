@@ -37,10 +37,12 @@ export default function App() {
   // Perso de BASE (non modifié) : la Revanche repart toujours de lui, sinon
   // les bonus de Lien/entraînement s'empileraient à chaque match.
   const baseCharRef = useRef<Character | null>(null)
+  const baseTeamRef = useRef<Character[]>([])
 
-  const startMatch = (char: Character, chosenDeck?: CardId[]) => {
+  const startMatch = (char: Character, chosenDeck?: CardId[], team: Character[] = baseTeamRef.current) => {
     if (chosenDeck) setDeck(chosenDeck)
     baseCharRef.current = char
+    baseTeamRef.current = team
     let fighter = applyBond(char) // le Lien booste le Cœur du perso
     // Vie d'Écurie : humeur → Hype de départ / bouderie ; entraînement → +1 stat.
     const stable = getStable(char.id, char.trait)
@@ -51,12 +53,20 @@ export default function App() {
         stats: { ...fighter.stats, [trained]: Math.min(12, fighter.stats[trained] + 1) },
       }
     }
+    // L'Écurie en match : chaque équipier monte avec SON Lien ; l'adversaire
+    // aligne une équipe de même taille (roster, sans doublons).
+    const teamFighters = team.map(t => applyBond(t))
+    const opponent = pickOpponent(char.id)
+    const pool = ROSTER.filter(r => r.id !== opponent.id)
+    const enemyTeam = [...pool].sort(() => Math.random() - 0.5).slice(0, teamFighters.length)
     matchOptsRef.current = {
       startHype: moodStartHype(stable.mood),
       sulky: moodIgnoresFirstOrder(stable.mood),
+      team: teamFighters,
+      enemyTeam,
     }
     setPlayer(fighter)
-    setEnemy(pickOpponent(char.id))
+    setEnemy(opponent)
     setScreen('ready') // le Vestiaire : annonce du match + permissions
   }
 

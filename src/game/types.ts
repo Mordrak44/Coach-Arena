@@ -264,6 +264,11 @@ export interface MatchState {
   sulky: boolean
   /** effets de cartes actifs côté joueur */
   mods: CardMods
+  /** l'Écurie : équipiers en réserve (relève au coin du ring, état conservé) */
+  bench: FighterState[]
+  enemyBench: FighterState[]
+  /** une seule relève par pause */
+  switchUsed: boolean
   /** le coin adverse joue un VRAI deck, symétrique du joueur */
   enemyDeck: CardId[]
   enemyHand: CardId[]
@@ -289,4 +294,5 @@ export type CombatEvent =
   | { kind: 'hypeFull'; t: number; who: 'player' | 'enemy' }
   | { kind: 'card'; t: number; name: string }
   | { kind: 'cardProc'; t: number; text: string }
+  | { kind: 'switch'; t: number; side: 'player' | 'enemy'; name: string }
   | { kind: 'trait'; t: number; text: string; color: string }

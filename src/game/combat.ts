@@ -117,7 +117,14 @@ export interface MatchOpts {
   startHype?: number
   /** humeur basse : le premier ordre du match est boudé */
   sulky?: boolean
+  /** l'Écurie : équipiers en réserve (max 2), relève au coin du ring */
+  team?: Character[]
+  /** équipe adverse (même taille que la tienne en général) */
+  enemyTeam?: Character[]
 }
+
+/** Coût en Souffle d'une relève au coin du ring. */
+export const SWITCH_COST = 1
 
 export function createMatch(
   playerChar: Character,
@@ -144,6 +151,9 @@ export function createMatch(
     consigneUsed: false,
     sulky: opts.sulky ?? false,
     mods: freshMods(),
+    bench: (opts.team ?? []).map(c => makeFighter(c, 'player')),
+    enemyBench: (opts.enemyTeam ?? []).map(c => makeFighter(c, 'enemy')),
+    switchUsed: false,
     enemyDeck: shuffle(buildStarterDeck(signatureFor(enemyChar.id))),
     enemyHand: [],
     enemyDiscard: [],
@@ -319,6 +329,37 @@ export function playCard(m: MatchState, id: CardId): boolean {
   m.events.push({ kind: 'card', t: m.t, name: card.name })
 
   applyCardEffects(m, card.effects, 'player')
+  return true
+}
+
+/** Réinitialise l'état « ring » d'un combattant qui monte (relève). */
+function enterRing(f: FighterState, side: 'player' | 'enemy', t: number): void {
+  f.x = side === 'player' ? 0.28 : 0.72
+  f.facing = side === 'player' ? 1 : -1
+  f.stance = 'neutral'
+  f.confusedUntil = 0
+  f.counterUntil = 0
+  f.ordersThisRound = 0
+  f.hypeFullSince = 0
+  f.nextActionAt = t + 0.5
+  f.anim = { kind: 'idle', until: 0 }
+}
+
+/**
+ * La relève (Écurie) : au coin du ring, échange le combattant actif avec un
+ * équipier vivant du banc. PV/Hype/Ulti de chacun sont CONSERVÉS — le
+ * sortant récupérera sur le banc… ou pas. Une relève par pause, 1 Souffle.
+ */
+export function switchFighter(m: MatchState, benchIndex: number): boolean {
+  if (m.phase !== 'tactics' || m.switchUsed || m.souffle < SWITCH_COST) return false
+  const incoming = m.bench[benchIndex]
+  if (!incoming || incoming.hp <= 0) return false
+  m.bench[benchIndex] = m.player
+  m.player = incoming
+  enterRing(incoming, 'player', m.t)
+  m.souffle -= SWITCH_COST
+  m.switchUsed = true
+  m.events.push({ kind: 'switch', t: m.t, side: 'player', name: incoming.char.name })
   return true
 }
 
@@ -652,6 +693,29 @@ function enemyCardValue(m: MatchState, card: CoachCard): number {
  */
 export function enemyCornerPlay(m: MatchState): void {
   m.enemySouffle = SOUFFLE_PER_CORNER
+  // La relève adverse : si son actif est entamé et qu'un équipier est plus
+  // frais, le coin adverse fait monter la réserve (coûte 1 Souffle).
+  if (m.enemyBench.length > 0 && m.enemySouffle >= SWITCH_COST) {
+    const ratio = m.enemy.hp / m.enemy.maxHp
+    let best = -1
+    let bestRatio = ratio + 0.15 // ça doit valoir le coup
+    for (let i = 0; i < m.enemyBench.length; i++) {
+      const b = m.enemyBench[i]
+      const r = b.hp / b.maxHp
+      if (b.hp > 0 && r > bestRatio) {
+        best = i
+        bestRatio = r
+      }
+    }
+    if (best !== -1 && ratio < 0.35) {
+      const incoming = m.enemyBench[best]
+      m.enemyBench[best] = m.enemy
+      m.enemy = incoming
+      enterRing(incoming, 'enemy', m.t)
+      m.enemySouffle -= SWITCH_COST
+      m.events.push({ kind: 'switch', t: m.t, side: 'enemy', name: incoming.char.name })
+    }
+  }
   // Vol de Souffle joué par le joueur au round précédent : le coin adverse
   // arrive essoufflé à sa pause.
   if (m.mods.drainEnemySouffle > 0) {
@@ -774,6 +838,7 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
           }
           m.mulliganUsed = false
           m.consigneUsed = false
+          m.switchUsed = false
           drawCards(m, HAND_SIZE - m.hand.length)
           enemyCornerPlay(m)
         }

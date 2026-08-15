@@ -247,8 +247,13 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## v2
 
-- [ ] L'Écurie : 3 combattants, remplacement au coin du ring (format
-      switch — voir GAME_DESIGN.md §4 ter), collection de persos
+- [x] L'Écurie v0 : équipe de 1+2, relève au coin du ring (1 Souffle,
+      1×/pause, PV/Hype/Ulti conservés par combattant — le sortant ne
+      récupère PAS sur le banc), sélection d'équipiers à l'écran de
+      sélection (roster + customs, chacun monte avec SON Lien), équipe
+      adverse de même taille avec relève IA (actif < 35 % PV et banc
+      plus frais), annonce 🔁 à l'écran. v1 : soins de banc, cartes
+      d'équipe, collection.
 - [x] Cartes créées par prompt v0 — la Forge de cartes : parseur local à
       14 familles de mots-clés → max 2 primitives clampées, coût
       budgétisé, timing déduit, nom extrait ou généré, desc auto depuis
@@ -267,6 +272,15 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-14 (routine) : L'Écurie v0 — le format switch demandé (« comme
+  un combat pokemon, le coach devient maître de gladiateurs ») : jusqu'à
+  2 équipiers de relève choisis à la sélection, échange au coin du ring
+  pour 1 Souffle (état de chaque combattant conservé — monter frais ou
+  garder son Ulti chargé, c'est le dilemme), équipe adverse symétrique
+  avec relève IA. Le moteur traite m.player/m.enemy comme « l'actif » :
+  aucun changement dans le combat lui-même. 3 tests vitest dédiés
+  (26 au total), équilibre duel inchangé (78/90/16).
 
 - 2026-08-14 (routine) : Vague 3 — la guerre des coins. Le coin adverse
   ayant un vrai deck depuis hier, il devient une CIBLE : blocage de sa

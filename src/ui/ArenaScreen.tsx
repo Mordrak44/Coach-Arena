@@ -11,8 +11,10 @@ import {
   forceRoundTimeout,
   mulligan,
   playCard,
+  switchFighter,
   tick,
   HYPE_MAX,
+  SWITCH_COST,
 } from '../game/combat'
 import { parseConsigne } from '../game/speechTactics'
 import { buildScenePlans, type ScenePlan } from '../game/sceneDirector'
@@ -120,6 +122,8 @@ export default function ArenaScreen({
   const [speechEnergy, setSpeechEnergy] = useState(0)
   const [consigne, setConsigne] = useState<string | null>(null)
   const lastFinalSeq = useRef(0)
+  const [benchView, setBenchView] = useState<{ name: string; hpPct: number; alive: boolean }[]>([])
+  const [switchDone, setSwitchDone] = useState(false)
   const [specialReady, setSpecialReady] = useState(false)
   const [ultiReady, setUltiReady] = useState(false)
   const [muted, setMuted] = useState(false)
@@ -219,6 +223,14 @@ export default function ArenaScreen({
           setMullSel([])
           setMullUsed(false)
           setConsigne(null)
+          setSwitchDone(false)
+          setBenchView(
+            m.bench.map(b => ({
+              name: b.char.name,
+              hpPct: Math.round((b.hp / b.maxHp) * 100),
+              alive: b.hp > 0,
+            })),
+          )
           // Ignore les phrases prononcées pendant le round écoulé.
           lastFinalSeq.current = sys.voice.state.finalSeq
         }
@@ -379,6 +391,21 @@ export default function ArenaScreen({
     setMullSel(sel => (sel.includes(idx) ? sel.filter(i => i !== idx) : [...sel, idx]))
   }
 
+  const onSwitch = (i: number) => {
+    const m = matchRef.current
+    if (switchFighter(m, i)) {
+      setSouffle(m.souffle)
+      setSwitchDone(true)
+      setBenchView(
+        m.bench.map(b => ({
+          name: b.char.name,
+          hpPct: Math.round((b.hp / b.maxHp) * 100),
+          alive: b.hp > 0,
+        })),
+      )
+    }
+  }
+
   const doMulligan = () => {
     const m = matchRef.current
     const ids = mullSel.map(i => hand[i]).filter(Boolean)
@@ -482,6 +509,25 @@ export default function ArenaScreen({
               </button>
             ))}
           </div>
+          {benchView.length > 0 && (
+            <>
+              <h2 style={{ fontSize: '0.95rem' }}>🔁 La relève ({SWITCH_COST} Souffle)</h2>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {benchView.map((b, i) => (
+                  <button
+                    key={`${b.name}-${i}`}
+                    className="btn secondary"
+                    disabled={!b.alive || switchDone || souffle < SWITCH_COST}
+                    style={!b.alive ? { opacity: 0.4 } : undefined}
+                    onClick={() => onSwitch(i)}
+                  >
+                    {b.alive ? `${b.name} — ${b.hpPct}% PV` : `${b.name} — KO`}
+                  </button>
+                ))}
+              </div>
+              {switchDone && <span className="permNote">Relève effectuée pour cette pause.</span>}
+            </>
+          )}
           {hand.length > 0 && (
             <>
               <h2 style={{ fontSize: '0.95rem' }}>

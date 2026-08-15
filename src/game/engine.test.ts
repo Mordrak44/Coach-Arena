@@ -3,12 +3,14 @@ import {
   HAND_SIZE,
   HYPE_MAX,
   SOUFFLE_PER_CORNER,
+  SWITCH_COST,
   ULTI_MAX,
   applyConsigne,
   createMatch,
   enemyCornerPlay,
   mulligan,
   playCard,
+  switchFighter,
   tick,
 } from './combat'
 import { CARD_POOL, SIGNATURE_CARDS, buildStarterDeck, clampEffect, computeCost, getCard, signatureFor } from './cards'
@@ -152,6 +154,47 @@ describe('coin adverse (deck symétrique)', () => {
     enemyCornerPlay(m)
     expect(m.enemyMods.damageReductionMul).toBeLessThan(1)
     expect(m.mods.damageReductionMul).toBe(1)
+  })
+})
+
+describe("l'Écurie : la relève", () => {
+  it('échange les combattants en conservant PV/Hype/Ulti, 1 fois par pause', () => {
+    const m = createMatch(ROSTER[0], ROSTER[1], [], { team: [ROSTER[2], ROSTER[3]] })
+    m.phase = 'tactics'
+    m.player.hp = 40
+    m.player.hype = 70
+    const yunaMaxHp = m.bench[0].maxHp
+    expect(switchFighter(m, 0)).toBe(true)
+    expect(m.player.char.id).toBe(ROSTER[2].id)
+    expect(m.player.hp).toBe(yunaMaxHp) // la remplaçante monte fraîche
+    expect(m.bench[0].char.id).toBe(ROSTER[0].id)
+    expect(m.bench[0].hp).toBe(40) // le sortant garde son état
+    expect(m.bench[0].hype).toBe(70)
+    expect(m.souffle).toBe(SOUFFLE_PER_CORNER - SWITCH_COST)
+    expect(switchFighter(m, 1)).toBe(false) // une seule relève par pause
+    expect(m.events.some(e => e.kind === 'switch' && e.side === 'player')).toBe(true)
+  })
+
+  it('refuse un équipier KO et hors phase tactique', () => {
+    const m = createMatch(ROSTER[0], ROSTER[1], [], { team: [ROSTER[2]] })
+    m.phase = 'tactics'
+    m.bench[0].hp = 0
+    expect(switchFighter(m, 0)).toBe(false)
+    m.bench[0].hp = 50
+    m.phase = 'fighting'
+    expect(switchFighter(m, 0)).toBe(false)
+  })
+
+  it("le coin adverse fait monter sa réserve quand l'actif est entamé", () => {
+    const m = createMatch(ROSTER[0], ROSTER[1], [], { enemyTeam: [ROSTER[4]] })
+    m.enemy.hp = Math.round(m.enemy.maxHp * 0.2)
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = []
+    enemyCornerPlay(m)
+    expect(m.enemy.char.id).toBe(ROSTER[4].id)
+    expect(m.enemyBench[0].char.id).toBe(ROSTER[1].id)
+    expect(m.events.some(e => e.kind === 'switch' && e.side === 'enemy')).toBe(true)
   })
 })
 
