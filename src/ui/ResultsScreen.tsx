@@ -33,6 +33,11 @@ export default function ResultsScreen({
       if (highlightUrl) URL.revokeObjectURL(highlightUrl)
     }
   }, [highlightUrl])
+  // Le « VICTOIRE ! » d'abord : la vidéo autoplay peut faire défiler l'écran.
+  useEffect(() => {
+    document.querySelector('.screen')?.scrollTo?.(0, 0)
+    window.scrollTo(0, 0)
+  }, [])
   return (
     <div className="screen">
       <div className={`bigResult ${won ? 'win' : 'lose'}`}>

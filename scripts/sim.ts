@@ -383,6 +383,13 @@ function makeFightingMatch(playerIdx: number): MatchState {
     if (m.phase === 'fighting' && m.t - roundStart > ROUND_TIME_LIMIT) forceRoundTimeout(m)
   }
   if (m.phase === 'tactics') {
+    // Depuis la guerre des coins, l'adversaire peut avoir armé un blocage
+    // (Silence du Coin est dans son deck) : on mesure l'EFFET de la carte,
+    // pas l'interférence — on neutralise le pari adverse pour ce test.
+    m.enemyMods.blockNextEnemyCard = false
+    // …et on s'assure qu'il y a de la marge à mesurer (PV/Hype non pleins).
+    m.player.hp = Math.min(m.player.hp, Math.round(m.player.maxHp * 0.7))
+    m.player.hype = Math.min(m.player.hype, 60)
     const hpBefore = m.player.hp
     const hypeBefore = m.player.hype
     if (!playCard(m, r.card.id)) throw new Error('forge : carte injouable en phase tactique')

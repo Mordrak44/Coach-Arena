@@ -33,6 +33,12 @@ try {
   await page.screenshot({ path: `${outDir}/arena-1.png` })
   await page.waitForTimeout(6000)
   await page.screenshot({ path: `${outDir}/arena-2.png` })
+
+  // Match complet accéléré (×6) jusqu'à l'écran de résultats
+  await page.goto(`http://localhost:${PORT}/?demo=fast`)
+  await page.waitForSelector('text=Revanche', { timeout: 180000 })
+  await page.waitForTimeout(1200)
+  await page.screenshot({ path: `${outDir}/results.png` })
   await browser.close()
   console.log(`captures écrites dans ${outDir}/`)
 } finally {

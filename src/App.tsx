@@ -30,7 +30,10 @@ type Screen = 'title' | 'story' | 'select' | 'ready' | 'arena' | 'results'
 
 // Mode démo (?demo) : saute directement dans l'arène sans capteurs — pour
 // les captures d'écran, le press kit et les tests visuels automatisés.
+// ?demo=fast : temps de jeu ×6 (atteindre l'écran de résultats en ~40 s).
 const DEMO = typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo')
+const DEMO_FAST =
+  typeof location !== 'undefined' && new URLSearchParams(location.search).get('demo') === 'fast'
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>(DEMO ? 'arena' : 'title')
@@ -128,6 +131,7 @@ export default function App() {
             matchOpts={matchOptsRef.current}
             preStream={streamRef.current}
             noMedia={DEMO}
+            speed={DEMO_FAST ? 6 : 1}
             onFinish={o => {
               recordResult(player.id, o.winner === 'player')
               recordMatchMood(player.id, o.winner === 'player')

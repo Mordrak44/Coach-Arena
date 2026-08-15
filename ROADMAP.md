@@ -294,6 +294,18 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-14 (routine) : Le pipeline viral PROUVÉ de bout en bout —
+  mode ?demo=fast (temps de jeu ×6) : un match complet se joue seul en
+  ~40 s réelles jusqu'à l'écran de résultats, désormais capturé par
+  shot.mjs. Verdict de la capture : le clip du moment fort s'est
+  réellement enregistré et se lit dans la page (MediaRecorder +
+  composite + segments rotatifs OK même en headless), partage/scènes en
+  place. Fix : scroll remis en haut des résultats (le VICTOIRE d'abord).
+  Chasse à un crash sim intermittent : depuis la guerre des coins,
+  l'adversaire peut BLOQUER la carte forgée du test end-to-end (Silence
+  du Coin dans son deck) — le test neutralise désormais l'interférence
+  et garantit une marge mesurable. 6 runs sim consécutifs stables.
+
 - 2026-08-14 (routine) : Prosodie v0 — l'intonation devient un signal de
   jeu, pas seulement le volume : pitch par autocorrélation locale
   (systems/pitch.ts, pur et testé aux ondes synthétiques), baseline

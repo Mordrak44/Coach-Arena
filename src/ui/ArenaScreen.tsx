@@ -60,6 +60,7 @@ export default function ArenaScreen({
   matchOpts,
   preStream,
   noMedia,
+  speed = 1,
   onFinish,
 }: {
   player: Character
@@ -71,6 +72,8 @@ export default function ArenaScreen({
   preStream?: MediaStream | null
   /** mode démo : ne demande aucun capteur (captures d'écran, tests visuels) */
   noMedia?: boolean
+  /** accélération du temps de jeu (démo rapide) — 1 en jeu normal */
+  speed?: number
   onFinish: (outcome: MatchOutcome) => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -186,7 +189,7 @@ export default function ArenaScreen({
       const cmd = pendingCmd.current ?? sys.voice.consumeCommand()
       pendingCmd.current = null
 
-      tick(m, dt, {
+      tick(m, dt * speed, {
         command: m.phase === 'fighting' ? cmd : null,
         voiceEnergy: sys.voice.state.energy,
         faceEnergy: sys.face.state.energy,
