@@ -353,6 +353,18 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       sans régression sur les écrans courts (vérifié en capture sur les
       5 écrans du funnel standard + Histoire à pleine hauteur, haut ET
       bas atteignables).
+- [x] Aperçu de partage (Open Graph / Twitter Card) — jusqu'ici absent :
+      partager le LIEN du jeu (pas un clip) sur Discord/Slack/iMessage/X
+      n'affichait aucune carte, juste une URL nue. `og-image.png` généré
+      en capturant un vrai moment de jeu (`?demo=fast`, viewport 1200×630
+      qui déclenche la disposition « plateau TV » déjà construite —
+      bulles d'aide masquées via localStorage pour une image propre,
+      sans tutoriel dessus) plutôt qu'une icône statique. `og:url` et les
+      chemins d'image restent relatifs faute de domaine de prod choisi
+      (voir « Hébergement » plus bas) — à absolutiser une fois hébergé.
+      Description reprise telle quelle du manifest PWA pour rester
+      cohérent. Zéro risque : balises `<head>` pures, aucun code JS
+      touché, 54 tests vitest inchangés.
 - [ ] Playtests humains (10-20 personnes) : fun au 15e match ? points de
       décrochage ? → ajuster avant tout investissement
 - [ ] Intégrer les illustrations Kling au jeu : portraits roster à la
@@ -464,6 +476,23 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : Aperçu de partage du LIEN (Open Graph / Twitter
+  Card). Après avoir épuisé l'audit CSS (grep de tous les
+  `overflow-y: auto` + `justify-content: center` du fichier — plus aucun
+  autre cas que `.screen`/`.overlay`, déjà corrigés), et avec le reste du
+  ROADMAP bloqué par des crédits/un backend/du matériel réel, j'ai cherché
+  un autre gap zéro-risque servant directement l'identité "conçu pour la
+  viralité TikTok" du projet : `index.html` n'avait NI meta description NI
+  balises Open Graph — partager le lien du jeu lui-même (pas un clip)
+  affichait une carte vide sur Discord/Slack/iMessage/X. Corrigé avec une
+  vraie capture de jeu comme image de preview plutôt qu'une icône statique
+  — `?demo=fast` à 1200×630 (déclenche la dispo "plateau TV" déjà
+  construite), bulles d'aide masquées via localStorage pour une image
+  propre. Description reprise du manifest PWA pour rester cohérent entre
+  les deux. `og:url`/chemins d'image en relatif, faute de domaine de prod
+  encore choisi — noté dans le HTML pour ne pas l'oublier au moment de
+  l'hébergement. Pur `<head>`, zéro JS touché, 54 tests vitest inchangés.
 
 - 2026-08-15 (routine) : Bug réel trouvé et corrigé sur l'écran Histoire
   (StoryScreen), jamais audité jusqu'ici (absent du funnel de
