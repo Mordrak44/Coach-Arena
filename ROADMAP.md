@@ -248,8 +248,23 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       identique à avant, bundle production +3 Ko gzip (le code du
       combat en cuts est désormais réellement importé par l'appli, plus
       seulement par les tests).
-- [ ] File de génération asynchrone (jobs Kling en arrière-plan, affichage
-      quand prêt, fallback arcade si échec/retard)
+- [x] File de génération asynchrone (sceneQueue.ts) — même principe que
+      cutLibrary.ts : `SceneJobQueue` prend les plans du Réalisateur, un
+      job par scène, indépendants (l'échec ou le retard de l'un
+      n'affecte jamais les autres). `SceneSubmitter` est le point
+      d'extension pour un vrai pipeline serveur demain ;
+      `STUB_SCENE_SUBMITTER` (défaut) échoue proprement et vite —
+      aucun pipeline branché aujourd'hui. Garde-fou « retard » :
+      `Promise.race` contre un timeout (20 s par défaut) pour ne jamais
+      rester bloqué sur un job muet. Câblé dans ResultsScreen : pendant
+      qu'un job est 'pending' → « ⏳ génération… », 'ready' → lecteur
+      `<video>` inline, 'failed' → l'UI copier-coller manuelle
+      d'aujourd'hui (le vrai filet « fallback arcade », pas une
+      régression dégradée). Avec le stub, tous les jobs finissent
+      'failed' en un micro-tick → écran de résultats identique à avant
+      (vérifié en capture, `<details>` fermé par défaut ET ouvert :
+      mêmes prompts, mêmes boutons Copier). 4 tests vitest (54 au
+      total).
 - [ ] Portrait de référence par perso (Kling image) — ⚠️ crédits, accord requis
 - [ ] Scènes image-to-video : entrée dans l'arène, moment fort du round, KO
 - [ ] Montage final du match (concat des clips + habillage) exportable 9:16
@@ -429,6 +444,24 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : File de génération asynchrone des scènes
+  (sceneQueue.ts) — prochaine case non cochée de « Mode Cinématique »
+  après trois itérations consécutives sur le combat en cuts. Même
+  discipline : une architecture réelle, testée, câblée dans l'UI, mais
+  qui ne change RIEN à ce que le joueur voit tant qu'aucun vrai pipeline
+  n'est branché (STUB_SCENE_SUBMITTER échoue toujours, comme
+  EMPTY_CUT_LIBRARY renvoie toujours null). Le vrai gain : le
+  copier-coller manuel des prompts (ResultsScreen) devient un ÉTAT parmi
+  d'autres ('failed') plutôt que le seul chemin possible — le jour où un
+  submitter réel existe (serveur Kling), 'pending' affiche un spinner et
+  'ready' un lecteur vidéo inline, sans toucher à ResultsScreen. Garde-fou
+  ajouté d'emblée (pas en réaction à un bug) : timeout par job via
+  Promise.race, pour qu'un pipeline lent ou muet ne bloque jamais
+  indéfiniment un job — chaque job est de toute façon indépendant des
+  autres. Vérifié en capture : écran de résultats fermé (identique à
+  avant) ET ouvert (mêmes prompts, mêmes boutons Copier, aucune régression
+  visible). 54 tests vitest, sim/build inchangés.
 
 - 2026-08-15 (routine) : Le `<video>` du combat en cuts, câblé — suite à
   la question « donc si tous les templates sont bons je vois pas le

@@ -669,3 +669,56 @@ describe('création par prompt & réalisateur', () => {
     expect(colorWord('#ffffff')).toBe('white')
   })
 })
+
+describe('SceneJobQueue (file de génération asynchrone des scènes)', () => {
+  const plan = (id: string) => ({ id, title: id, prompt: `prompt ${id}`, refChars: ['Kenta'] })
+
+  it('filet par défaut (STUB_SCENE_SUBMITTER) : chaque job échoue proprement, jamais bloqué', async () => {
+    const { SceneJobQueue } = await import('./sceneQueue')
+    const updates: string[][] = []
+    const queue = new SceneJobQueue([plan('a'), plan('b')], {
+      onUpdate: jobs => updates.push(jobs.map(j => j.status)),
+    })
+    expect(queue.jobs().every(j => j.status === 'pending')).toBe(true)
+    queue.start()
+    await new Promise(r => setTimeout(r, 10))
+    expect(queue.jobs().every(j => j.status === 'failed')).toBe(true)
+    expect(queue.jobs().every(j => j.clipUrl === null)).toBe(true)
+  })
+
+  it('un submitter qui répond : le job passe à ready avec son clip', async () => {
+    const { SceneJobQueue } = await import('./sceneQueue')
+    const queue = new SceneJobQueue([plan('a')], {
+      submitter: { submit: async p => `fake://clip/${p.id}` },
+    })
+    queue.start()
+    await new Promise(r => setTimeout(r, 10))
+    const [job] = queue.jobs()
+    expect(job.status).toBe('ready')
+    expect(job.clipUrl).toBe('fake://clip/a')
+  })
+
+  it('un submitter trop lent est abandonné au bout de timeoutMs (jamais de blocage indéfini)', async () => {
+    const { SceneJobQueue } = await import('./sceneQueue')
+    const neverResolves: Promise<string | null> = new Promise(() => {})
+    const queue = new SceneJobQueue([plan('a')], {
+      submitter: { submit: () => neverResolves },
+      timeoutMs: 20,
+    })
+    queue.start()
+    await new Promise(r => setTimeout(r, 60))
+    expect(queue.jobs()[0].status).toBe('failed')
+  })
+
+  it("l'échec d'un job n'affecte pas les autres (indépendants)", async () => {
+    const { SceneJobQueue } = await import('./sceneQueue')
+    const queue = new SceneJobQueue([plan('ok'), plan('ko')], {
+      submitter: { submit: async p => (p.id === 'ok' ? `fake://${p.id}` : null) },
+    })
+    queue.start()
+    await new Promise(r => setTimeout(r, 10))
+    const jobs = queue.jobs()
+    expect(jobs.find(j => j.plan.id === 'ok')?.status).toBe('ready')
+    expect(jobs.find(j => j.plan.id === 'ko')?.status).toBe('failed')
+  })
+})

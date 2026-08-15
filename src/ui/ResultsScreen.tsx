@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Character } from '../game/types'
 import { MatchRecorder, fileExt, shareOrDownload } from '../systems/recorder'
 import { bondLevelFor, bondTitle, getProgress } from '../game/progression'
+import { SceneJobQueue, type SceneJob } from '../game/sceneQueue'
 import type { MatchOutcome } from './ArenaScreen'
 
 export default function ResultsScreen({
@@ -33,6 +34,19 @@ export default function ResultsScreen({
       if (highlightUrl) URL.revokeObjectURL(highlightUrl)
     }
   }, [highlightUrl])
+  // File de génération asynchrone des scènes du Réalisateur — aucun
+  // pipeline branché aujourd'hui (STUB_SCENE_SUBMITTER par défaut), donc
+  // chaque job échoue vite et proprement : le repli copier-coller
+  // manuel ci-dessous s'affiche, exactement comme avant cette file.
+  const [sceneJobs, setSceneJobs] = useState<SceneJob[]>(() =>
+    outcome.scenes.map(plan => ({ plan, status: 'pending' as const, clipUrl: null })),
+  )
+  useEffect(() => {
+    const queue = new SceneJobQueue(outcome.scenes, { onUpdate: setSceneJobs })
+    setSceneJobs(queue.jobs())
+    queue.start()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // Le « VICTOIRE ! » d'abord : la vidéo autoplay peut faire défiler l'écran.
   useEffect(() => {
     document.querySelector('.screen')?.scrollTo?.(0, 0)
@@ -114,36 +128,51 @@ export default function ResultsScreen({
         <p className="permNote">Pas de clip pour ce match (enregistrement indisponible).</p>
       )}
 
-      {outcome.scenes.length > 0 && (
-        <details style={{ width: '86%', textAlign: 'left' }}>
+      {sceneJobs.length > 0 && (
+        <details style={{ width: '86%', textAlign: 'left' }} open={sceneJobs.some(j => j.status === 'ready')}>
           <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
-            🎬 Scènes de ton match ({outcome.scenes.length}) — prompts prêts pour Kling
+            🎬 Scènes de ton match ({sceneJobs.length})
+            {sceneJobs.some(j => j.status === 'pending') && ' — génération en cours…'}
           </summary>
           <p className="permNote">
             Le Réalisateur a détecté les moments forts et écrit les prompts vidéo. Colle-les dans
             Kling (image-to-video avec la planche du perso) pour l'épisode anime du match.
           </p>
-          {outcome.scenes.map(s => (
-            <div key={s.id} style={{ margin: '6px 0' }}>
-              <b style={{ fontSize: '0.8rem' }}>{s.title}</b>{' '}
-              <button
-                className="btn secondary"
-                style={{ fontSize: '0.7rem', padding: '2px 8px' }}
-                onClick={() => navigator.clipboard?.writeText(s.prompt).catch(() => {})}
-              >
-                📋 Copier
-              </button>
-              <div
-                style={{
-                  fontSize: '0.68rem',
-                  opacity: 0.75,
-                  maxHeight: 52,
-                  overflow: 'hidden',
-                  fontFamily: 'monospace',
-                }}
-              >
-                {s.prompt}
-              </div>
+          {sceneJobs.map(job => (
+            <div key={job.plan.id} style={{ margin: '6px 0' }}>
+              <b style={{ fontSize: '0.8rem' }}>{job.plan.title}</b>{' '}
+              {job.status === 'pending' && <span style={{ fontSize: '0.7rem' }}>⏳ génération…</span>}
+              {job.status === 'ready' && job.clipUrl && (
+                <video
+                  src={job.clipUrl}
+                  controls
+                  muted
+                  playsInline
+                  style={{ width: '100%', borderRadius: 8, marginTop: 4 }}
+                />
+              )}
+              {job.status === 'failed' && (
+                <>
+                  <button
+                    className="btn secondary"
+                    style={{ fontSize: '0.7rem', padding: '2px 8px' }}
+                    onClick={() => navigator.clipboard?.writeText(job.plan.prompt).catch(() => {})}
+                  >
+                    📋 Copier
+                  </button>
+                  <div
+                    style={{
+                      fontSize: '0.68rem',
+                      opacity: 0.75,
+                      maxHeight: 52,
+                      overflow: 'hidden',
+                      fontFamily: 'monospace',
+                    }}
+                  >
+                    {job.plan.prompt}
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </details>
