@@ -233,8 +233,12 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       des prompts (les parseurs locaux deviennent les fallbacks)
 - [ ] Polish mobile/iOS : Safari (tests réels), budget batterie —
       mp4 + Web Share faits (voir Mode Cinématique)
-- [ ] Légal : CGU/CGV, privacy policy (« tout en local » valorisé),
-      watermark « généré par IA » (AI Act), paiement mineurs
+- [~] Légal : écran « 🔒 Vie privée » v0 FAIT (micro/caméra/clips/
+      progression/mineurs — le « tout en local » assumé comme argument,
+      lien discret sur l'écran titre, engagement de prévenir AVANT toute
+      fonction en ligne). Restent : CGU/CGV formelles au moment du
+      paiement, watermark « généré par IA » quand les clips Kling
+      arriveront en jeu, relecture par un juriste avant lancement.
 - [ ] Hébergement + analytics funnel (arrivée → match 1 → match 3 → achat)
 
 ### Tier 2 — Édition Histoire 14,90 € (stores)
@@ -293,6 +297,15 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-14 (routine) : Vie privée + hygiène de dossier — écran
+  « 🔒 Vie privée » complet (le tout-local expliqué simplement, mineurs
+  inclus, promesse de prévenir avant toute fonction en ligne), lien
+  depuis le titre. README remis au niveau du jeu réel (deck 28 cartes,
+  Ulti, Histoire, Écurie, prosodie, PWA, commandes dev). shot.mjs
+  couvre maintenant TOUT le funnel : titre, vie privée, sélection,
+  Vestiaire (fallback capteurs vérifié en capture), arène ×2,
+  résultats. 33 tests + sim verts.
 
 - 2026-08-14 (routine) : Le pipeline viral PROUVÉ de bout en bout —
   mode ?demo=fast (temps de jeu ×6) : un match complet se joue seul en

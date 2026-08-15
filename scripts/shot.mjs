@@ -19,13 +19,23 @@ try {
   })
   const page = await browser.newPage({ viewport: { width: 430, height: 932 } })
 
-  // Le funnel d'entrée : titre puis sélection
+  // Le funnel d'entrée : titre, vie privée, sélection, vestiaire
   await page.goto(`http://localhost:${PORT}/`)
   await page.waitForTimeout(1200)
   await page.screenshot({ path: `${outDir}/title.png` })
-  await page.click('button')
+  await page.click('text=Vie privée')
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${outDir}/privacy.png` })
+  await page.click('text=Retour')
+  await page.waitForTimeout(400)
+  await page.click("text=Entrer dans l'arène")
   await page.waitForTimeout(1200)
   await page.screenshot({ path: `${outDir}/select.png` })
+  await page.click('.charCard')
+  await page.waitForTimeout(400)
+  await page.click('text=/Coacher .+ !/')
+  await page.waitForTimeout(1500)
+  await page.screenshot({ path: `${outDir}/ready.png` })
 
   // L'arène en mode démo — deux instants différents du match
   await page.goto(`http://localhost:${PORT}/?demo`)

@@ -10,9 +10,11 @@ import { ArenaRenderer, CANVAS_H, CANVAS_W } from '../render/arenaRenderer'
 export default function TitleScreen({
   onStart,
   onStory,
+  onPrivacy,
 }: {
   onStart: () => void
   onStory: () => void
+  onPrivacy: () => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -116,6 +118,19 @@ export default function TitleScreen({
           🎙️ + 📷 Le jeu demande le micro et la caméra : c'est toi, le coach à l'écran. Refuse si tu
           préfères — des boutons de secours existent.
         </p>
+        <button
+          onClick={onPrivacy}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--muted)',
+            fontSize: '0.72rem',
+            textDecoration: 'underline',
+            cursor: 'pointer',
+          }}
+        >
+          🔒 Vie privée : tout reste sur ton appareil
+        </button>
       </div>
     </div>
   )

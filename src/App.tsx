@@ -18,6 +18,7 @@ import ReadyScreen from './ui/ReadyScreen'
 import ArenaScreen, { type MatchOutcome } from './ui/ArenaScreen'
 import ResultsScreen from './ui/ResultsScreen'
 import StoryScreen from './ui/StoryScreen'
+import PrivacyScreen from './ui/PrivacyScreen'
 import {
   type StoryChapter,
   chapterEnemyDeck,
@@ -26,7 +27,7 @@ import {
   markCleared,
 } from './game/story'
 
-type Screen = 'title' | 'story' | 'select' | 'ready' | 'arena' | 'results'
+type Screen = 'title' | 'story' | 'select' | 'ready' | 'arena' | 'results' | 'privacy'
 
 // Mode démo (?demo) : saute directement dans l'arène sans capteurs — pour
 // les captures d'écran, le press kit et les tests visuels automatisés.
@@ -107,8 +108,10 @@ export default function App() {
               setScreen('select')
             }}
             onStory={() => setScreen('story')}
+            onPrivacy={() => setScreen('privacy')}
           />
         )}
+        {screen === 'privacy' && <PrivacyScreen onBack={() => setScreen('title')} />}
         {screen === 'story' && (
           <StoryScreen
             onPick={ch => {
