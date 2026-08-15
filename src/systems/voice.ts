@@ -69,9 +69,15 @@ export class VoiceCoach {
     this.startRecognition()
   }
 
+  /** Débloque le contexte s'il est resté « suspended » (Safari/iOS). */
+  resume(): void {
+    if (this.audioCtx?.state === 'suspended') void this.audioCtx.resume()
+  }
+
   private startVolumeMeter(stream: MediaStream) {
     try {
       this.audioCtx = new AudioContext()
+      void this.audioCtx.resume()
       const src = this.audioCtx.createMediaStreamSource(stream)
       this.analyser = this.audioCtx.createAnalyser()
       this.analyser.fftSize = 2048 // assez long pour l'autocorrélation du pitch

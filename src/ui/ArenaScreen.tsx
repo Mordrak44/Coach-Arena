@@ -167,6 +167,18 @@ export default function ArenaScreen({
 
     sys.sound.start()
 
+    // Filet de sécurité Safari/iOS : le contexte audio peut démarrer
+    // « suspended » car sound.start() tourne dans ce useEffect, hors de la
+    // pile synchrone du clic « Faire sonner le gong ». La toute première
+    // interaction réelle du coach dans l'arène débloque tout — silencieux
+    // et sans coût si l'audio tournait déjà (Chrome/Firefox desktop).
+    const unlockAudio = () => {
+      sys.sound.resume()
+      sys.voice.resume()
+    }
+    window.addEventListener('pointerdown', unlockAudio, { once: true })
+    window.addEventListener('keydown', unlockAudio, { once: true })
+
     const setup = async () => {
       // Flux déjà obtenu au Vestiaire ; sinon on demande ici (accès direct).
       let stream: MediaStream | null = preStream ?? null
@@ -458,6 +470,8 @@ export default function ArenaScreen({
       disposed = true
       cancelAnimationFrame(rafId)
       window.removeEventListener('keydown', onKey)
+      window.removeEventListener('pointerdown', unlockAudio)
+      window.removeEventListener('keydown', unlockAudio)
       sys.voice.stop()
       sys.face.stop()
       sys.recorder.stop()

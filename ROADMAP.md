@@ -274,6 +274,18 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       async §7), mp4 9:16 partageable — LE produit vendu
 - [ ] Génération perso + cartes via Claude API (serveur) + modération
       des prompts (les parseurs locaux deviennent les fallbacks)
+- [x] Fix silencieux potentiel sur Safari/iOS : `sound.start()` tourne
+      dans un `useEffect` (hors de la pile SYNCHRONE du clic « Faire
+      sonner le gong »), donc le contexte audio peut démarrer
+      « suspended » et rester muet indéfiniment (contrainte Safari
+      documentée, aucun `.resume()` n'existait nulle part dans le code
+      avant ce correctif). Ajout : `SoundSystem.resume()` +
+      `VoiceCoach.resume()`, débloqués sur la toute première
+      interaction réelle du coach dans l'arène (`pointerdown`/`keydown`
+      une fois, retirés ensuite) — silencieux et sans coût sur
+      Chrome/Firefox desktop où l'audio tourne déjà. Non vérifiable sur
+      vrai matériel iOS dans ce sandbox ; correction basée sur une
+      contrainte plateforme bien documentée, pas une supposition.
 - [ ] Polish mobile/iOS : Safari (tests réels), budget batterie —
       mp4 + Web Share faits (voir Mode Cinématique)
 - [~] Légal : écran « 🔒 Vie privée » v0 FAIT (micro/caméra/clips/
@@ -359,6 +371,21 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : Audit ciblé + fix silence potentiel Safari/iOS.
+  D'abord un audit visuel de CharacterSelect (jamais vérifié en entier
+  depuis l'ajout équipe/écurie/forge) : fausse alerte sur `.screen`
+  (j'ai vérifié par un test de scroll réel — contrairement à `.overlay`
+  hier, il est entièrement atteignable, je n'ai pas « corrigé » ce qui
+  n'était pas cassé) ; panneaux équipe/écurie/forge/deck tous propres en
+  capture. Ensuite, audit de compatibilité iOS (par lecture de code,
+  faute de vrai appareil) : `sound.start()` s'exécute dans un
+  `useEffect`, hors de la pile synchrone du clic « Faire sonner le
+  gong » — sur Safari, le contexte audio peut démarrer « suspended » et
+  ne JAMAIS jouer un son, sans qu'aucun `.resume()` n'existe dans tout
+  le code. Ajouté : resume() sur sound.ts et voice.ts, déclenché à la
+  première interaction réelle dans l'arène. 42 tests + sim verts, aucune
+  régression visuelle.
 
 - 2026-08-15 (routine) : Bulles d'aide premiers pas + fix d'un bug
   d'accessibilité réel du coin du ring. Exploration écartée cette

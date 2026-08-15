@@ -9,7 +9,13 @@ export class SoundSystem {
   private crowdTarget = 0.04
   muted = false
 
-  /** À appeler depuis un geste utilisateur (les navigateurs bloquent l'audio sinon). */
+  /**
+   * À appeler depuis un geste utilisateur (les navigateurs bloquent l'audio
+   * sinon). Insuffisant à lui seul sur Safari/iOS : le contexte peut
+   * démarrer « suspended » dès que la création n'est pas dans la PILE
+   * SYNCHRONE du geste (ex. un useEffect qui se déclenche après le rendu,
+   * un tick après le clic) — voir resume().
+   */
   start() {
     if (this.ctx) return
     try {
@@ -18,9 +24,19 @@ export class SoundSystem {
       this.master.gain.value = 0.7
       this.master.connect(this.ctx.destination)
       this.startCrowd()
+      void this.ctx.resume()
     } catch {
       this.ctx = null
     }
+  }
+
+  /**
+   * Débloque un contexte resté « suspended » (Safari/iOS). À appeler sur
+   * la toute première interaction réelle du coach dans l'arène (clic,
+   * touche) — sans coût si le contexte tourne déjà.
+   */
+  resume(): void {
+    if (this.ctx?.state === 'suspended') void this.ctx.resume()
   }
 
   setMuted(m: boolean) {
