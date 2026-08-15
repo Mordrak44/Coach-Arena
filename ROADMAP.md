@@ -140,21 +140,27 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       est tenue. Équilibre : coach 82 %, +deck 89 %, sans coach 16 %.
 - [x] Le Temps Mort (vision utilisateur : geler le combat pour parler et
       jouer une carte) — nouvelle mécanique, symétrique, indépendante de
-      toute vidéo. 1 par match (précieux, comme un vrai coach de sport),
-      bouton dédié en combat, gèle TOUT (tick() ne résout plus rien
-      pendant le gel — état des combattants figé à l'identique), main
-      jouable + consignes parlées pendant les 5 s chronométrées, reprise
-      EXACTE (le chrono du round n'est pas remis à zéro). Coin adverse :
-      temps mort d'urgence automatique si PV critiques + carte de soin
-      en main (garde-fou : jamais de « résurrection » après un KO déjà
-      arrivé). Bug réel trouvé et corrigé en le testant en capture :
+      toute vidéo. 1 par round (rechargé à chaque manche, sur retour
+      utilisateur — pas 1 par match : chaque round mérite son moment de
+      respiration), bouton dédié en combat, gèle TOUT (tick() ne résout
+      plus rien pendant le gel — état des combattants figé à l'identique),
+      main jouable + consignes parlées pendant les 5 s chronométrées,
+      reprise EXACTE (le chrono du round n'est pas remis à zéro). Coin
+      adverse : temps mort d'urgence automatique si PV critiques + carte
+      de soin en main (garde-fou : jamais de « résurrection » après un KO
+      déjà arrivé). Bug réel trouvé et corrigé en le testant en capture :
       muter m.phase depuis un clic (hors du tick()) n'était jamais vu
       par la détection de changement de phase de la boucle de jeu (elle
       compare avant/après SON PROPRE tick, pas les mutations externes)
       — l'état React ne se synchronisait donc jamais ; corrigé en
       synchronisant explicitement dans le handler, comme pickPlan/
-      onSwitch le font déjà. 4 tests vitest (46 au total), vérifié en
-      capture (gel, jeu de carte, reprise au bon chrono).
+      onSwitch le font déjà. Bandeau « 🛑 TEMPS MORT » dessiné directement
+      sur le canvas (pas seulement en overlay DOM) : le recorder n'exporte
+      que le canvas, donc sans ce bandeau un clip TikTok montrerait un
+      combat qui se fige 5 s sans explication, comme un bug de lag.
+      5 tests vitest (47 au total), vérifié en capture — y compris une
+      capture du canvas SEUL (toDataURL, sans le DOM par-dessus) pour
+      confirmer que le bandeau est bien gravé dans ce qui sera exporté.
 
 ## v1 — Mode Cinématique (voir GAME_DESIGN.md §7)
 
@@ -388,6 +394,26 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : Le Temps Mort, suite — deux retours utilisateur
+  traités dans la foulée. (1) « 1 par round plutôt » que 1 par match :
+  `TIMEOUTS_PER_MATCH` renommé `TIMEOUTS_PER_ROUND`, rechargé dans
+  `startNextRound` (m.timeoutsLeft/enemyTimeoutsLeft remis au max à
+  chaque nouvelle manche). L'UI se resynchronise gratuitement — elle
+  écoutait déjà tout changement de phase, et le passage roundEnd→tactics→
+  intro en fait partie. Nouveau test vitest qui traverse un round entier
+  (fighting→roundEnd→tactics→intro round 2) et vérifie la recharge des
+  deux réserves. (2) Le bandeau canvas « 🛑 TEMPS MORT » qui restait en
+  chantier (ajouté dans arenaRenderer.ts avant la coupure de contexte,
+  jamais buildé ni vérifié) : build + 47 tests vitest + sim OK, puis
+  vérifié par deux captures — l'overlay DOM complet, ET le canvas SEUL
+  (via `canvas.toDataURL()`, pour voir exactement ce que le recorder
+  exporte sans le DOM par-dessus) comparé côte à côte avec une capture
+  « avant gel » : le fond s'assombrit bien, le bandeau jaune/noir est
+  net et lisible par-dessus les combattants figés. Sans cette vérif au
+  niveau pixel du canvas, un bug où le bandeau ne s'affiche qu'en DOM
+  (donc invisible dans les clips exportés) serait passé inaperçu — c'est
+  exactement le problème que ce bandeau existe pour résoudre.
 
 - 2026-08-15 : Le Temps Mort — la mécanique proposée par l'utilisateur
   pour résoudre « geler le combat, parler, jouer une carte » sans

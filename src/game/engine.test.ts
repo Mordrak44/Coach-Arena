@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   HAND_SIZE,
   HYPE_MAX,
+  ROUND_END_DURATION,
   SOUFFLE_PER_CORNER,
   SWITCH_COST,
-  TIMEOUTS_PER_MATCH,
+  TACTICS_DURATION,
+  TIMEOUTS_PER_ROUND,
   TIMEOUT_DURATION,
   ULTI_MAX,
   applyConsigne,
@@ -262,7 +264,7 @@ describe('Le Temps Mort — geler le combat pour parler et jouer une carte', () 
     m.hand = ['massage']
     expect(callTimeout(m)).toBe(true)
     expect(m.phase).toBe('timeout')
-    expect(m.timeoutsLeft).toBe(TIMEOUTS_PER_MATCH - 1)
+    expect(m.timeoutsLeft).toBe(TIMEOUTS_PER_ROUND - 1)
     // Le gel ne bouge rien tout seul : tick() sans jouer de carte ne change ni PV ni Hype.
     tick(m, 1, quiet)
     expect(m.player.hp).toBe(42)
@@ -281,7 +283,24 @@ describe('Le Temps Mort — geler le combat pour parler et jouer une carte', () 
     toFighting(m)
     expect(callTimeout(m)).toBe(true)
     m.phase = 'fighting' // on force la reprise pour retenter
-    expect(callTimeout(m)).toBe(false) // plus de temps mort (1/match)
+    expect(callTimeout(m)).toBe(false) // plus de temps mort pour ce round
+  })
+
+  it('le temps mort se recharge au round suivant (1 par round, pas 1 par match)', () => {
+    const m = freshMatch()
+    toFighting(m)
+    expect(callTimeout(m)).toBe(true)
+    m.phase = 'fighting'
+    expect(callTimeout(m)).toBe(false) // épuisé pour ce round
+    // On force la fin du round et l'entame du suivant.
+    m.player.hp = m.player.maxHp
+    m.enemy.hp = 0
+    tick(m, 0.05, quiet) // -> roundEnd
+    tick(m, ROUND_END_DURATION + 0.1, quiet) // -> tactics
+    tick(m, TACTICS_DURATION + 0.1, quiet) // -> startNextRound -> intro
+    expect(m.round).toBe(2)
+    expect(m.timeoutsLeft).toBe(TIMEOUTS_PER_ROUND)
+    expect(m.enemyTimeoutsLeft).toBe(TIMEOUTS_PER_ROUND)
   })
 
   it("un temps mort ne remet pas le round à zéro (côté moteur, phaseUntil est propre au gel)", () => {

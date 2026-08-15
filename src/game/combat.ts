@@ -131,7 +131,7 @@ export const SWITCH_COST = 1
 /** Durée du Temps Mort — court et chronométré, pour garder la tension. */
 export const TIMEOUT_DURATION = 5
 /** Temps morts disponibles par match — précieux, comme au vrai sport. */
-export const TIMEOUTS_PER_MATCH = 1
+export const TIMEOUTS_PER_ROUND = 1
 
 export function createMatch(
   playerChar: Character,
@@ -161,8 +161,8 @@ export function createMatch(
     bench: (opts.team ?? []).map(c => makeFighter(c, 'player')),
     enemyBench: (opts.enemyTeam ?? []).map(c => makeFighter(c, 'enemy')),
     switchUsed: false,
-    timeoutsLeft: TIMEOUTS_PER_MATCH,
-    enemyTimeoutsLeft: TIMEOUTS_PER_MATCH,
+    timeoutsLeft: TIMEOUTS_PER_ROUND,
+    enemyTimeoutsLeft: TIMEOUTS_PER_ROUND,
     enemyDeck: shuffle(opts.enemyDeck ?? buildStarterDeck(signatureFor(enemyChar.id))),
     enemyHand: [],
     enemyDiscard: [],
@@ -1075,6 +1075,10 @@ function startNextRound(m: MatchState, plan: TacticPlan): void {
   m.plan = plan
   m.phase = 'intro'
   m.phaseUntil = m.t + INTRO_DURATION
+  // Le Temps Mort se recharge à chaque round : chaque manche mérite son
+  // propre moment de respiration, pas un jeton unique consommé au round 1.
+  m.timeoutsLeft = TIMEOUTS_PER_ROUND
+  m.enemyTimeoutsLeft = TIMEOUTS_PER_ROUND
   m.events.push({ kind: 'roundStart', t: m.t, round: m.round })
 }
 

@@ -165,6 +165,12 @@ export class ArenaRenderer {
       case 'matchEnd':
         this.flash(now, ev.winner === 'player' ? '#ffdd00' : '#223', 0.3)
         break
+      case 'timeout':
+        if (ev.side === 'player') {
+          this.flash(now, '#4a4370', 0.18)
+          this.shake(now, 8)
+        }
+        break
     }
   }
 
@@ -220,6 +226,10 @@ export class ArenaRenderer {
     this.drawHUD(ctx, m, roundTimeLeft)
     this.drawCommentary(ctx, now)
     this.drawSpecialBanner(ctx, now)
+    // Le Temps Mort DOIT être visible sur le canvas enregistré — l'overlay
+    // de sélection de carte est du DOM, invisible dans les clips exportés ;
+    // sans ce bandeau, un temps mort ressemblerait à un bug de lag figé.
+    if (m.phase === 'timeout') this.drawTimeoutBanner(ctx, now)
 
     // Flash d'impact
     if (now < this.flashUntil) {
@@ -1019,6 +1029,33 @@ export class ArenaRenderer {
     ctx.lineWidth = 6
     ctx.strokeText(this.specialBannerText, CANVAS_W / 2, 380)
     ctx.fillText(this.specialBannerText, CANVAS_W / 2, 380)
+    ctx.restore()
+  }
+
+  /**
+   * Bandeau du Temps Mort — dessiné SUR LE CANVAS (donc dans les clips
+   * exportés). L'overlay de sélection de carte est du DOM par-dessus,
+   * invisible à l'enregistrement ; sans ce bandeau, un temps mort
+   * ressemblerait à un bug de lag figé dans un clip TikTok.
+   */
+  private drawTimeoutBanner(ctx: CanvasRenderingContext2D, now: number) {
+    ctx.save()
+    ctx.fillStyle = 'rgba(8, 6, 16, 0.72)'
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+    const pulse = 1 + Math.sin(now * 5) * 0.04
+    ctx.textAlign = 'center'
+    ctx.translate(CANVAS_W / 2, 470)
+    ctx.scale(pulse, pulse)
+    ctx.font = `900 italic 44px 'Arial Black', sans-serif`
+    ctx.strokeStyle = '#111'
+    ctx.lineWidth = 7
+    ctx.strokeText('🛑 TEMPS MORT', 0, 0)
+    ctx.fillStyle = '#ffdd00'
+    ctx.fillText('🛑 TEMPS MORT', 0, 0)
+    ctx.scale(1 / pulse, 1 / pulse)
+    ctx.font = '700 20px sans-serif'
+    ctx.fillStyle = '#fff'
+    ctx.fillText('le coach parle à son perso…', 0, 42)
     ctx.restore()
   }
 }

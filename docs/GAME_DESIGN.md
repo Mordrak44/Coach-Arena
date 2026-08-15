@@ -36,7 +36,7 @@ plan tactique, deck de cartes (guerre des coins incluse — bloquer ou
 drainer le coin adverse), relève d'équipier (PV/Hype/Ulti conservés),
 et conseils parlés librement transformés en effets réels. En plein
 round, le coach garde un dernier outil précieux : le **Temps Mort**
-(1/match) — gèle le combat, parle à son perso, joue une carte, puis ça
+(1/round, rechargé à chaque manche) — gèle le combat, parle à son perso, joue une carte, puis ça
 reprend exactement où c'était. Le coach adverse est un vrai miroir (son
 propre deck, sa propre équipe, son propre Temps Mort d'urgence), visible
 en tuile façon appel vidéo — demain, la vraie facecam d'un adversaire
