@@ -138,6 +138,23 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       la fin de round (résolution à la pause suivante). Le deck adverse
       devient une cible — la promesse « lisible et à terme bloquable »
       est tenue. Équilibre : coach 82 %, +deck 89 %, sans coach 16 %.
+- [x] Le Temps Mort (vision utilisateur : geler le combat pour parler et
+      jouer une carte) — nouvelle mécanique, symétrique, indépendante de
+      toute vidéo. 1 par match (précieux, comme un vrai coach de sport),
+      bouton dédié en combat, gèle TOUT (tick() ne résout plus rien
+      pendant le gel — état des combattants figé à l'identique), main
+      jouable + consignes parlées pendant les 5 s chronométrées, reprise
+      EXACTE (le chrono du round n'est pas remis à zéro). Coin adverse :
+      temps mort d'urgence automatique si PV critiques + carte de soin
+      en main (garde-fou : jamais de « résurrection » après un KO déjà
+      arrivé). Bug réel trouvé et corrigé en le testant en capture :
+      muter m.phase depuis un clic (hors du tick()) n'était jamais vu
+      par la détection de changement de phase de la boucle de jeu (elle
+      compare avant/après SON PROPRE tick, pas les mutations externes)
+      — l'état React ne se synchronisait donc jamais ; corrigé en
+      synchronisant explicitement dans le handler, comme pickPlan/
+      onSwitch le font déjà. 4 tests vitest (46 au total), vérifié en
+      capture (gel, jeu de carte, reprise au bon chrono).
 
 ## v1 — Mode Cinématique (voir GAME_DESIGN.md §7)
 
@@ -371,6 +388,20 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 : Le Temps Mort — la mécanique proposée par l'utilisateur
+  pour résoudre « geler le combat, parler, jouer une carte » sans
+  attendre la moindre vidéo : nouvelle phase 'timeout', gel total
+  symétrique, 1 par match, résolution exacte (chrono préservé). Le vrai
+  bug de la session : muter m.phase depuis un gestionnaire de clic ne
+  se voyait jamais dans la boucle de jeu, dont la détection de
+  changement de phase compare son état avant/après SON PROPRE tick() —
+  une mutation externe entre deux frames n'est simplement jamais
+  détectée par ce pattern. Trouvé uniquement parce que la capture
+  d'écran montrait un jeu figé sans overlay visible ; corrigé en
+  synchronisant l'état React directement dans le handler. 4 tests
+  vitest (46 au total) + 3 captures de vérification (gel, carte jouée,
+  reprise au bon chrono, 54 s et non 59 s).
 
 - 2026-08-15 (routine) : Audit ciblé + fix silence potentiel Safari/iOS.
   D'abord un audit visuel de CharacterSelect (jamais vérifié en entier

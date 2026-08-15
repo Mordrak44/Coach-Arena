@@ -236,7 +236,7 @@ export interface FighterState {
   anim: { kind: 'idle' | 'attack' | 'hurt' | 'guard' | 'dodge' | 'special' | 'ko'; until: number }
 }
 
-export type MatchPhase = 'intro' | 'fighting' | 'roundEnd' | 'tactics' | 'matchEnd'
+export type MatchPhase = 'intro' | 'fighting' | 'roundEnd' | 'tactics' | 'timeout' | 'matchEnd'
 
 export interface MatchState {
   player: FighterState
@@ -272,6 +272,10 @@ export interface MatchState {
   enemyBench: FighterState[]
   /** une seule relève par pause */
   switchUsed: boolean
+  /** Le Temps Mort : gèle le combat pour jouer une carte en pleine action.
+   *  Précieux — 1 par match, comme un vrai coach de sport. Symétrique. */
+  timeoutsLeft: number
+  enemyTimeoutsLeft: number
   /** le coin adverse joue un VRAI deck, symétrique du joueur */
   enemyDeck: CardId[]
   enemyHand: CardId[]
@@ -298,4 +302,5 @@ export type CombatEvent =
   | { kind: 'card'; t: number; name: string }
   | { kind: 'cardProc'; t: number; text: string }
   | { kind: 'switch'; t: number; side: 'player' | 'enemy'; name: string }
+  | { kind: 'timeout'; t: number; side: 'player' | 'enemy' }
   | { kind: 'trait'; t: number; text: string; color: string }

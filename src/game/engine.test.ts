@@ -4,8 +4,11 @@ import {
   HYPE_MAX,
   SOUFFLE_PER_CORNER,
   SWITCH_COST,
+  TIMEOUTS_PER_MATCH,
+  TIMEOUT_DURATION,
   ULTI_MAX,
   applyConsigne,
+  callTimeout,
   createMatch,
   enemyCornerPlay,
   mulligan,
@@ -247,6 +250,63 @@ describe('guerre des coins (vague 3)', () => {
     expect(m.mods.blockNextEnemyCard).toBe(true)
     expect(m.mods.drainEnemySouffle).toBe(2)
     expect(m.mods.damageReductionMul).toBe(1) // le reste a bien expiré
+  })
+})
+
+describe('Le Temps Mort — geler le combat pour parler et jouer une carte', () => {
+  it('gèle sans rien changer, joue une carte, reprend au bon endroit', () => {
+    const m = freshMatch(buildStarterDeck(null))
+    toFighting(m)
+    m.player.hp = 42
+    m.player.hype = 30
+    m.hand = ['massage']
+    expect(callTimeout(m)).toBe(true)
+    expect(m.phase).toBe('timeout')
+    expect(m.timeoutsLeft).toBe(TIMEOUTS_PER_MATCH - 1)
+    // Le gel ne bouge rien tout seul : tick() sans jouer de carte ne change ni PV ni Hype.
+    tick(m, 1, quiet)
+    expect(m.player.hp).toBe(42)
+    expect(m.player.hype).toBe(30)
+    // On peut jouer une carte PENDANT le gel.
+    expect(playCard(m, 'massage')).toBe(true)
+    expect(m.player.hp).toBeGreaterThan(42)
+    // Le gel expire après TIMEOUT_DURATION et rend la main au combat.
+    tick(m, TIMEOUT_DURATION + 0.1, quiet)
+    expect(m.phase).toBe('fighting')
+  })
+
+  it('refuse hors combat et sans temps mort restant', () => {
+    const m = freshMatch()
+    expect(callTimeout(m)).toBe(false) // encore en intro
+    toFighting(m)
+    expect(callTimeout(m)).toBe(true)
+    m.phase = 'fighting' // on force la reprise pour retenter
+    expect(callTimeout(m)).toBe(false) // plus de temps mort (1/match)
+  })
+
+  it("un temps mort ne remet pas le round à zéro (côté moteur, phaseUntil est propre au gel)", () => {
+    const m = freshMatch()
+    toFighting(m)
+    const before = m.round
+    callTimeout(m)
+    tick(m, TIMEOUT_DURATION + 0.1, quiet)
+    expect(m.phase).toBe('fighting')
+    expect(m.round).toBe(before) // toujours le même round, rien n'a été relancé
+  })
+
+  it("le coin adverse a sa propre réserve de temps morts (symétrie)", () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.enemy.hp = Math.round(m.enemy.maxHp * 0.2) // sous le seuil critique
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = ['secondWind'] // une carte de soin, exploitable en urgence
+    const before = m.enemy.hp
+    const timeoutsBefore = m.enemyTimeoutsLeft
+    tick(m, 0.05, quiet)
+    expect(m.enemy.hp).toBeGreaterThan(before)
+    expect(m.enemyTimeoutsLeft).toBe(timeoutsBefore - 1)
+    expect(m.events.some(e => e.kind === 'timeout' && e.side === 'enemy')).toBe(true)
   })
 })
 

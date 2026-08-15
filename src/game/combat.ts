@@ -128,6 +128,11 @@ export interface MatchOpts {
 /** Coût en Souffle d'une relève au coin du ring. */
 export const SWITCH_COST = 1
 
+/** Durée du Temps Mort — court et chronométré, pour garder la tension. */
+export const TIMEOUT_DURATION = 5
+/** Temps morts disponibles par match — précieux, comme au vrai sport. */
+export const TIMEOUTS_PER_MATCH = 1
+
 export function createMatch(
   playerChar: Character,
   enemyChar: Character,
@@ -156,6 +161,8 @@ export function createMatch(
     bench: (opts.team ?? []).map(c => makeFighter(c, 'player')),
     enemyBench: (opts.enemyTeam ?? []).map(c => makeFighter(c, 'enemy')),
     switchUsed: false,
+    timeoutsLeft: TIMEOUTS_PER_MATCH,
+    enemyTimeoutsLeft: TIMEOUTS_PER_MATCH,
     enemyDeck: shuffle(opts.enemyDeck ?? buildStarterDeck(signatureFor(enemyChar.id))),
     enemyHand: [],
     enemyDiscard: [],
@@ -312,9 +319,25 @@ function applyCardEffects(m: MatchState, effects: EffectPrimitive[], side: 'play
   }
 }
 
-/** Joue une carte pendant la phase tactique, si le Souffle le permet. */
+/**
+ * Le Temps Mort — gèle le combat en pleine action pour parler et jouer
+ * une carte, comme un vrai coach de sport. Précieux (1/match) : le
+ * timing de l'appel est lui-même une décision stratégique. Le combat
+ * reprend EXACTEMENT où il en était (aucun état des combattants ne
+ * bouge pendant le gel — tick() se contente de ne rien résoudre).
+ */
+export function callTimeout(m: MatchState): boolean {
+  if (m.phase !== 'fighting' || m.timeoutsLeft <= 0) return false
+  m.timeoutsLeft--
+  m.phase = 'timeout'
+  m.phaseUntil = m.t + TIMEOUT_DURATION
+  m.events.push({ kind: 'timeout', t: m.t, side: 'player' })
+  return true
+}
+
+/** Joue une carte pendant la phase tactique OU un Temps Mort, si le Souffle le permet. */
 export function playCard(m: MatchState, id: CardId): boolean {
-  if (m.phase !== 'tactics') return false
+  if (m.phase !== 'tactics' && m.phase !== 'timeout') return false
   const card = getCard(id)
   if (m.souffle < card.cost) return false
   const idx = m.hand.indexOf(id)
@@ -371,7 +394,8 @@ export function switchFighter(m: MatchState, benchIndex: number): boolean {
  * par pause : la parole est la ressource, pas le Souffle.
  */
 export function applyConsigne(m: MatchState, effects: EffectPrimitive[], label: string): boolean {
-  if (m.phase !== 'tactics' || m.consigneUsed || effects.length === 0) return false
+  if ((m.phase !== 'tactics' && m.phase !== 'timeout') || m.consigneUsed || effects.length === 0)
+    return false
   m.consigneUsed = true
   applyCardEffects(m, effects.slice(0, 2).map(clampEffect), 'player')
   m.events.push({ kind: 'card', t: m.t, name: `🎤 ${label}` })
@@ -852,10 +876,36 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
     case 'tactics':
       if (m.t >= m.phaseUntil) startNextRound(m, m.plan ?? 'coldblood')
       return
+    case 'timeout':
+      // Gel total : aucun état des combattants ne bouge (pas d'appel à
+      // resolveAttack/enemyCoachAI ci-dessous) — le combat reprend
+      // exactement où il en était, seul le temps du gel s'est écoulé.
+      if (m.t >= m.phaseUntil) m.phase = 'fighting'
+      return
     case 'matchEnd':
       return
     case 'fighting':
       break
+  }
+
+  // Temps mort adverse : décision d'urgence instantanée (pas de gel visible
+  // à jouer côté IA — contrairement au joueur, elle n'a personne à qui
+  // parler). Symétrique du joueur : même ressource, précieuse, 1/match.
+  if (
+    m.enemyTimeoutsLeft > 0 &&
+    m.enemy.hp > 0 && // pas de résurrection : un temps mort agit AVANT le KO, jamais après
+    m.enemy.hp / m.enemy.maxHp < 0.25 &&
+    m.enemyHand.some(id => getCard(id).effects.some(e => e.kind === 'heal' || e.kind === 'lowHpHypeFull'))
+  ) {
+    const healId = m.enemyHand.find(id => getCard(id).effects.some(e => e.kind === 'heal'))
+    if (healId) {
+      m.enemyTimeoutsLeft--
+      m.enemyHand.splice(m.enemyHand.indexOf(healId), 1)
+      m.enemyDiscard.push(healId)
+      m.events.push({ kind: 'timeout', t: m.t, side: 'enemy' })
+      m.events.push({ kind: 'card', t: m.t, name: `${getCard(healId).name} (temps mort adverse)` })
+      applyCardEffects(m, getCard(healId).effects, 'enemy')
+    }
   }
 
   // --- Coaching temps réel ---

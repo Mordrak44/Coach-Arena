@@ -4,8 +4,10 @@ import {
   type MatchOpts,
   ROUND_TIME_LIMIT,
   SOUFFLE_PER_CORNER,
+  TIMEOUT_DURATION,
   addSpeechHype,
   applyConsigne,
+  callTimeout,
   chooseTacticPlan,
   createMatch,
   forceRoundTimeout,
@@ -128,6 +130,8 @@ export default function ArenaScreen({
   const [mullSel, setMullSel] = useState<number[]>([])
   const [mullUsed, setMullUsed] = useState(false)
   const [tacticsLeft, setTacticsLeft] = useState(0)
+  const [timeoutsLeft, setTimeoutsLeft] = useState(matchRef.current.timeoutsLeft)
+  const [timeoutLeftSec, setTimeoutLeftSec] = useState(0)
   const [speechEnergy, setSpeechEnergy] = useState(0)
   const [consigne, setConsigne] = useState<string | null>(null)
   const lastFinalSeq = useRef(0)
@@ -237,12 +241,28 @@ export default function ArenaScreen({
         voiceTone: sys.voice.state.pitchRatio,
       })
 
-      // Timer de round côté UI
-      if (prevPhase !== 'fighting' && m.phase === 'fighting') roundStart = m.t
+      // Timer de round côté UI — SEUL 'intro' démarre un nouveau round : un
+      // retour de 'timeout' vers 'fighting' ne doit pas remettre le chrono
+      // à zéro, sinon un temps mort prolongerait gratuitement le round.
+      if (prevPhase === 'intro' && m.phase === 'fighting') roundStart = m.t
       if (m.phase === 'fighting' && m.t - roundStart > ROUND_TIME_LIMIT) forceRoundTimeout(m)
 
-      // Pendant la phase tactique, le discours du coach charge la Hype…
-      if (m.phase === 'tactics') {
+      // Temps mort : décompte affiché, hand/souffle resynchronisés à l'entrée.
+      if (m.phase === 'timeout') {
+        setTimeoutLeftSec(Math.max(0, Math.ceil(m.phaseUntil - m.t)))
+        if (prevPhase !== 'timeout') {
+          setHand([...m.hand])
+          setSouffle(m.souffle)
+          // Ignore les phrases prononcées AVANT l'appel du temps mort —
+          // seul ce qui est dit PENDANT le gel doit pouvoir devenir une consigne.
+          lastFinalSeq.current = sys.voice.state.finalSeq
+        }
+      }
+
+      // Pendant la phase tactique OU un temps mort, le discours du coach
+      // charge la Hype — un temps mort n'est pas qu'une pause carte, c'est
+      // aussi le moment de motiver son perso en pleine tempête.
+      if (m.phase === 'tactics' || m.phase === 'timeout') {
         const e = sys.voice.state.energy * 0.7 + sys.face.state.energy * 0.3
         if (e > 0.2) addSpeechHype(m, e * dt * 18)
         setTacticsLeft(Math.max(0, Math.ceil(m.phaseUntil - m.t)))
@@ -260,6 +280,7 @@ export default function ArenaScreen({
 
       if (m.phase !== prevPhase) {
         setPhase(m.phase)
+        setTimeoutsLeft(m.timeoutsLeft)
         if (m.phase === 'tactics') {
           if (!hasSeenCornerHint()) setShowCornerHint(true)
           setPlan(null)
@@ -486,6 +507,23 @@ export default function ArenaScreen({
     pendingCmd.current = cmd
   }
 
+  const onCallTimeout = () => {
+    const m = matchRef.current
+    if (!callTimeout(m)) return
+    // callTimeout mute m.phase HORS de la boucle de jeu : la détection
+    // « changement de phase » de la boucle compare avant/après son PROPRE
+    // tick() et ne verrait jamais une mutation externe — il faut donc
+    // synchroniser l'état React nous-mêmes ici, comme pickPlan/onSwitch le
+    // font déjà pour leurs propres mutations hors-tick().
+    setPhase(m.phase)
+    setTimeoutsLeft(m.timeoutsLeft)
+    setHand([...m.hand])
+    setSouffle(m.souffle)
+    // Idem : ignore les phrases dites AVANT l'appel (seul ce qui est dit
+    // PENDANT le gel doit pouvoir devenir une consigne).
+    lastFinalSeq.current = sysRef.current!.voice.state.finalSeq
+  }
+
   const dismissCombatHint = () => {
     combatHintDismissedRef.current = true
     setShowCombatHint(false)
@@ -605,6 +643,15 @@ export default function ArenaScreen({
         <button onClick={() => sendCmd('defend')}>🛡 Défends</button>
         <button onClick={() => sendCmd('dodge')}>💨 Esquive</button>
         <button onClick={() => sendCmd('counter')}>↩ Contre</button>
+        {phase === 'fighting' && timeoutsLeft > 0 && (
+          <button
+            style={{ background: '#4a4370', color: '#fff' }}
+            onClick={onCallTimeout}
+            title="Gèle le combat pour parler et jouer une carte — 1 par match"
+          >
+            🛑 Temps Mort
+          </button>
+        )}
         {ultiReady ? (
           <button
             className="special"
@@ -734,6 +781,44 @@ export default function ArenaScreen({
             <i style={{ width: `${Math.round(speechEnergy * 100)}%` }} />
           </div>
           <span className="permNote">niveau du discours de coach 🎙️</span>
+        </div>
+      )}
+
+      {phase === 'timeout' && (
+        <div className="overlay">
+          <h2>🛑 Temps Mort</h2>
+          <div className="countdown">{timeoutLeftSec}</div>
+          <p className="tagline">
+            Le combat est gelé — <b>parle à ton perso</b> et joue une carte si tu en as besoin. Ça
+            reprend exactement où c'était.
+          </p>
+          {hand.length > 0 ? (
+            <div className="planGrid">
+              {hand.map((id, idx) => {
+                const c = getCard(id)
+                const affordable = souffle >= c.cost
+                return (
+                  <button
+                    key={`${id}-${idx}`}
+                    className="planCard"
+                    disabled={!affordable}
+                    style={!affordable ? { opacity: 0.45 } : undefined}
+                    onClick={() => onPlayCard(id)}
+                  >
+                    <b>
+                      {c.icon} {c.name}{' '}
+                      <span style={{ color: 'var(--violet)' }}>{'●'.repeat(c.cost)}</span>
+                    </b>
+                    <span>
+                      [{TIMING_LABEL[c.timing]}] {c.desc}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <span className="permNote">Main vide — parle, ça suffit déjà à motiver ton perso.</span>
+          )}
         </div>
       )}
     </div>
