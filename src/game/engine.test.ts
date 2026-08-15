@@ -266,6 +266,50 @@ describe('consignes parlées', () => {
   })
 })
 
+describe('prosodie (pitch local)', () => {
+  it('détecte une onde à 220 Hz à ±5 %', async () => {
+    const { detectPitch } = await import('../systems/pitch')
+    const sr = 48000
+    const buf = new Float32Array(2048)
+    for (let i = 0; i < buf.length; i++) buf[i] = Math.sin((2 * Math.PI * 220 * i) / sr) * 0.3
+    const hz = detectPitch(buf, sr)
+    expect(hz).not.toBeNull()
+    expect(Math.abs(hz! - 220)).toBeLessThan(11)
+  })
+
+  it('rejette le silence et le bruit', async () => {
+    const { detectPitch } = await import('../systems/pitch')
+    const silence = new Float32Array(2048)
+    expect(detectPitch(silence, 48000)).toBeNull()
+    let seed = 1
+    const noise = new Float32Array(2048).map(() => {
+      seed = (seed * 16807) % 2147483647
+      return (seed / 2147483647 - 0.5) * 0.4
+    })
+    expect(detectPitch(noise, 48000)).toBeNull()
+  })
+
+  it('le tracker suit la montée dans les aigus', async () => {
+    const { PitchTracker } = await import('../systems/pitch')
+    const t = new PitchTracker()
+    for (let i = 0; i < 200; i++) t.update(150) // voix posée
+    for (let i = 0; i < 12; i++) t.update(220) // ça monte !
+    expect(t.ratio()).toBeGreaterThan(1.15)
+  })
+
+  it('un ordre AIGU stresse un Cérébral même sans crier fort', () => {
+    const m = createMatch(ROSTER[2], ROSTER[0], []) // Yuna, cérébrale
+    toFighting(m)
+    m.player.nextActionAt = m.t + 1000
+    m.enemy.nextActionAt = m.t + 1000
+    m.player.hype = 50
+    // volume modéré (0.5) mais ton monté dans les aigus
+    tick(m, 0.05, { command: 'attack', voiceEnergy: 0.5, faceEnergy: 0, voiceTone: 1.3 })
+    expect(m.player.hype).toBeLessThan(50)
+    expect(m.events.some(e => e.kind === 'trait' && e.text.includes('BRUIT'))).toBe(true)
+  })
+})
+
 describe('mode Histoire', () => {
   it('8 chapitres, adversaires valides, difficulté croissante', async () => {
     const { STORY_CHAPTERS, chapterOpponent, chapterOpponentTeam, isUnlocked } = await import('./story')

@@ -197,6 +197,9 @@ export interface CoachInput {
   voiceEnergy: number
   /** énergie facecam 0..1 (mouvement du visage/corps lissé) */
   faceEnergy: number
+  /** prosodie : pitch courant / voix posée (1 = ton normal, >1.15 = aigu,
+   *  <0.9 = grave posé). Optionnel — 1 si absent (boutons/clavier). */
+  voiceTone?: number
 }
 
 export interface FighterState {

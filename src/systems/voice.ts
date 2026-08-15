@@ -1,4 +1,5 @@
 import type { CoachCommand } from '../game/types'
+import { PitchTracker, detectPitch } from './pitch'
 
 // Reconnaissance vocale (Web Speech API) + mesure du volume micro.
 // Fallback : si SpeechRecognition n'existe pas, seuls le volume et les
@@ -15,6 +16,8 @@ export interface VoiceState {
   lastFinal: string
   /** incrémenté à chaque phrase finale : permet de détecter les nouvelles */
   finalSeq: number
+  /** prosodie : ratio pitch courant / voix posée (1 = normal, >1.15 = aigu) */
+  pitchRatio: number
   supported: boolean
   listening: boolean
 }
@@ -45,9 +48,13 @@ export class VoiceCoach {
     lastHeard: '',
     lastFinal: '',
     finalSeq: 0,
+    pitchRatio: 1,
     supported: false,
     listening: false,
   }
+
+  private pitch = new PitchTracker()
+  private timeBuf: Float32Array | null = null
 
   private recognition: any = null
   private audioCtx: AudioContext | null = null
@@ -67,9 +74,10 @@ export class VoiceCoach {
       this.audioCtx = new AudioContext()
       const src = this.audioCtx.createMediaStreamSource(stream)
       this.analyser = this.audioCtx.createAnalyser()
-      this.analyser.fftSize = 512
+      this.analyser.fftSize = 2048 // assez long pour l'autocorrélation du pitch
       src.connect(this.analyser)
       this.volBuf = new Uint8Array(this.analyser.frequencyBinCount)
+      this.timeBuf = new Float32Array(this.analyser.fftSize)
       const loop = () => {
         if (this.stopped || !this.analyser || !this.volBuf) return
         this.analyser.getByteFrequencyData(this.volBuf as any)
@@ -83,6 +91,12 @@ export class VoiceCoach {
           raw > this.state.energy
             ? this.state.energy * 0.6 + raw * 0.4
             : this.state.energy * 0.95 + raw * 0.05
+        // Prosodie : hauteur de voix par autocorrélation (locale, gratuite).
+        if (this.timeBuf && this.audioCtx) {
+          this.analyser.getFloatTimeDomainData(this.timeBuf as any)
+          this.pitch.update(detectPitch(this.timeBuf, this.audioCtx.sampleRate))
+          this.state.pitchRatio = this.pitch.ratio()
+        }
         this.rafId = requestAnimationFrame(loop)
       }
       loop()

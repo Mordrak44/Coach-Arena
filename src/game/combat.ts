@@ -390,12 +390,15 @@ const COMMAND_STANCE: Partial<Record<CoachCommand, Stance>> = {
 }
 
 /** Applique une commande du coach au perso joueur. Retourne les events générés. */
-function applyCommand(m: MatchState, cmd: CoachCommand, voiceEnergy: number): void {
+function applyCommand(m: MatchState, cmd: CoachCommand, voiceEnergy: number, voiceTone = 1): void {
   const f = m.player
   const hrtScale = 0.5 + f.char.stats.hrt / 12 // 0.66..1.5 : le Cœur amplifie tout
   const trait = f.char.trait
-  const shouting = voiceEnergy > 0.55
-  const calm = voiceEnergy < 0.45
+  // Prosodie : « crier » = fort OU monté dans les aigus ; « calme » exige
+  // les deux (volume posé ET ton posé). L'intonation compte, pas que le volume.
+  const sharp = voiceTone > 1.15
+  const shouting = voiceEnergy > 0.55 || sharp
+  const calm = voiceEnergy < 0.45 && voiceTone < 1.1
 
   if (cmd === 'cheer') {
     let gain = 6 * hrtScale
@@ -856,7 +859,7 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
   }
 
   // --- Coaching temps réel ---
-  if (input.command) applyCommand(m, input.command, input.voiceEnergy)
+  if (input.command) applyCommand(m, input.command, input.voiceEnergy, input.voiceTone ?? 1)
 
   const p = m.player
   const hrtScale = 0.5 + p.char.stats.hrt / 12

@@ -280,11 +280,28 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       État de l'art 2026 vérifié : auto-rig + banques d'animations
       existent ; on n'y va PAS pour le combat (animations génériques vs
       notre mise en scène shōnen, cohérence de style, réécriture rendu).
-- [ ] Prosodie vocale (intonation, pas seulement volume)
+- [x] Prosodie vocale v0 — détection de pitch 100 % locale
+      (autocorrélation normalisée sur le time-domain WebAudio, 0 €,
+      zéro réseau) : PitchTracker apprend la voix posée du coach
+      (baseline adaptative) et mesure le ratio courant. En jeu :
+      « crier » = fort OU monté dans les aigus ; « calme » = volume posé
+      ET ton posé — un Cérébral se braque sur un ordre aigu même
+      chuchoté, un Sanguin s'enflamme. CoachInput.voiceTone optionnel
+      (boutons/clavier = ton neutre). Tests : sinus 220 Hz ±5 %, rejet
+      bruit/silence, tracker, effet Cérébral.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-14 (routine) : Prosodie v0 — l'intonation devient un signal de
+  jeu, pas seulement le volume : pitch par autocorrélation locale
+  (systems/pitch.ts, pur et testé aux ondes synthétiques), baseline
+  adaptative de la « voix posée », ratio branché dans CoachInput. Le
+  point de design promis à l'utilisateur (« l'IA doit pressentir
+  l'intonation ») existe en local gratuit ; l'API Claude n'aura à faire
+  que la couche sémantique. Équilibre inchangé (72/87/19, bruit
+  statistique), 33 tests verts.
 
 - 2026-08-14 (routine) : Histoire × Écurie — decks adverses thématiques
   par chapitre (le coin raconte le perso : contrôle pour Yuna, mur pour

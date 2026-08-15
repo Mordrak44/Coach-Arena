@@ -190,6 +190,7 @@ export default function ArenaScreen({
         command: m.phase === 'fighting' ? cmd : null,
         voiceEnergy: sys.voice.state.energy,
         faceEnergy: sys.face.state.energy,
+        voiceTone: sys.voice.state.pitchRatio,
       })
 
       // Timer de round côté UI
