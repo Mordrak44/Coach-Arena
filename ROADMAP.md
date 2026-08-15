@@ -473,9 +473,18 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [~] Légal : écran « 🔒 Vie privée » v0 FAIT (micro/caméra/clips/
       progression/mineurs — le « tout en local » assumé comme argument,
       lien discret sur l'écran titre, engagement de prévenir AVANT toute
-      fonction en ligne). Restent : CGU/CGV formelles au moment du
-      paiement, watermark « généré par IA » quand les clips Kling
-      arriveront en jeu, relecture par un juriste avant lancement.
+      fonction en ligne). Watermark « ✨ Généré par IA » FAIT (2026-08-15,
+      construit AVANT que Kling n'ait jamais atteint un vrai joueur, pas
+      après) : badge affiché en haut à droite dès qu'un cut vidéo joue
+      (`activeCut` non nul dans ArenaScreen), + gravé dans le canvas
+      composite exporté (le badge DOM n'existe pas dans le fichier —
+      même contrainte que le bandeau Temps Mort). Bibliothèque vide
+      aujourd'hui → jamais affiché → zéro changement visible, vérifié en
+      capture (funnel standard identique) ET avec un clip de test
+      synthétique (canvas+MediaRecorder, zéro crédit Kling) confirmant le
+      badge dans les DEUX rendus (DOM live + composite exporté). Restent :
+      CGU/CGV formelles au moment du paiement, relecture par un juriste
+      avant lancement.
 - [ ] Hébergement + analytics funnel (arrivée → match 1 → match 3 → achat)
 
 ### Tier 2 — Édition Histoire 14,90 € (stores)
@@ -553,6 +562,23 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : Watermark « ✨ Généré par IA » — le pilote Kling
+  d'hier a rendu concret un engagement jusque-là abstrait dans ROADMAP.md
+  (« watermark quand les clips Kling arriveront en jeu »). Plutôt
+  qu'attendre que de vrais clips soient wiring en dur (et risquer
+  d'oublier), construit le badge MAINTENANT, dormant : il ne peut
+  s'afficher que quand `activeCut` (LiveCutPlayer) est non nul, ce qui
+  n'arrive jamais avec `EMPTY_CUT_LIBRARY`. Deux rendus nécessaires,
+  comme pour le bandeau Temps Mort avant lui : un badge DOM (visible en
+  direct) ET une gravure sur le canvas composite (visible dans le clip
+  exporté, puisque le DOM n'existe pas dans le fichier). Vérifié à trois
+  niveaux avec un clip de test synthétique (canvas+MediaRecorder — zéro
+  crédit Kling, patch temporaire retiré avant ce commit) : capture DOM
+  live, capture du canvas composite via toDataURL, ET capture du funnel
+  standard confirmant zéro changement visible avec la bibliothèque vide
+  réelle. Pur CSS + JSX, 80 tests vitest inchangés (aucune logique de jeu
+  touchée), sim/build inchangés.
 
 - 2026-08-15 (routine) : Couverture de tests pour commentator.ts — suite
   de la série stable.ts/progression.ts, prochain fichier de logique

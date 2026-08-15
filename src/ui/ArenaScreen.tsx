@@ -446,6 +446,17 @@ export default function ArenaScreen({
         const cutVideo = cutVideoRef.current
         if (cutNow && cutVideo && cutVideo.readyState >= 2) {
           cctx.drawImage(cutVideo, 0, 0, CANVAS_W, CANVAS_H)
+          // Filet légal : gravé dans le composite car le badge DOM
+          // (.aiWatermark) n'existe pas dans le fichier exporté.
+          cctx.save()
+          cctx.font = '700 13px sans-serif'
+          cctx.textAlign = 'right'
+          cctx.strokeStyle = 'rgba(0, 0, 0, 0.6)'
+          cctx.lineWidth = 3
+          cctx.strokeText('✨ Généré par IA', CANVAS_W - 14, 28)
+          cctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+          cctx.fillText('✨ Généré par IA', CANVAS_W - 14, 28)
+          cctx.restore()
         } else {
           cctx.drawImage(canvasRef.current, 0, 0)
         }
@@ -631,15 +642,22 @@ export default function ArenaScreen({
           remonté (key=url) pour forcer le chargement + la lecture du
           nouveau clip à chaque changement, sans gestion impérative. */}
       {activeCut && (
-        <video
-          key={activeCut.url}
-          ref={cutVideoRef}
-          className="cutVideo"
-          src={activeCut.url}
-          autoPlay
-          muted
-          playsInline
-        />
+        <>
+          <video
+            key={activeCut.url}
+            ref={cutVideoRef}
+            className="cutVideo"
+            src={activeCut.url}
+            autoPlay
+            muted
+            playsInline
+          />
+          {/* Filet légal (voir ROADMAP « Légal ») : tout clip vidéo généré
+              par IA doit être identifiable comme tel. Gravé aussi sur le
+              canvas composite (voir la boucle de jeu) car ce badge DOM
+              n'existe pas dans le fichier exporté. */}
+          <div className="aiWatermark">✨ Généré par IA</div>
+        </>
       )}
 
       <button
