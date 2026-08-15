@@ -122,6 +122,27 @@ remplacement total. Idée à instruire : un bouton « Mode Léger » (zéro
 vidéo, zéro data, zéro batterie) comme option assumée, pas un repli
 honteux — cohérent avec l'identité « tout en local ».
 
+## Modèle mental : Final Fantasy VII (confirmé avec l'utilisateur)
+
+L'écran de combat FF7 = notre vectoriel qui tourne en continu ; une
+animation d'attaque FF7 = un cut. On ne peut pas fondre un cut dans le
+suivant, chacun est un clip séparé déclenché par une action réelle
+(exactement le contrat de `CutSequencer`). Le HUD reste un menu,
+jamais de la vidéo.
+
+**« Habiller les vecteurs par IA » — EN DIRECT (chaque frame) : non**,
+pas réalisable (latence de plusieurs secondes par image avec les
+technos actuelles, et ça reviendrait à payer de l'IA en continu sur
+TOUTE la durée du match au lieu des seuls moments forts — détruit
+l'économie du système). **En PRODUCTION (une fois, hors match) : oui,
+et c'est une piste à instruire** — utiliser le mouvement précis déjà
+calculé par le rendu vectoriel (fentes d'attaque, recul du coup
+encaissé, posture de garde — déjà dans `arenaRenderer.ts`) comme
+référence de mouvement (motion transfer / pose-driven generation) pour
+produire les templates, plutôt que du texte seul. Résultat attendu :
+des templates mieux synchronisés au vrai timing du jeu. Le vectoriel
+sert alors aussi de PLAN DE TOURNAGE pour sa propre relève vidéo.
+
 ## Validation avant production de masse
 
 1. **Test n°1 (bloquant)** : `counter-exchange` + swap Kenta/Rei — le
