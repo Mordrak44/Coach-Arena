@@ -64,6 +64,48 @@ ajouter quand la bibliothèque de gestuelles sera réellement produite ;
 s'accroche naturellement au Lien / à l'entraînement déjà en place
 (`progression.ts`, `stable.ts`).
 
+## Catégories : la bibliothèque partagée qui résout « zéro template pour
+mon perso » (vision utilisateur 2026-08-15)
+
+**Décision clé : la catégorie = l'archétype**, champ qui existe déjà
+(`Character.archetype`, 6 valeurs : brawler/rival/prodigy/veteran/beast/
+trickster) — zéro modèle de données à ajouter. `createFromPrompt`
+l'assigne déjà automatiquement à tout perso créé par prompt.
+
+- **Bibliothèque de BASE par catégorie** : produite UNE fois par
+  archétype — c'est exactement l'investissement roster déjà prévu (le
+  roster EST les 6 catégories), réutilisé pour bénéficier à tout perso
+  custom dès sa création. Aucune dépense supplémentaire pour que « pas
+  de template pour mon perso » cesse d'être vrai.
+- **Variantes secondaires** (2-3 par cut, choisies par trait secondaire
+  — arme, tempérament, couleur) : atténue le risque « tous les Bêtes se
+  ressemblent ». Sélection par règles (comme `createFromPrompt`/Forge),
+  pas de génération libre. Le SWAP change l'identité complète
+  (visage/couleurs/tenue) même sur un mouvement partagé — deux persos
+  de la même catégorie restent visuellement distincts malgré le partage
+  d'animation (standard des jeux de combat pro).
+- **Paliers débloqués dans le temps** : base (offert, avec le perso) →
+  avancé/expert (mérités : combat, quêtes, chapitres d'Histoire, Lien —
+  s'accroche aux 5 paliers de Lien et aux 8 chapitres déjà en place,
+  chacun pourrait débloquer un palier au lieu d'une simple carte) →
+  **légendaire** (rare, construit de A à Z ou pré-existant, gagné ou
+  payant — la collection d'Ultis par chapitre vaincu, déjà décidée,
+  EST ce palier).
+- **IA qui caractérise vs IA qui génère** — distinction de coût/risque
+  à respecter : l'IA qui répartit des points et NOMME/CHOISIT parmi les
+  variantes existantes de la catégorie (comme les stats aujourd'hui) est
+  quasi gratuite et sans risque qualité ; l'IA qui invente un tout
+  nouveau clip vidéo à la demande est chère et risquée en cohérence
+  visuelle à l'échelle — réservée au palier légendaire, curatée au
+  moins au début, jamais le flux par défaut.
+- **Perso fraîchement créé, en pratique** : joue immédiatement avec la
+  bibliothèque de base de SA catégorie (identité swappée dessus) ; son
+  swap personnel avancé arrive ensuite sans rien bloquer entre-temps.
+- **Célébrations par IA** : bon candidat cosmétique premium (aucune
+  contrainte de timing de combat, risque faible).
+- **Cartes d'action coach par IA** : déjà sur la roadmap (discours du
+  coin du ring compris par Claude) — cohérent, inchangé.
+
 ## Validation avant production de masse
 
 1. **Test n°1 (bloquant)** : `counter-exchange` + swap Kenta/Rei — le
