@@ -307,9 +307,26 @@ de paires attaquant×défenseur à générer.
 - **Contrainte** : templates standardisés (cadrage fixe par type de cut)
   + transitions manga (flash, speed lines — déjà dans le renderer) pour
   masquer les raccords, comme l'animation limitée japonaise.
+
+**Correction utilisateur (2026-08-15) : les échanges À DEUX sont aussi
+swappables.** Un template = une chorégraphie complète à deux interprètes
+génériques (coup1, esquive, contre…) ; le swap multi-personnages (Viggle
+Multi-Track ≤ 7 éléments, workflows ComfyUI multi-persos) y injecte
+n'importe quelle PAIRE. Nœud paramétré : (planche A, planche B, template
+d'échange) → leur combat ; T templates × séquençage = Z versions par
+matchup. Économie : le coût est PAR MATCHUP, donc 1) cache par paire
+(roster/Histoire amortis à ~0), 2) paires nouvelles générées EN DEHORS
+du combat — pendant le Vestiaire et les coins du ring (matchup connu dès
+la sélection), en lazy (1-2 échanges pour le round 1, la suite pendant
+les pauses), 3) les cuts solo comblent tout retard (principe deux-couches
+intact). ⚠️ À valider par un test réel : le swap simultané de deux
+identités dans un même plan est la config la plus sujette au mélange de
+traits — premier test à faire au branchement de la chaîne.
+
 - Trois niveaux de spectacle sur le même moteur : arcade vectoriel
-  (gratuit) → cinéma de cuts (banque amortie, gratuit à l'usage) →
-  générations Kling uniques (TON Ulti, TON KO — premium).
+  (gratuit) → cinéma de cuts solo + échanges swappés par matchup
+  (banques et caches amortis) → générations Kling uniques (TON Ulti,
+  TON KO — premium).
 
 ### Modèle de monétisation (proposition chiffrée)
 
