@@ -17,6 +17,12 @@ import {
   SWITCH_COST,
 } from '../game/combat'
 import { parseConsigne } from '../game/speechTactics'
+import {
+  hasSeenCombatHint,
+  hasSeenCornerHint,
+  markCombatHintSeen,
+  markCornerHintSeen,
+} from '../game/onboarding'
 import { buildScenePlans, type ScenePlan } from '../game/sceneDirector'
 import { TIMING_LABEL, getCard } from '../game/cards'
 import { Commentator } from '../game/commentator'
@@ -134,6 +140,14 @@ export default function ArenaScreen({
     bubble: null,
   })
   const [playerProc, setPlayerProc] = useState(false)
+  // Premiers pas : deux bulles d'aide montrées une seule fois dans la vie
+  // du joueur — réduisent le décrochage des arrivées TikTok qui ne savent
+  // pas encore qu'on parle à son perso. Fermables, jamais bloquantes.
+  const [showCombatHint, setShowCombatHint] = useState(() => !hasSeenCombatHint())
+  const [showCornerHint, setShowCornerHint] = useState(false)
+  // La boucle de jeu (useEffect à deps []) capture un closure figé : on lit
+  // l'état « déjà vu » via une ref pour rester à jour à l'intérieur.
+  const combatHintDismissedRef = useRef(hasSeenCombatHint())
   const enemyMoodRef = useRef(enemyMood)
   const moodTimer = useRef(0)
   const procTimer = useRef(0)
@@ -198,6 +212,11 @@ export default function ArenaScreen({
       const prevPhase = m.phase
       const cmd = pendingCmd.current ?? sys.voice.consumeCommand()
       pendingCmd.current = null
+      if (cmd && !combatHintDismissedRef.current) {
+        combatHintDismissedRef.current = true
+        markCombatHintSeen()
+        setShowCombatHint(false)
+      }
 
       tick(m, dt * speed, {
         command: m.phase === 'fighting' ? cmd : null,
@@ -230,6 +249,7 @@ export default function ArenaScreen({
       if (m.phase !== prevPhase) {
         setPhase(m.phase)
         if (m.phase === 'tactics') {
+          if (!hasSeenCornerHint()) setShowCornerHint(true)
           setPlan(null)
           setHand([...m.hand])
           setSouffle(m.souffle)
@@ -452,6 +472,17 @@ export default function ArenaScreen({
     pendingCmd.current = cmd
   }
 
+  const dismissCombatHint = () => {
+    combatHintDismissedRef.current = true
+    setShowCombatHint(false)
+    markCombatHintSeen()
+  }
+
+  const dismissCornerHint = () => {
+    setShowCornerHint(false)
+    markCornerHintSeen()
+  }
+
   const pickPlan = (p: TacticPlan) => {
     setPlan(p)
     chooseTacticPlan(matchRef.current, p)
@@ -545,6 +576,16 @@ export default function ArenaScreen({
           : heard && `🎙️ « ${heard} »`}
       </div>
 
+      {showCombatHint && (phase === 'intro' || phase === 'fighting') && (
+        <div className="hintBubble">
+          🎙️ Crie « ATTAQUE ! », « DÉFENDS ! », « ESQUIVE ! »… ou clique un bouton en bas. Ton
+          perso t'écoute.
+          <button className="hintClose" onClick={dismissCombatHint} aria-label="Fermer l'aide">
+            ✕
+          </button>
+        </div>
+      )}
+
       <div className="cmdBar">
         <button onClick={() => sendCmd('attack')}>⚔ Attaque</button>
         <button onClick={() => sendCmd('defend')}>🛡 Défends</button>
@@ -573,6 +614,14 @@ export default function ArenaScreen({
             Choisis le plan du prochain round — et <b>parle à ton perso</b> : ton discours de coach
             charge sa Hype !
           </p>
+          {showCornerHint && (
+            <div className="hintBubble" style={{ position: 'static', margin: '0 0 6px' }}>
+              🃏 Choisis un plan et joue tes cartes ici — parle aussi, ça marche même en pause.
+              <button className="hintClose" onClick={dismissCornerHint} aria-label="Fermer l'aide">
+                ✕
+              </button>
+            </div>
+          )}
           {consigne ? (
             <p className="permNote" style={{ color: '#ffd166' }}>
               🎤 Consigne comprise : <b>{consigne}</b>

@@ -224,6 +224,18 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
 Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ### Tier 0 — prouver le fun
+- [x] Bulles d'aide « premiers pas » — deux courtes bulles fermables,
+      montrées une seule fois dans la vie du joueur (localStorage) :
+      pendant le combat (« crie ATTAQUE ! ou clique un bouton »),
+      pendant le tout premier coin du ring (« choisis un plan, joue tes
+      cartes »). Réduit le décrochage des arrivées TikTok qui ne savent
+      pas encore qu'on parle à son perso — sans ralentir un joueur qui
+      sait déjà (fermable en un tap, jamais bloquant). Bug découvert et
+      corrigé en cours de route : `.overlay` (coin du ring) utilisait
+      `justify-content: center` + overflow — le haut du contenu
+      (titre, countdown, tagline) devenait injoignable au scroll dès
+      que le contenu dépassait un écran (systématique avec deck+banc) ;
+      passé à `flex-start`, entièrement atteignable désormais.
 - [x] Passe de rendu 2.5D (fausse perspective, zéro 3D) : horizon lumineux
       lié à la Hype, projecteurs qui balaient, foule étagée en perspective
       avec fans à bâtons lumineux, ring à lattes convergentes (point de
@@ -347,6 +359,22 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : Bulles d'aide premiers pas + fix d'un bug
+  d'accessibilité réel du coin du ring. Exploration écartée cette
+  itération : Émotions MediaPipe FaceLandmarker — accessible en réseau
+  (vérifié), mais 12-36 Mo de binaires WASM à committer et aucun moyen
+  de valider la détection sur un vrai visage dans cet environnement
+  sandboxé (pas de webcam réelle) ; reporté plutôt que livré à l'aveugle
+  avec des seuils non vérifiés. À la place : deux bulles d'aide
+  fermables (combat + premier coin du ring, localStorage, jamais
+  répétées), qui adressent directement le risque n°1 identifié dans le
+  gap analysis (décrochage des arrivées TikTok). En vérifiant en
+  capture, découverte d'un vrai bug : le coin du ring devenait
+  partiellement injoignable au scroll dès que son contenu dépassait un
+  écran (deck + banc + relève, un cas courant) à cause de
+  `justify-content: center` sur un conteneur en overflow — corrigé en
+  `flex-start`. 42 tests + sim verts, funnel complet revérifié.
 
 - 2026-08-15 (routine) : LiveCutPlayer — la conclusion de la discussion
   sur « vidéo pendant le round » devient du code : file de cuts bornée
