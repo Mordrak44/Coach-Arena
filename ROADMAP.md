@@ -293,10 +293,30 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       chuchoté, un Sanguin s'enflamme. CoachInput.voiceTone optionnel
       (boutons/clavier = ton neutre). Tests : sinus 220 Hz ±5 %, rejet
       bruit/silence, tracker, effet Cérébral.
+- [x] La « visio des coachs » v0 (demande utilisateur) — préfiguration
+      du PvP : ta cam en tuile bas-gauche, le COACH ADVERSE en tuile
+      bas-droite (avatar animé qui réagit : 😤 + bulle quand il joue une
+      carte — tu VOIS son coup —, 🔥 sur son spécial, 😏/😱 en fin de
+      round), tuiles visibles PENDANT le coin du ring (au-dessus de
+      l'overlay), et ta tuile PULSE quand ta voix déclenche une carte
+      armée — le signal que l'adversaire humain verra en PvP. Les deux
+      tuiles sont aussi incrustées dans les clips. En PvP, la tuile
+      adverse devient la cam du joueur d'en face.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-14 : La visio des coachs (vision utilisateur : « comme une
+  petite conversation, en bas à droite et gauche les cams des joueurs,
+  notamment pendant le corner ») — disposition visio : toi bas-gauche,
+  coach adverse bas-droite (avatar qui réagit aux événements avec
+  bulles annonçant SES cartes), visibles par-dessus l'overlay du coin,
+  pulsation de ta tuile quand ta voix déclenche une carte armée
+  (l'information que l'adversaire doit voir, à la TFT : information
+  ouverte + présence sociale par l'avatar). Incrusté dans les clips.
+  Vérifié en capture : bulle « Forteresse » sur la tuile adverse
+  pendant le coin du ring.
 
 - 2026-08-14 (routine) : Vie privée + hygiène de dossier — écran
   « 🔒 Vie privée » complet (le tout-local expliqué simplement, mineurs

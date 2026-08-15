@@ -191,9 +191,12 @@ h1.logo {
   display: block;
 }
 
+/* Disposition « visio de coachs » : toi en bas à gauche, le coach adverse
+   en bas à droite — visibles au-dessus de l'overlay du coin du ring
+   (z-index > .overlay), comme une conversation vidéo pendant le match. */
 .facecam {
   position: absolute;
-  right: 10px;
+  left: 10px;
   bottom: 120px;
   width: 26%;
   aspect-ratio: 3 / 4;
@@ -203,13 +206,28 @@ h1.logo {
   transform: scaleX(-1);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
   background: #000;
-  z-index: 5;
+  z-index: 15;
+}
+/* La voix vient de déclencher une carte armée : la tuile pulse — en PvP,
+   c'est CE signal que l'adversaire verra sur ta cam. */
+.facecam.proc {
+  animation: procPulse 0.5s ease-in-out 3;
+  border-color: #ffdd00;
+}
+@keyframes procPulse {
+  0%,
+  100% {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 26px 8px rgba(255, 221, 0, 0.8);
+  }
 }
 .facecamBadge {
   position: absolute;
-  right: 10px;
+  left: 10px;
   bottom: 104px;
-  z-index: 6;
+  z-index: 16;
   background: var(--accent2);
   color: #fff;
   font-size: 0.6rem;
@@ -219,12 +237,72 @@ h1.logo {
   text-transform: uppercase;
 }
 
+/* Tuile du coach adverse (bas droite) — en PvP, la cam du joueur d'en face. */
+.coachTile {
+  position: absolute;
+  right: 10px;
+  bottom: 120px;
+  width: 26%;
+  aspect-ratio: 3 / 4;
+  border: 3px solid var(--accent2);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #1c1830, #0e0c1a);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.coachFace {
+  font-size: 2.6rem;
+  animation: coachBob 2.4s ease-in-out infinite;
+}
+@keyframes coachBob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+.coachName {
+  position: absolute;
+  right: 10px;
+  bottom: 104px;
+  z-index: 16;
+  background: #4a4370;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+.coachBubble {
+  position: absolute;
+  bottom: 102%;
+  right: 0;
+  max-width: 150%;
+  background: #fff;
+  color: #14121f;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 5px 8px;
+  border-radius: 10px 10px 2px 10px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .heardLine {
   position: absolute;
-  left: 10px;
+  left: 29%;
+  right: 29%;
   bottom: 104px;
-  right: 38%;
   z-index: 5;
+  text-align: center;
   color: var(--accent);
   font-size: 0.75rem;
   font-weight: 700;

@@ -127,6 +127,16 @@ export default function ArenaScreen({
   const lastFinalSeq = useRef(0)
   const [benchView, setBenchView] = useState<{ name: string; hpPct: number; alive: boolean }[]>([])
   const [switchDone, setSwitchDone] = useState(false)
+  // La « visio des coachs » : humeur du coach adverse + pulsation de TA tuile
+  // quand ta voix déclenche une carte (le signal que l'adversaire verra en PvP).
+  const [enemyMood, setEnemyMood] = useState<{ emoji: string; bubble: string | null }>({
+    emoji: '🧐',
+    bubble: null,
+  })
+  const [playerProc, setPlayerProc] = useState(false)
+  const enemyMoodRef = useRef(enemyMood)
+  const moodTimer = useRef(0)
+  const procTimer = useRef(0)
   const [specialReady, setSpecialReady] = useState(false)
   const [ultiReady, setUltiReady] = useState(false)
   const [muted, setMuted] = useState(false)
@@ -243,9 +253,52 @@ export default function ArenaScreen({
       setUltiReady(m.player.ulti >= 100 && !m.player.ultiUsed)
       setHeard(sys.voice.state.lastHeard)
 
+      // Visio des coachs : humeur adverse temporaire + pulsation de ta tuile.
+      const setMood = (emoji: string, bubble: string | null, ms: number) => {
+        const mood = { emoji, bubble }
+        enemyMoodRef.current = mood
+        setEnemyMood(mood)
+        window.clearTimeout(moodTimer.current)
+        moodTimer.current = window.setTimeout(() => {
+          enemyMoodRef.current = { emoji: '🧐', bubble: null }
+          setEnemyMood(enemyMoodRef.current)
+        }, ms)
+      }
+      const procPulse = () => {
+        setPlayerProc(false)
+        window.clearTimeout(procTimer.current)
+        // double rAF : relance l'animation CSS même si elle est déjà active
+        requestAnimationFrame(() => setPlayerProc(true))
+        procTimer.current = window.setTimeout(() => setPlayerProc(false), 1600)
+      }
+
       // --- Bande-son : consomme les nouveaux événements du match ---
       for (; soundEventIdx < m.events.length; soundEventIdx++) {
         const ev = m.events[soundEventIdx]
+        // …et alimente la visio des coachs.
+        switch (ev.kind) {
+          case 'card':
+            if (ev.name.includes('(coin adverse)'))
+              setMood('😤', ev.name.replace(' (coin adverse)', ''), 2600)
+            else procPulse()
+            break
+          case 'cardProc':
+            if (ev.text.includes('ADVERSE') || ev.text.includes('TON SOUFFLE')) setMood('⚡', ev.text, 2000)
+            else procPulse()
+            break
+          case 'switch':
+            if (ev.side === 'enemy') setMood('🔁', `${ev.name} monte !`, 2600)
+            else procPulse()
+            break
+          case 'special':
+          case 'ulti':
+            if (ev.by === 'enemy') setMood('🔥', null, 1800)
+            else setMood('😰', null, 1500)
+            break
+          case 'roundEnd':
+            setMood(ev.winner === 'enemy' ? '😏' : '😱', null, 3000)
+            break
+        }
         switch (ev.kind) {
           case 'hit':
             sys.sound.hit(ev.crit)
@@ -306,23 +359,44 @@ export default function ArenaScreen({
       if (cctx && canvasRef.current) {
         cctx.drawImage(canvasRef.current, 0, 0)
         const video = sys.face.video
+        const tw = CANVAS_W * 0.27
+        const th = (tw * 4) / 3
+        const ty = CANVAS_H - th - 120
         if (sys.face.state.active && video.readyState >= 2) {
-          const w = CANVAS_W * 0.27
-          const h = (w * 4) / 3
-          const x = CANVAS_W - w - 14
-          const y = CANVAS_H - h - 120
+          // Toi : en bas à GAUCHE (disposition visio des coachs)
+          const x = 14
           cctx.save()
           // miroir façon selfie
-          cctx.translate(x + w, y)
+          cctx.translate(x + tw, ty)
           cctx.scale(-1, 1)
-          cctx.drawImage(video, 0, 0, w, h)
+          cctx.drawImage(video, 0, 0, tw, th)
           cctx.restore()
           cctx.strokeStyle = '#ffdd00'
           cctx.lineWidth = 4
-          cctx.strokeRect(x, y, w, h)
+          cctx.strokeRect(x, ty, tw, th)
           cctx.fillStyle = '#ff3366'
           cctx.font = 'bold 15px sans-serif'
-          cctx.fillText('● COACH', x + 6, y + h + 20)
+          cctx.textAlign = 'left'
+          cctx.fillText('● COACH', x + 6, ty + th + 20)
+        }
+        // Le coach adverse : en bas à DROITE, dans le clip aussi
+        {
+          const x = CANVAS_W - tw - 14
+          const grad = cctx.createLinearGradient(0, ty, 0, ty + th)
+          grad.addColorStop(0, '#1c1830')
+          grad.addColorStop(1, '#0e0c1a')
+          cctx.fillStyle = grad
+          cctx.fillRect(x, ty, tw, th)
+          cctx.strokeStyle = '#ff3366'
+          cctx.lineWidth = 4
+          cctx.strokeRect(x, ty, tw, th)
+          cctx.font = '52px sans-serif'
+          cctx.textAlign = 'center'
+          cctx.fillText(enemyMoodRef.current.emoji, x + tw / 2, ty + th / 2 + 18)
+          cctx.fillStyle = '#a29bfe'
+          cctx.font = 'bold 13px sans-serif'
+          cctx.fillText('COACH ADVERSE', x + tw / 2, ty + th + 18)
+          cctx.textAlign = 'left'
         }
         cctx.font = '900 italic 20px sans-serif'
         cctx.textAlign = 'left'
@@ -452,10 +526,18 @@ export default function ArenaScreen({
 
       {camOk && (
         <>
-          <video ref={camRef} className="facecam" muted playsInline />
-          <span className="facecamBadge">🔴 Coach cam</span>
+          <video ref={camRef} className={`facecam${playerProc ? ' proc' : ''}`} muted playsInline />
+          <span className="facecamBadge">
+            {playerProc ? '🎤 carte déclenchée !' : '🔴 Toi, coach'}
+          </span>
         </>
       )}
+      {/* Le coach adverse — en PvP, la cam du joueur d'en face prendra cette place. */}
+      <div className="coachTile">
+        {enemyMood.bubble && <div className="coachBubble">{enemyMood.bubble}</div>}
+        <div className="coachFace">{enemyMood.emoji}</div>
+      </div>
+      <span className="coachName">Coach adverse</span>
 
       <div className="heardLine">
         {micOk === false
