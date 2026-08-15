@@ -325,8 +325,24 @@ traits — premier test à faire au branchement de la chaîne.
 
 - Trois niveaux de spectacle sur le même moteur : arcade vectoriel
   (gratuit) → cinéma de cuts solo + échanges swappés par matchup
-  (banques et caches amortis) → générations Kling uniques (TON Ulti,
-  TON KO — premium).
+  (banques et caches amortis) → générations Kling uniques (premium).
+
+**Ultis & KO en templates aussi (décision 2026-08-15).** La génération à
+la demande est une loterie ; un template d'Ulti est SÉLECTIONNÉ (10
+générations → la meilleure, polie) puis swappé : qualité moyenne en
+hausse, variance nulle. La personnalisation reste : FX/couleurs
+paramétrés aux couleurs du perso, nom et onomatopée de SON Ulti en
+habillage, commentateur. Les KO pareil (templates de mise à terre,
+swap du perdant réel).
+- **La collection d'Ultis se débloque par l'HISTOIRE** : chaque chapitre
+  vaincu débloque le template d'Ulti de son adversaire (ch4 → le
+  rempart de Gorō, ch6 → l'illusion de Nyx, boss → un légendaire).
+  L'Édition Histoire devient « le mode qui remplit ton arsenal » —
+  argument d'achat concret et rejouable. Boutique en complément,
+  entraînement Écurie pour les gestes de base.
+- **La seule génération pure restante = créer SON Ulti unique**
+  (premium, une fois par perso, valeur perçue maximale — le luxe
+  assumé, plus une dépense courante).
 
 ### Modèle de monétisation (proposition chiffrée)
 
