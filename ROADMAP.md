@@ -304,8 +304,33 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       (vérifié en capture, `<details>` fermé par défaut ET ouvert :
       mêmes prompts, mêmes boutons Copier). 4 tests vitest (54 au
       total).
-- [ ] Portrait de référence par perso (Kling image) — ⚠️ crédits, accord requis
-- [ ] Scènes image-to-video : entrée dans l'arène, moment fort du round, KO
+- [~] Portrait de référence par perso (Kling image) — DÉBLOQUÉ le
+      2026-08-15, pilote sur 2 catégories (Kenta/brawler, Rei/rival).
+      Planche multi-vues (face/profil/trois-quarts) par perso, puis un
+      portrait d'action unique dérivé par image-to-image — nécessaire
+      car un modèle i2v attend UNE image nette, pas une planche à 3
+      panneaux. Reste : décider où les héberger DURABLEMENT (les URLs
+      Kling expirent en 24h — voir note ci-dessous) avant de les
+      intégrer au jeu.
+- [~] Scènes image-to-video : entrée dans l'arène, moment fort du round,
+      KO — pilote : 8 clips vidéo générés pour Kenta+Rei (test bloquant
+      n°1 counter-exchange validé en premier, puis attack-solo/
+      hit-reaction/ko-down ×2 + victory-pose Kenta ; reste : victory-pose
+      Rei, intro-faceoff, idle-loop, impact-flash et crowd neutres —
+      lot interrompu par l'utilisateur avant la fin, pas relancé sans
+      confirmation). ~210 crédits consommés sur 2978. **Non vérifié
+      visuellement par Claude** : ce bac à sable bloque l'accès réseau à
+      klingai.com (CDN images ET vidéos) au niveau de la politique
+      egress — confirmé à la fois en `curl`/WebFetch direct et en
+      Chromium headless (Playwright) chargeant un vrai `<video src=...>`
+      pointant vers un clip généré (`net::ERR_TUNNEL_CONNECTION_FAILED`).
+      Le câblage `<video>`/`CutClipLibrary` déjà en place (voir Mode
+      Cinématique) a été testé avec un patch TEMPORAIRE (retiré avant ce
+      commit) pointant vers ces vraies URLs Kling : la logique demande
+      bien la bonne URL pour le bon perso/kind (`readyState` cohérent,
+      pas d'erreur de câblage) — seule la LECTURE réelle du fichier
+      n'est pas vérifiable d'ici. Les liens ont été partagés en
+      conversation ; ils expirent 24h après génération.
 - [ ] Montage final du match (concat des clips + habillage) exportable 9:16
 - [ ] Génération de perso via API Claude (stats + lore + nom du spécial)
 - [x] Le discours du coin du ring COMPRIS — v0 locale : parseur de
@@ -515,6 +540,34 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 : Kling débloqué par l'utilisateur — pilote sur 2
+  catégories (Kenta/brawler, Rei/rival), le choix suit directement le
+  « test bloquant n°1 » déjà défini dans TEMPLATES_SPEC.md
+  (counter-exchange + swap Kenta/Rei, la config la plus dure). Corrigé
+  une première approximation : un unique portrait de face ne suffit pas
+  comme référence i2v (remarque de l'utilisateur) — une planche
+  multi-vues (face/profil/trois-quarts) par perso a été produite à la
+  place, puis un portrait d'action unique dérivé par image-to-image
+  (nécessaire car un modèle vidéo attend une image nette, pas 3 panneaux
+  en grille). Test bloquant validé en premier (18 crédits) avant
+  d'investir dans le reste — puis 7 des 8 clips solo du socle P1
+  (attack-solo/hit-reaction/ko-down ×2, victory-pose Kenta) générés
+  avant que l'utilisateur n'interrompe le lot ; non relancé sans
+  confirmation explicite, conformément à la règle « jamais de crédits
+  sans autorisation ». ~210 crédits consommés sur 2978 (SVIP/Pro).
+  Contrainte réelle découverte : ce bac à sable bloque l'accès réseau à
+  klingai.com au niveau de la politique egress (confirmé côté
+  curl/WebFetch ET Chromium headless réel) — Claude ne peut vérifier
+  AUCUN résultat visuellement depuis cette session ; les liens ont été
+  partagés en conversation pour relecture humaine (expirent 24h). Une
+  vérification de câblage (patch temporaire, retiré avant ce commit) a
+  confirmé que `CutClipLibrary`/`<video>` demandent bien la bonne URL
+  pour le bon perso/kind — la mécanique déjà construite fonctionne, seule
+  la lecture réelle du fichier reste à confirmer par un humain. Aucun
+  code de production modifié dans cette session (tout patch de
+  vérification a été retiré avant commit) — seul ROADMAP.md documente
+  l'état du pilote.
 
 - 2026-08-15 (routine) : Couverture de tests pour progression.ts (Lien,
   paliers, persos créés) — suite logique de l'itération stable.ts : même
