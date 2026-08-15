@@ -333,6 +333,26 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       visage expressif par état (cri en attaque, œil fermé + grimace
       quand touché, pupille vers l'adversaire, goutte de sueur PV bas).
       Vérifié par captures avant/après.
+- [x] Audit visuel de l'écran Histoire (StoryScreen) — jamais capturé
+      depuis sa création, pas dans le funnel de scripts/shot.mjs. Même
+      classe de bug que `.overlay` la veille, reproduite cette fois sur
+      `.screen` (partagé par 5 écrans) : `justify-content: center` +
+      `overflow-y: auto` laisse le HAUT du contenu au-delà de
+      `scrollTop = 0` dès que le contenu dépasse la hauteur de l'écran —
+      constaté avec 7/8 chapitres débloqués (8 boutons + titre + tagline
+      + 2 boutons dépasse un petit mobile) : le logo « LE GRAND HURLEMENT »
+      restait invisible même en forçant `scrollTop = 0` par script, et le
+      bouton « Retour » en bas était coupé. La veille, `.screen` avait été
+      audité sur CharacterSelect et jugé sain — correctement : il l'était
+      À CE MOMENT-LÀ, le contenu ne débordait pas encore assez pour
+      révéler le même bug latent. Corrigé avec `justify-content: safe
+      center` (Chromium 141 le supporte) plutôt qu'un `flex-start` sec
+      comme pour `.overlay` : centre quand le contenu tient (Titre, Vie
+      privée, Résultats), bascule en alignement de départ dès qu'il
+      déborde — un seul écran, deux comportements selon le contenu,
+      sans régression sur les écrans courts (vérifié en capture sur les
+      5 écrans du funnel standard + Histoire à pleine hauteur, haut ET
+      bas atteignables).
 - [ ] Playtests humains (10-20 personnes) : fun au 15e match ? points de
       décrochage ? → ajuster avant tout investissement
 - [ ] Intégrer les illustrations Kling au jeu : portraits roster à la
@@ -444,6 +464,27 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : Bug réel trouvé et corrigé sur l'écran Histoire
+  (StoryScreen), jamais audité jusqu'ici (absent du funnel de
+  scripts/shot.mjs). Après quatre itérations d'affilée sur le combat en
+  cuts, tout ce qui restait d'ouvert dans ROADMAP.md nécessitait des
+  crédits, un backend, ou du matériel réel — donc plutôt que forcer une
+  tâche gate-keepée, j'ai repris la discipline qui avait déjà trouvé le
+  bug `.overlay` : auditer un écran jamais vérifié. `.screen` (partagé par
+  Titre/Vie privée/Histoire/Vestiaire/Résultats) avait été jugé sain sur
+  CharacterSelect la veille — correctement, à ce moment précis : le
+  contenu ne débordait pas encore. Avec 7/8 chapitres débloqués (le cas
+  d'un joueur avancé, testé en pré-remplissant le localStorage), le même
+  `justify-content: center` + overflow a laissé le TITRE au-delà de
+  `scrollTop = 0` — vérifié par script (pas juste visuel) : forcer
+  `el.scrollTop = 0` et capturer confirmait le logo absent, le bouton
+  Retour coupé en bas. Corrigé avec `justify-content: safe center`
+  (Chromium 141 le supporte) au lieu d'un `flex-start` sec comme pour
+  `.overlay` — préserve le centrage sur les écrans courts (vérifié sur
+  les 5 captures du funnel standard, aucune régression) tout en résolvant
+  le débordement sur les écrans longs. Pur CSS, 54 tests vitest
+  inchangés, sim/build inchangés (hors taille CSS négligeable).
 
 - 2026-08-15 (routine) : File de génération asynchrone des scènes
   (sceneQueue.ts) — prochaine case non cochée de « Mode Cinématique »

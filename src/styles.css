@@ -81,7 +81,14 @@ h1.logo {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* "safe" : centre quand le contenu tient, mais bascule en alignement
+     de départ dès qu'il déborde — sinon le haut (logo/titre) part au-delà
+     de scrollTop=0 et devient inatteignable au scroll (bug réel trouvé
+     sur l'écran Histoire avec 8 chapitres débloqués : le H1 restait
+     invisible même à scrollTop=0 forcé). Même famille de bug que
+     .overlay, corrigée différemment ici pour garder le centrage quand
+     le contenu est court (Titre, Vie privée, la plupart des écrans). */
+  justify-content: safe center;
   gap: 18px;
   padding: 24px;
   text-align: center;
