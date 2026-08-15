@@ -289,14 +289,27 @@ describe('mode Histoire', () => {
     expect(isUnlocked(STORY_CHAPTERS[1], new Set(['ch1']))).toBe(true)
   })
 
-  it("un match de chapitre se joue avec l'équipe adverse du chapitre", async () => {
-    const { STORY_CHAPTERS, chapterOpponent, chapterOpponentTeam } = await import('./story')
+  it("un match de chapitre se joue avec l'équipe et le deck adverses du chapitre", async () => {
+    const { STORY_CHAPTERS, chapterOpponent, chapterOpponentTeam, chapterEnemyDeck } = await import('./story')
     const ch = STORY_CHAPTERS[6] // le mur de trois
+    const deck = chapterEnemyDeck(ch)
     const m = createMatch(ROSTER[0], chapterOpponent(ch), [], {
       enemyTeam: chapterOpponentTeam(ch),
+      enemyDeck: deck,
     })
     expect(m.enemyBench.length).toBe(2)
-    expect(m.enemy.char.name).toBeTruthy()
+    // la main de départ adverse est déjà piochée dans ce deck
+    expect(m.enemyDeck.length + m.enemyHand.length).toBe(deck.length)
+    expect([...m.enemyDeck, ...m.enemyHand].sort()).toEqual([...deck].sort())
+  })
+
+  it('chaque chapitre a un deck thématique aux cartes valides', async () => {
+    const { STORY_CHAPTERS, chapterEnemyDeck } = await import('./story')
+    for (const ch of STORY_CHAPTERS) {
+      const deck = chapterEnemyDeck(ch)
+      expect(deck.length, ch.id).toBeGreaterThanOrEqual(6)
+      for (const id of deck) expect(getCard(id), `${ch.id}:${id}`).toBeTruthy()
+    }
   })
 })
 

@@ -245,8 +245,14 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       inédit (Shion, le Champion Muet — variante prodigy), progression
       persistée avec déverrouillage en chaîne, écran Histoire + entrée
       depuis le titre, outro narrative aux résultats. v1 : cinématiques
-      pré-générées par chapitre, création de perso en récompense finale,
-      decks adverses thématiques.
+      pré-générées par chapitre, création de perso en récompense finale.
+- [x] Decks adverses thématiques par chapitre : le coin adverse raconte
+      le même personnage que le ring (ch3 Yuna = contrôle, ch4 Gorō =
+      le mur, ch5 la meute = aggro + sa signature, ch7 = guerre des
+      coins, ch8 = le champion complet). MatchOpts.enemyDeck générique.
+- [x] HUD d'équipe : le banc affiché sous les étoiles (pastille couleur
+      + mini-barre de PV, croix rouge si KO) des deux côtés — les clips
+      montrent que c'est un combat d'équipe. Démo avec équipes.
 - [ ] Wrapper Capacitor/Electron + pages stores
 
 ### Tier 3 — PvP (rétention long terme, après premiers revenus)
@@ -279,6 +285,13 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-14 (routine) : Histoire × Écurie — decks adverses thématiques
+  par chapitre (le coin raconte le perso : contrôle pour Yuna, mur pour
+  Gorō, guerre des coins au ch7…) via MatchOpts.enemyDeck, et HUD de
+  banc en arène (pastilles + mini-PV des deux côtés, KO barré) pour que
+  les combats d'équipe se lisent à l'écran et dans les clips. Démo mise
+  à jour avec équipes → vérifié en capture. 29 tests verts.
 
 - 2026-08-14 (routine) : Mode Histoire v0 — « Le Grand Hurlement »,
   l'arc shōnen en 8 chapitres qui donne un but au solo et le socle de

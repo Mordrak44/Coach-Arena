@@ -121,6 +121,8 @@ export interface MatchOpts {
   team?: Character[]
   /** équipe adverse (même taille que la tienne en général) */
   enemyTeam?: Character[]
+  /** deck du coin adverse (Histoire : decks thématiques par chapitre) */
+  enemyDeck?: CardId[]
 }
 
 /** Coût en Souffle d'une relève au coin du ring. */
@@ -154,7 +156,7 @@ export function createMatch(
     bench: (opts.team ?? []).map(c => makeFighter(c, 'player')),
     enemyBench: (opts.enemyTeam ?? []).map(c => makeFighter(c, 'enemy')),
     switchUsed: false,
-    enemyDeck: shuffle(buildStarterDeck(signatureFor(enemyChar.id))),
+    enemyDeck: shuffle(opts.enemyDeck ?? buildStarterDeck(signatureFor(enemyChar.id))),
     enemyHand: [],
     enemyDiscard: [],
     enemySouffle: SOUFFLE_PER_CORNER,

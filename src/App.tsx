@@ -18,7 +18,13 @@ import ReadyScreen from './ui/ReadyScreen'
 import ArenaScreen, { type MatchOutcome } from './ui/ArenaScreen'
 import ResultsScreen from './ui/ResultsScreen'
 import StoryScreen from './ui/StoryScreen'
-import { type StoryChapter, chapterOpponent, chapterOpponentTeam, markCleared } from './game/story'
+import {
+  type StoryChapter,
+  chapterEnemyDeck,
+  chapterOpponent,
+  chapterOpponentTeam,
+  markCleared,
+} from './game/story'
 
 type Screen = 'title' | 'story' | 'select' | 'ready' | 'arena' | 'results'
 
@@ -35,7 +41,10 @@ export default function App() {
   const [deck, setDeck] = useState<CardId[]>(() => buildStarterDeck(null))
 
   const streamRef = useRef<MediaStream | null>(null)
-  const matchOptsRef = useRef<MatchOpts>({})
+  // En démo : un match d'équipe (montre le HUD de banc dans les captures).
+  const matchOptsRef = useRef<MatchOpts>(
+    DEMO ? { team: [ROSTER[2]], enemyTeam: [ROSTER[5]], startHype: 30 } : {},
+  )
   // Perso de BASE (non modifié) : la Revanche repart toujours de lui, sinon
   // les bonus de Lien/entraînement s'empileraient à chaque match.
   const baseCharRef = useRef<Character | null>(null)
@@ -72,6 +81,7 @@ export default function App() {
       sulky: moodIgnoresFirstOrder(stable.mood),
       team: teamFighters,
       enemyTeam,
+      enemyDeck: story ? chapterEnemyDeck(story) : undefined,
     }
     setPlayer(fighter)
     setEnemy(opponent)

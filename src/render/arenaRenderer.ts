@@ -902,6 +902,52 @@ export class ArenaRenderer {
     ctx.fillText('★'.repeat(m.playerWins) + '☆'.repeat(2 - m.playerWins), 18, 118)
     ctx.textAlign = 'right'
     ctx.fillText('☆'.repeat(2 - m.enemyWins) + '★'.repeat(m.enemyWins), CANVAS_W - 18, 118)
+
+    // L'Écurie : le banc sous les étoiles — pastille + mini-barre de PV par
+    // équipier (les clips doivent montrer que c'est un combat d'équipe).
+    this.drawBench(ctx, m.bench, 18, 132, false)
+    this.drawBench(ctx, m.enemyBench, CANVAS_W - 18, 132, true)
+  }
+
+  private drawBench(
+    ctx: CanvasRenderingContext2D,
+    bench: FighterState[],
+    x: number,
+    y: number,
+    rightAlign: boolean,
+  ) {
+    const w = 54
+    for (let i = 0; i < bench.length; i++) {
+      const b = bench[i]
+      const x0 = rightAlign ? x - w - i * (w + 8) : x + i * (w + 8)
+      const alive = b.hp > 0
+      // pastille couleur du perso
+      ctx.fillStyle = alive ? b.char.color : '#444'
+      ctx.strokeStyle = '#111'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.arc(x0 + 6, y + 4, 6, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+      if (!alive) {
+        ctx.strokeStyle = '#ff5566'
+        ctx.beginPath()
+        ctx.moveTo(x0 + 1, y - 1)
+        ctx.lineTo(x0 + 11, y + 9)
+        ctx.moveTo(x0 + 11, y - 1)
+        ctx.lineTo(x0 + 1, y + 9)
+        ctx.stroke()
+      }
+      // mini-barre de PV
+      ctx.fillStyle = '#222'
+      ctx.fillRect(x0 + 15, y, w - 15, 7)
+      if (alive) {
+        ctx.fillStyle = b.hp / b.maxHp > 0.35 ? '#b6ff6b' : '#ff7788'
+        ctx.fillRect(x0 + 15, y, (w - 15) * (b.hp / b.maxHp), 7)
+      }
+      ctx.strokeStyle = '#111'
+      ctx.strokeRect(x0 + 15, y, w - 15, 7)
+    }
   }
 
   private drawHealthBar(ctx: CanvasRenderingContext2D, f: FighterState, x: number, y: number, rightAlign: boolean) {

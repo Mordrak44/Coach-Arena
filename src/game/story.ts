@@ -1,4 +1,4 @@
-import type { Character } from './types'
+import type { CardId, Character } from './types'
 import { ROSTER } from './characters'
 
 // Le Mode Histoire — « Le Grand Hurlement », tournoi où les coachs crient
@@ -169,6 +169,27 @@ export function chapterOpponentTeam(ch: StoryChapter): Character[] {
     const c = chapterOpponent({ ...ch, opponentId: id })
     return { ...c, id: `${c.id}-bench` }
   })
+}
+
+// --- Decks adverses thématiques ---------------------------------------------
+// Chaque chapitre a une personnalité de coin : le deck adverse raconte le
+// même personnage que le ring. 2 copies de chaque carte listée.
+
+const CHAPTER_DECKS: Record<string, CardId[]> = {
+  ch1: ['massage', 'focus', 'secondWind'], // débutant : soins simples
+  ch2: ['coldShower', 'provocation', 'focus', 'perfectCounter'], // le rival humilie
+  ch3: ['coldBlood', 'cornerSilence', 'coldShower', 'fortress', 'focus'], // Yuna : contrôle
+  ch4: ['ironGuard', 'steelSkin', 'secondWind', 'massage', 'fortress'], // Gorō : le mur
+  ch5: ['adrenaline', 'sigFang', 'warCry', 'verbalUppercut', 'provocation'], // la meute : aggro
+  ch6: ['smokeScreen', 'ambush', 'perfectCounter', 'coldShower', 'lastChance'], // Nyx : illusions
+  ch7: ['breathTheft', 'cornerSilence', 'championTax', 'embargo', 'secondWind'], // guerre des coins
+  ch8: ['embargo', 'coldBlood', 'fortress', 'lastStand', 'totalCounter', 'secondWind'], // le champion complet
+}
+
+/** Deck du coin adverse pour un chapitre (2 copies par carte listée). */
+export function chapterEnemyDeck(ch: StoryChapter): CardId[] {
+  const list = CHAPTER_DECKS[ch.id] ?? []
+  return list.flatMap(id => [id, id])
 }
 
 // --- Progression persistée ---------------------------------------------------
