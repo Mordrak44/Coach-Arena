@@ -129,6 +129,15 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       Guet-Apens, Sang-Froid Glacial, Peau d'Acier) — 100 % données DSL,
       coûts auto-validés. Deck de départ : 18 → 34 cartes (cible 30-60
       atteinte). Prochaines vagues de 5-10 au fil de l'eau.
+- [x] Vague 3 « la guerre des coins » : 2 nouvelles primitives DSL
+      (blockEnemyCard : la meilleure carte adverse part dans le vide à
+      la prochaine pause ; drainSouffle : le coin adverse arrive
+      essoufflé) + 5 cartes (Silence du Coin, Vol de Souffle, Rideau de
+      Fumée, Taxe du Champion, Embargo Total). 100 % symétrique :
+      l'adversaire peut te bloquer/drainer aussi. Ces paris survivent à
+      la fin de round (résolution à la pause suivante). Le deck adverse
+      devient une cible — la promesse « lisible et à terme bloquable »
+      est tenue. Équilibre : coach 82 %, +deck 89 %, sans coach 16 %.
 
 ## v1 — Mode Cinématique (voir GAME_DESIGN.md §7)
 
@@ -258,6 +267,15 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-14 (routine) : Vague 3 — la guerre des coins. Le coin adverse
+  ayant un vrai deck depuis hier, il devient une CIBLE : blocage de sa
+  meilleure carte (payée, jouée dans le vide) et vol de son Souffle,
+  via 2 nouvelles primitives DSL disponibles aussi pour la Forge et les
+  futures cartes par prompt. Entièrement symétrique (il peut te le faire
+  aussi si ces cartes montent dans son deck) ; les paris survivent à
+  endRound et se résolvent à la pause suivante. 5 cartes, coûts
+  auto-validés (28/28), 23 tests vitest, équilibre stable.
 
 - 2026-08-14 (routine) : Attract mode sur l'écran titre — capture du
   funnel d'entrée (titre/sélection) : la sélection tient la route, le

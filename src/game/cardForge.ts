@@ -145,6 +145,10 @@ function describe(e: EffectPrimitive): string {
       return `encaisser ${e.hits} coups donne +${Math.round(e.amount)} Hype`
     case 'halveEnemySpecial':
       return 'le premier spécial adverse est réduit de moitié'
+    case 'blockEnemyCard':
+      return 'la prochaine carte du coin adverse est annulée'
+    case 'drainSouffle':
+      return `le coin adverse perd ${Math.round(e.amount)} Souffle`
   }
 }
 

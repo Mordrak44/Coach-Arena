@@ -91,6 +91,12 @@ export type CardId =
   | 'ambush' // condition : provoque ET arme un contre — le piège complet
   | 'coldBlood' // pause : sabote la Hype adverse + immunité confusion
   | 'steelSkin' // condition : encaisser nourrit + réduction légère
+  // Vague 3 — la guerre des coins (interaction avec le coin adverse)
+  | 'cornerSilence' // pause : la prochaine carte adverse part dans le vide
+  | 'breathTheft' // pause : le coin adverse perd 2 Souffle
+  | 'smokeScreen' // pause : carte adverse bloquée + esquive légère
+  | 'championTax' // pause : drain 2 Souffle + petit moral
+  | 'embargo' // pause : blocage + drain — l'étouffement complet
   // Cartes signatures (une par perso du roster, débloquées par le Lien)
   | 'sigKenta' // Cœur Vaillant : encaisser 3 coups → +40 Hype
   | 'sigRei' // Orgueil du Rival : le prochain contre remplit 50 % de la Hype
@@ -126,6 +132,10 @@ export type EffectPrimitive =
   | { kind: 'counterHype'; amount: number } // prochain contre réussi → +Hype
   | { kind: 'hitsTakenHype'; hits: number; amount: number } // encaisser N coups → +Hype
   | { kind: 'halveEnemySpecial' } // premier spécial adverse ÷ 2
+  // — guerre des coins (interaction avec le coin adverse, résolue à la
+  //   PROCHAINE pause : ce sont des paris sur un round) —
+  | { kind: 'blockEnemyCard' } // la prochaine carte du coin adverse part dans le vide
+  | { kind: 'drainSouffle'; amount: number } // le coin adverse perd N Souffle à sa prochaine pause
 
 export interface CoachCard {
   id: CardId
@@ -174,6 +184,10 @@ export interface CardMods {
   hitsTakenCount: number
   /** premier spécial adverse ÷ 2 */
   halveEnemySpecial: boolean
+  /** la prochaine carte jouée par le coin ADVERSE est annulée (survit à la fin de round) */
+  blockNextEnemyCard: boolean
+  /** Souffle retiré au coin adverse à sa prochaine pause (survit à la fin de round) */
+  drainEnemySouffle: number
 }
 
 export interface CoachInput {

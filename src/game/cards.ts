@@ -36,6 +36,10 @@ export function primitivePower(e: EffectPrimitive): number {
       return e.amount / 20
     case 'halveEnemySpecial':
       return 2
+    case 'blockEnemyCard':
+      return 1.5
+    case 'drainSouffle':
+      return e.amount * 0.5
   }
 }
 
@@ -75,6 +79,8 @@ export function clampEffect(e: EffectPrimitive): EffectPrimitive {
       return { ...e, amount: c(e.amount, 15, 60) }
     case 'hitsTakenHype':
       return { ...e, hits: c(Math.round(e.hits), 2, 5), amount: c(e.amount, 15, 50) }
+    case 'drainSouffle':
+      return { ...e, amount: c(Math.round(e.amount), 1, 3) }
     default:
       return e
   }
@@ -270,6 +276,56 @@ export const CARD_POOL: CoachCard[] = [
       { kind: 'hitsTakenHype', hits: 3, amount: 25 },
       { kind: 'damageReduction', mul: 0.85 },
     ],
+  },
+  // --- Vague 3 : la guerre des coins — l'adversaire a un deck, attaque-le.
+  // Ces paris se résolvent à la PROCHAINE pause (après le round qui vient).
+  {
+    id: 'cornerSilence',
+    name: 'Silence du Coin',
+    timing: 'pause',
+    cost: 2,
+    icon: '🤫',
+    desc: 'À la prochaine pause, la meilleure carte du coin adverse part dans le vide.',
+    effects: [{ kind: 'blockEnemyCard' }],
+  },
+  {
+    id: 'breathTheft',
+    name: 'Vol de Souffle',
+    timing: 'pause',
+    cost: 1,
+    icon: '🌬️',
+    desc: 'Le coin adverse perd 2 Souffle à sa prochaine pause.',
+    effects: [{ kind: 'drainSouffle', amount: 2 }],
+  },
+  {
+    id: 'smokeScreen',
+    name: 'Rideau de Fumée',
+    timing: 'pause',
+    cost: 2,
+    icon: '🌫️',
+    desc: 'Carte adverse bloquée à la prochaine pause, et +5 % d’esquive ce round.',
+    effects: [{ kind: 'blockEnemyCard' }, { kind: 'dodgeBonus', add: 0.05 }],
+  },
+  {
+    id: 'championTax',
+    name: 'Taxe du Champion',
+    timing: 'pause',
+    cost: 2,
+    icon: '👑',
+    desc: 'Le coin adverse perd 2 Souffle à sa prochaine pause, et +15 Hype immédiate.',
+    effects: [
+      { kind: 'drainSouffle', amount: 2 },
+      { kind: 'hype', amount: 15 },
+    ],
+  },
+  {
+    id: 'embargo',
+    name: 'Embargo Total',
+    timing: 'pause',
+    cost: 3,
+    icon: '⛔',
+    desc: 'À la prochaine pause adverse : meilleure carte annulée ET 2 Souffle en moins.',
+    effects: [{ kind: 'blockEnemyCard' }, { kind: 'drainSouffle', amount: 2 }],
   },
 ]
 

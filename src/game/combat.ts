@@ -224,6 +224,8 @@ export function freshMods(): MatchState['mods'] {
     hitsTakenHype: 0,
     hitsTakenCount: 0,
     halveEnemySpecial: false,
+    blockNextEnemyCard: false,
+    drainEnemySouffle: 0,
   }
 }
 
@@ -288,6 +290,12 @@ function applyCardEffects(m: MatchState, effects: EffectPrimitive[], side: 'play
       case 'halveEnemySpecial':
         mods.halveEnemySpecial = true
         break
+      case 'blockEnemyCard':
+        mods.blockNextEnemyCard = true
+        break
+      case 'drainSouffle':
+        mods.drainEnemySouffle += e.amount
+        break
     }
   }
 }
@@ -302,6 +310,12 @@ export function playCard(m: MatchState, id: CardId): boolean {
   m.hand.splice(idx, 1)
   m.discard.push(id)
   m.souffle -= card.cost
+  // Silence du Coin adverse : ta carte part dans le vide (coût payé).
+  if (m.enemyMods.blockNextEnemyCard) {
+    m.enemyMods.blockNextEnemyCard = false
+    m.events.push({ kind: 'cardProc', t: m.t, text: `🚫 ${card.name.toUpperCase()} BLOQUÉE !!` })
+    return true
+  }
   m.events.push({ kind: 'card', t: m.t, name: card.name })
 
   applyCardEffects(m, card.effects, 'player')
@@ -619,6 +633,12 @@ function enemyCardValue(m: MatchState, card: CoachCard): number {
       case 'halveEnemySpecial':
         v += p.hype > 60 ? 1.6 : 0.6
         break
+      case 'blockEnemyCard':
+        v += 0.8
+        break
+      case 'drainSouffle':
+        v += 0.7
+        break
     }
   }
   return v
@@ -632,6 +652,13 @@ function enemyCardValue(m: MatchState, card: CoachCard): number {
  */
 export function enemyCornerPlay(m: MatchState): void {
   m.enemySouffle = SOUFFLE_PER_CORNER
+  // Vol de Souffle joué par le joueur au round précédent : le coin adverse
+  // arrive essoufflé à sa pause.
+  if (m.mods.drainEnemySouffle > 0) {
+    m.enemySouffle = Math.max(0, m.enemySouffle - m.mods.drainEnemySouffle)
+    m.mods.drainEnemySouffle = 0
+    m.events.push({ kind: 'cardProc', t: m.t, text: '🌬️ SOUFFLE ADVERSE VOLÉ !!' })
+  }
   drawEnemyCards(m, HAND_SIZE - m.enemyHand.length)
   for (;;) {
     let best: CardId | null = null
@@ -650,6 +677,13 @@ export function enemyCornerPlay(m: MatchState): void {
     m.enemyHand.splice(m.enemyHand.indexOf(best), 1)
     m.enemyDiscard.push(best)
     m.enemySouffle -= card.cost
+    // Silence du Coin : sa meilleure carte part dans le vide (coût payé),
+    // il peut encore jouer le reste de son Souffle.
+    if (m.mods.blockNextEnemyCard) {
+      m.mods.blockNextEnemyCard = false
+      m.events.push({ kind: 'cardProc', t: m.t, text: `🚫 ${card.name.toUpperCase()} ADVERSE BLOQUÉE !!` })
+      continue
+    }
     m.events.push({ kind: 'card', t: m.t, name: `${card.name} (coin adverse)` })
     applyCardEffects(m, card.effects, 'enemy')
   }
@@ -732,6 +766,12 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
           // reconduit alors que l'UI affiche « aucun plan choisi ».
           m.plan = null
           m.souffle = SOUFFLE_PER_CORNER
+          // Vol de Souffle adverse : tu arrives essoufflé à ta pause.
+          if (m.enemyMods.drainEnemySouffle > 0) {
+            m.souffle = Math.max(0, m.souffle - m.enemyMods.drainEnemySouffle)
+            m.enemyMods.drainEnemySouffle = 0
+            m.events.push({ kind: 'cardProc', t: m.t, text: '🌬️ TON SOUFFLE EST VOLÉ !!' })
+          }
           m.mulliganUsed = false
           m.consigneUsed = false
           drawCards(m, HAND_SIZE - m.hand.length)
@@ -849,13 +889,18 @@ function endRound(m: MatchState, winner: 'player' | 'enemy'): void {
       m.events.push({ kind: 'ultiReady', t: m.t, who: loser === m.player ? 'player' : 'enemy' })
   }
   loser.anim = { kind: 'ko', until: m.t + ROUND_END_DURATION }
-  // Les effets « durée d'un round » expirent — des deux côtés.
-  const provoked = m.mods.provokedUntil
-  m.mods = freshMods()
-  m.mods.provokedUntil = provoked // temporel, expire tout seul
-  const enemyProvoked = m.enemyMods.provokedUntil
-  m.enemyMods = freshMods()
-  m.enemyMods.provokedUntil = enemyProvoked
+  // Les effets « durée d'un round » expirent — des deux côtés. Exceptions :
+  // provokedUntil (temporel) et les paris de guerre des coins
+  // (blocage/drain), qui se résolvent à la PROCHAINE pause.
+  const keep = (mods: MatchState['mods']) => {
+    const fresh = freshMods()
+    fresh.provokedUntil = mods.provokedUntil
+    fresh.blockNextEnemyCard = mods.blockNextEnemyCard
+    fresh.drainEnemySouffle = mods.drainEnemySouffle
+    return fresh
+  }
+  m.mods = keep(m.mods)
+  m.enemyMods = keep(m.enemyMods)
   m.phase = 'roundEnd'
   m.phaseUntil = m.t + ROUND_END_DURATION
   m.events.push({ kind: 'roundEnd', t: m.t, winner })

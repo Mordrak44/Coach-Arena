@@ -155,6 +155,58 @@ describe('coin adverse (deck symétrique)', () => {
   })
 })
 
+describe('guerre des coins (vague 3)', () => {
+  it('Silence du Coin : la meilleure carte adverse part dans le vide', () => {
+    const m = freshMatch()
+    m.enemy.hp = Math.round(m.enemy.maxHp * 0.3)
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = ['secondWind']
+    m.mods.blockNextEnemyCard = true
+    const before = m.enemy.hp
+    enemyCornerPlay(m)
+    expect(m.enemy.hp).toBe(before) // le soin n'a PAS eu lieu
+    expect(m.mods.blockNextEnemyCard).toBe(false) // pari consommé
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('BLOQUÉE'))).toBe(true)
+  })
+
+  it('Vol de Souffle : le coin adverse arrive essoufflé', () => {
+    const m = freshMatch()
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = []
+    m.mods.drainEnemySouffle = 2
+    enemyCornerPlay(m)
+    expect(m.enemySouffle).toBe(SOUFFLE_PER_CORNER - 2)
+    expect(m.mods.drainEnemySouffle).toBe(0)
+  })
+
+  it("symétrie : l'adversaire peut bloquer TA carte (coût payé, effet nul)", () => {
+    const m = freshMatch(buildStarterDeck(null))
+    m.phase = 'tactics'
+    m.hand = ['massage']
+    m.player.hp = 10
+    m.enemyMods.blockNextEnemyCard = true
+    expect(playCard(m, 'massage')).toBe(true)
+    expect(m.player.hp).toBe(10) // aucun soin
+    expect(m.souffle).toBe(SOUFFLE_PER_CORNER - getCard('massage').cost)
+    expect(m.enemyMods.blockNextEnemyCard).toBe(false)
+  })
+
+  it('les paris de coin survivent à la fin de round (résolution à la pause)', () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.mods.blockNextEnemyCard = true
+    m.mods.drainEnemySouffle = 2
+    m.enemy.hp = 0
+    tick(m, 0.05, quiet)
+    expect(m.phase).toBe('roundEnd')
+    expect(m.mods.blockNextEnemyCard).toBe(true)
+    expect(m.mods.drainEnemySouffle).toBe(2)
+    expect(m.mods.damageReductionMul).toBe(1) // le reste a bien expiré
+  })
+})
+
 describe('consignes parlées', () => {
   it('comprend une consigne conditionnelle', () => {
     const c = parseConsigne("s'il sort son spécial tu esquives d'accord")
