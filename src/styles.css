@@ -33,6 +33,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+}
+
+/* Édition PC : sur écran large, l'arène 9:16 reste intacte au centre
+   (même moteur, même canvas) mais les marges latérales deviennent un
+   plateau TV — un dégradé qui rappelle l'arène, pour ne pas laisser de
+   bandes noires mortes. Les tuiles des coachs y migrent (voir plus bas). */
+@media (min-width: 900px) and (min-aspect-ratio: 4/3) {
+  .app {
+    background: radial-gradient(ellipse at center, #171430 0%, #0b0912 70%, #050408 100%);
+  }
 }
 
 /* Cadre portrait 9:16 centré, façon TikTok */
@@ -294,6 +305,44 @@ h1.logo {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Édition PC : les tuiles des coachs quittent les coins de l'arène pour
+   le plateau TV latéral — la marge inutilisée d'un écran large. Même
+   moteur, même canvas 9:16 intact au centre ; seule la disposition des
+   tuiles change (position: fixed = ancrée à la fenêtre, pas à la scène). */
+@media (min-width: 900px) and (min-aspect-ratio: 4/3) {
+  /* Demi-largeur de la scène 9:16 quand elle est limitée par la hauteur
+     (le cas courant en paysage) : hauteur = 100vh, largeur = 100vh*9/16,
+     demi-largeur = 28.125vh. Les tuiles viennent buter juste à côté. */
+  .facecam {
+    position: fixed;
+    left: max(24px, calc(50vw - 28.125vh - 260px));
+    top: 32vh;
+    bottom: auto;
+    width: 260px;
+  }
+  .facecamBadge {
+    position: fixed;
+    left: max(24px, calc(50vw - 28.125vh - 260px));
+    top: calc(32vh + 260px * 4 / 3 + 10px);
+    bottom: auto;
+  }
+  .coachTile {
+    position: fixed;
+    right: max(24px, calc(50vw - 28.125vh - 260px));
+    left: auto;
+    top: 32vh;
+    bottom: auto;
+    width: 260px;
+  }
+  .coachName {
+    position: fixed;
+    right: max(24px, calc(50vw - 28.125vh - 260px));
+    left: auto;
+    top: calc(32vh + 260px * 4 / 3 + 10px);
+    bottom: auto;
+  }
 }
 
 .heardLine {

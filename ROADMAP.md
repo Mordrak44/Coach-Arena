@@ -276,13 +276,16 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       + mini-barre de PV, croix rouge si KO) des deux côtés — les clips
       montrent que c'est un combat d'équipe. Démo avec équipes.
 - [ ] Wrapper Capacitor/Electron + pages stores
-- [ ] Édition PC / layout paysage 16:9 (pour Steam) : arène élargie au
-      centre, cams des deux coachs sur les CÔTÉS façon plateau TV de
-      boxe (la visio des coachs s'y prête déjà). Canvas/moteur
-      inchangés — travail de composition d'écran. Angle stratégique :
-      le joueur PC type est un streamer, le jeu est un format Twitch
-      par nature. Déjà jouable sur PC aujourd'hui : navigateur +
-      clavier (A/D/E/C/S/U/espace) + PWA desktop, colonne 9:16 assumée.
+- [x] Plateau TV en paysage (CSS pur, zéro dépendance) : sur écran large
+      (≥900px, format paysage), les tuiles des coachs quittent les coins
+      de l'arène pour les marges latérales (position: fixed, calées sur
+      la demi-largeur réelle de la scène 9:16 — 28.125vh), agrandies
+      (260px), avec un fond radial qui rappelle l'arène au lieu de
+      bandes noires mortes. Canvas/moteur strictement inchangés — un
+      media query. Mobile vérifié non régressé. Reste pour l'Édition PC
+      complète (Steam) : wrapper Capacitor/Electron, pages stores.
+      Angle stratégique : le joueur PC type est un streamer, le jeu est
+      un format Twitch par nature.
 
 ### Tier 3 — PvP (rétention long terme, après premiers revenus)
 - [ ] Serveur d'autorité, matchmaking, Éclats
@@ -331,6 +334,19 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : Le plateau TV en paysage — réponse à « il y a
+  un PC joueur possible ? » : sur écran large, les tuiles des coachs
+  (facecam + coach adverse) migrent en CSS pur des coins de l'arène vers
+  les marges latérales, agrandies, avec un fond d'ambiance au lieu de
+  bandes noires — le combat garde son canvas 9:16 intact au centre.
+  Zéro dépendance, zéro appel réseau, testable dans cette session.
+  Vérifié à 1280×800 et 1920×1080 (tuiles bien calées, pas de
+  chevauchement) et en mobile (non régressé). Recherche complémentaire :
+  tarifs réels swap vidéo — Viggle API ~0,01 $/s (le bon choix pour
+  démarrer), ComfyUI/Wan auto-hébergé ~0,08-0,10 $/s sur H100 (rentable
+  seulement à gros volume) — chiffrage qui referme la discussion sur le
+  coût du pipeline templates+swap.
 
 - 2026-08-15 (routine) : Le Séquenceur de cuts — les décisions de design
   de la veille (templates + swap, combat en cuts, échanges par matchup)
