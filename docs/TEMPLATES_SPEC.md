@@ -106,6 +106,22 @@ l'assigne déjà automatiquement à tout perso créé par prompt.
 - **Cartes d'action coach par IA** : déjà sur la roadmap (discours du
   coin du ring compris par Claude) — cohérent, inchangé.
 
+## Le rendu vectoriel reste nécessaire — pour toujours, pas en transition
+
+Question posée et tranchée (2026-08-15) : les catégories ne rendent PAS
+le rendu vectoriel superflu. Il garde trois emplois qu'aucune vidéo ne
+remplira jamais : (1) combler tout instant SANS cut (les cuts sont
+courts et discontinus ; entre deux, il faut un état continu à 60 fps —
+idle, replacement, posture d'attente), (2) le HUD (PV, Hype, timer,
+banc, main de cartes — donnée live, jamais filmable), (3) la garantie
+zéro-coût/zéro-latence/zéro-panne, valable AUSSI après que les
+catégories soient produites (nouveau joueur day one, nouvelle mécanique
+sans template encore, service indisponible). Le cadre reste : vidéo
+posée SUR le vectoriel, cut par cut (CutSequencer/cutLibrary), jamais un
+remplacement total. Idée à instruire : un bouton « Mode Léger » (zéro
+vidéo, zéro data, zéro batterie) comme option assumée, pas un repli
+honteux — cohérent avec l'identité « tout en local ».
+
 ## Validation avant production de masse
 
 1. **Test n°1 (bloquant)** : `counter-exchange` + swap Kenta/Rei — le
