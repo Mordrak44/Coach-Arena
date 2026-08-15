@@ -122,6 +122,25 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       consommation à usage unique de l'entraînement, dérive vers 50,
       rechargement des actions au changement de jour, seuils de
       moodInfo/moodStartHype/moodIgnoresFirstOrder.
+- [x] Couverture de tests de progression.ts (Lien, paliers, persos
+      créés) — même démarche, prochain fichier de logique substantiel
+      (192 lignes) hors sim.ts. `fakeLocalStorage()` factorisé au niveau
+      du fichier de test (même piège `hasStorage` que stable.ts, dont
+      progression.ts dépend via `getDesiresFulfilled`). 8 tests vitest
+      (71 au total) : seuils exacts de bondLevel/bondHrtBonus/bondTitle
+      (bornes 1/3/6/10/15, clamp à 5 même à 999 victoires),
+      rewardOptionsFor déterministe (même perso+palier → mêmes 2 cartes,
+      jamais deux fois la même), et surtout l'ordre STRICT des paliers de
+      récompense verrouillé par un test explicite : avec 6 victoires
+      (bondLevel 3), pendingReward propose bien le palier 1 EN PREMIER,
+      jamais un saut direct au palier 3 — comportement correct en
+      pratique mais qui n'était garanti par aucun test jusqu'ici, donc
+      cassable sans que rien ne le détecte. Aussi : claimReward refuse
+      une carte hors options et un second claim au même palier,
+      applyBond ne copie jamais un perso à bonus nul (même référence) et
+      plafonne HRT à 12, saveCustom/loadCustoms testés sur la limite de 4
+      + dédoublonnage par id + migration des persos sauvegardés avant
+      l'Ulti.
 
 ## v1 — Deck & collection (voir GAME_DESIGN.md §4 bis)
 
@@ -496,6 +515,21 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : Couverture de tests pour progression.ts (Lien,
+  paliers, persos créés) — suite logique de l'itération stable.ts : même
+  angle (chaque fichier de src/game/ comparé à ses usages dans
+  engine.test.ts et scripts/sim.ts), même piège (`hasStorage` figé au
+  premier `import()`, donc `fakeLocalStorage()` factorisé au niveau du
+  fichier plutôt que dupliqué). La vraie trouvaille en écrivant les tests
+  n'est pas un bug mais une lacune de garantie : `pendingReward` avance
+  les paliers de récompense un par un dans l'ordre (jamais de saut, même
+  si le Lien réel est plus haut) — comportement correct aujourd'hui, mais
+  jusqu'ici rien ne l'aurait détecté si un futur changement cassait cet
+  ordre (par ex. en réclamant directement le palier du bondLevel courant
+  plutôt que `claimed + 1`). Un test dédié verrouille maintenant ce
+  contrat. 8 tests vitest (71 au total, exécutés 3× de suite), sim/build
+  inchangés, aucun code de production touché.
 
 - 2026-08-15 (routine) : Couverture de tests pour stable.ts (Vie
   d'Écurie). Même logique que les itérations précédentes : le ROADMAP

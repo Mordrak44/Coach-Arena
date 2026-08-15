@@ -723,27 +723,30 @@ describe('SceneJobQueue (file de génération asynchrone des scènes)', () => {
   })
 })
 
+// L'environnement de test (Node, pas jsdom) n'a pas de localStorage — les
+// modules qui le lisent (stable.ts, progression.ts…) le détectent via un
+// `hasStorage` calculé UNE FOIS au chargement du module. Sans un faux
+// localStorage posé AVANT leur tout premier `import()`, ils tourneraient
+// en mode « stockage indisponible » où toute écriture est un no-op — la
+// persistance inter-appels serait invisible aux tests, silencieusement.
+function fakeLocalStorage() {
+  const store = new Map<string, string>()
+  return {
+    getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+    setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+    key: (i: number) => [...store.keys()][i] ?? null,
+    get length() {
+      return store.size
+    },
+  }
+}
+
 describe("Vie d'Écurie (stable.ts) — jamais testée jusqu'ici (0 référence)", () => {
   const DAY1 = Date.UTC(2026, 0, 1, 12)
 
-  // L'environnement de test (Node, pas jsdom) n'a pas de localStorage —
-  // stable.ts le détecte via `hasStorage`, calculé UNE FOIS au chargement
-  // du module. On pose un faux localStorage AVANT le premier import
-  // dynamique du module pour qu'il soit vu comme disponible, et on le vide
-  // avant chaque test pour que les persos ne se contaminent pas entre eux.
-  function fakeLocalStorage() {
-    const store = new Map<string, string>()
-    return {
-      getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
-      setItem: (k: string, v: string) => void store.set(k, v),
-      removeItem: (k: string) => void store.delete(k),
-      clear: () => store.clear(),
-      key: (i: number) => [...store.keys()][i] ?? null,
-      get length() {
-        return store.size
-      },
-    }
-  }
+  // Vidé avant chaque test pour que les persos ne se contaminent pas entre eux.
   beforeEach(() => {
     ;(globalThis as any).localStorage = fakeLocalStorage()
   })
@@ -839,5 +842,124 @@ describe("Vie d'Écurie (stable.ts) — jamais testée jusqu'ici (0 référence)
     expect(moodStartHype(10)).toBe(0)
     expect(moodIgnoresFirstOrder(10)).toBe(true)
     expect(moodIgnoresFirstOrder(50)).toBe(false)
+  })
+})
+
+describe('Progression / Lien (progression.ts) — couverture des cas limites', () => {
+  beforeEach(() => {
+    ;(globalThis as any).localStorage = fakeLocalStorage()
+  })
+
+  it('bondLevel / bondHrtBonus / bondTitle : seuils exacts', async () => {
+    const { bondLevel, bondHrtBonus, bondTitle } = await import('./progression')
+    expect(bondLevel(0)).toBe(0)
+    expect(bondLevel(1)).toBe(1)
+    expect(bondLevel(2)).toBe(1) // pas encore 3
+    expect(bondLevel(3)).toBe(2)
+    expect(bondLevel(6)).toBe(3)
+    expect(bondLevel(10)).toBe(4)
+    expect(bondLevel(15)).toBe(5)
+    expect(bondLevel(999)).toBe(5) // jamais au-delà des 5 paliers définis
+
+    expect(bondHrtBonus(0)).toBe(0)
+    expect(bondHrtBonus(1)).toBe(1)
+    expect(bondHrtBonus(2)).toBe(1)
+    expect(bondHrtBonus(3)).toBe(2)
+    expect(bondHrtBonus(4)).toBe(2)
+    expect(bondHrtBonus(5)).toBe(3)
+
+    expect(bondTitle(0)).toBe('Inconnu')
+    expect(bondTitle(5)).toBe('Légende du coin')
+    expect(bondTitle(-1)).toBe('Inconnu') // clampé
+    expect(bondTitle(99)).toBe('Légende du coin') // clampé
+  })
+
+  it('recordResult / getProgress : victoires et défaites comptées et persistées', async () => {
+    const { recordResult, getProgress } = await import('./progression')
+    expect(getProgress('kenta')).toEqual({ wins: 0, losses: 0 })
+    recordResult('kenta', true)
+    recordResult('kenta', true)
+    recordResult('kenta', false)
+    expect(getProgress('kenta')).toMatchObject({ wins: 2, losses: 1 })
+  })
+
+  it("bondLevelFor : l'entretien de l'Écurie compte comme des victoires d'équivalence (3 envies = 1)", async () => {
+    const { bondLevelFor } = await import('./progression')
+    const { getStable, doStableAction } = await import('./stable')
+    expect(bondLevelFor('rei')).toBe(0)
+    // Comble 3 envies sur 3 jours distincts (une envie comblée ne renaît pas le même jour).
+    for (let d = 0; d < 3; d++) {
+      const now = Date.UTC(2026, 0, 1 + d, 12)
+      const s = getStable('rei', 'cerebral', now)
+      doStableAction('rei', 'cerebral', s.desire!, 'def', now)
+    }
+    expect(bondLevelFor('rei')).toBe(1) // floor(3/3)=1 "victoire" d'équivalence -> bondLevel(1)=1
+  })
+
+  it('rewardOptionsFor : déterministe (même perso+palier -> mêmes cartes) et jamais deux fois la même', async () => {
+    const { rewardOptionsFor } = await import('./progression')
+    const a1 = rewardOptionsFor('kenta', 1)
+    const a2 = rewardOptionsFor('kenta', 1)
+    expect(a1).toEqual(a2)
+    expect(a1[0]).not.toBe(a1[1])
+  })
+
+  it('pendingReward / claimReward : ordre strict des paliers, jamais de saut, jamais deux fois', async () => {
+    const { recordResult, pendingReward, claimReward, rewardOptionsFor } = await import('./progression')
+    expect(pendingReward('goro')).toBeNull() // 0 victoire, rien à réclamer
+
+    // 6 victoires -> bondLevel(6) = 3, mais le palier proposé reste le PREMIER non réclamé (1), jamais un saut à 3.
+    for (let i = 0; i < 6; i++) recordResult('goro', true)
+    const first = pendingReward('goro')
+    expect(first?.level).toBe(1)
+    expect(first?.options).toEqual(rewardOptionsFor('goro', 1))
+
+    // Refuse une carte hors des options proposées.
+    expect(claimReward('goro', 'carte-inexistante-xyz' as any)).toBe(false)
+    // Réclame la vraie récompense du palier 1.
+    expect(claimReward('goro', first!.options[0])).toBe(true)
+    // Le palier suivant proposé est bien le 2, pas un saut plus loin.
+    expect(pendingReward('goro')?.level).toBe(2)
+    // Impossible de réclamer deux fois le même palier avec la même carte déjà réclamée.
+    expect(claimReward('goro', first!.options[0])).toBe(false)
+  })
+
+  it('applyBond : aucun changement au niveau 0, HRT plafonné à 12 au niveau 5', async () => {
+    const { applyBond, recordResult } = await import('./progression')
+    const char = ROSTER[0]
+    const untouched = applyBond(char)
+    expect(untouched).toBe(char) // même référence : pas de copie inutile si bonus = 0
+
+    for (let i = 0; i < 15; i++) recordResult(char.id, true) // bondLevel(15) = 5 -> bonus +3
+    const boosted = applyBond({ ...char, stats: { ...char.stats, hrt: 11 } })
+    expect(boosted.stats.hrt).toBe(12) // 11+3=14, plafonné à 12
+  })
+
+  it('saveCustom / loadCustoms : les plus récents en tête, plafonné à 4, dédoublonné par id', async () => {
+    const { saveCustom, loadCustoms } = await import('./progression')
+    const mk = (id: string) => ({ ...ROSTER[0], id, name: id })
+    saveCustom(mk('a'))
+    saveCustom(mk('b'))
+    saveCustom(mk('c'))
+    saveCustom(mk('d'))
+    saveCustom(mk('e')) // 5e perso -> le plus ancien (a) sort
+    const ids = loadCustoms().map(c => c.id)
+    expect(ids).toEqual(['e', 'd', 'c', 'b'])
+    expect(ids.length).toBe(4)
+
+    // Re-sauvegarder un perso existant le fait remonter en tête, sans doublon.
+    saveCustom(mk('c'))
+    expect(loadCustoms().map(c => c.id)).toEqual(['c', 'e', 'd', 'b'])
+  })
+
+  it("loadCustoms migre les persos sauvegardés avant l'Ulti", async () => {
+    ;(globalThis as any).localStorage.setItem(
+      'coach-arena-customs-v1',
+      JSON.stringify([{ ...ROSTER[0], id: 'ancien', ulti: undefined }]),
+    )
+    const { loadCustoms } = await import('./progression')
+    const found = loadCustoms().find(x => x.id === 'ancien')
+    expect(found?.ulti).toBeTruthy()
+    expect(found?.ulti.name).toContain('Zénith')
   })
 })
