@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   HAND_SIZE,
   HYPE_MAX,
@@ -720,5 +720,124 @@ describe('SceneJobQueue (file de génération asynchrone des scènes)', () => {
     const jobs = queue.jobs()
     expect(jobs.find(j => j.plan.id === 'ok')?.status).toBe('ready')
     expect(jobs.find(j => j.plan.id === 'ko')?.status).toBe('failed')
+  })
+})
+
+describe("Vie d'Écurie (stable.ts) — jamais testée jusqu'ici (0 référence)", () => {
+  const DAY1 = Date.UTC(2026, 0, 1, 12)
+
+  // L'environnement de test (Node, pas jsdom) n'a pas de localStorage —
+  // stable.ts le détecte via `hasStorage`, calculé UNE FOIS au chargement
+  // du module. On pose un faux localStorage AVANT le premier import
+  // dynamique du module pour qu'il soit vu comme disponible, et on le vide
+  // avant chaque test pour que les persos ne se contaminent pas entre eux.
+  function fakeLocalStorage() {
+    const store = new Map<string, string>()
+    return {
+      getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+      clear: () => store.clear(),
+      key: (i: number) => [...store.keys()][i] ?? null,
+      get length() {
+        return store.size
+      },
+    }
+  }
+  beforeEach(() => {
+    ;(globalThis as any).localStorage = fakeLocalStorage()
+  })
+
+  it('première rencontre : humeur neutre (50), aucune action faite, une envie du jour', async () => {
+    const { getStable } = await import('./stable')
+    const s = getStable('kenta', 'sanguin', DAY1)
+    expect(s.mood).toBe(50)
+    expect(s.actionsToday).toBe(0)
+    expect(['train', 'leisure']).toContain(s.desire) // envies possibles du trait sanguin
+  })
+
+  it("doStableAction : jamais d'échec dans la limite du jour, refusé au-delà", async () => {
+    const { doStableAction } = await import('./stable')
+    for (let i = 0; i < 3; i++) {
+      expect(doStableAction('kenta', 'sanguin', 'leisure', 'atk', DAY1).ok).toBe(true)
+    }
+    const r4 = doStableAction('kenta', 'sanguin', 'leisure', 'atk', DAY1)
+    expect(r4.ok).toBe(false)
+    expect(r4.message).not.toBe('')
+  })
+
+  it("combler l'envie du jour donne un bonus d'humeur et incrémente desiresFulfilled", async () => {
+    const { getStable, doStableAction, getDesiresFulfilled } = await import('./stable')
+    const s = getStable('rei', 'cerebral', DAY1)
+    expect(getDesiresFulfilled('rei')).toBe(0)
+    const r = doStableAction('rei', 'cerebral', s.desire!, 'def', DAY1)
+    expect(r.fulfilledDesire).toBe(true)
+    expect(r.message).toContain('💖')
+    expect(getDesiresFulfilled('rei')).toBe(1)
+    // Une envie comblée ne renaît pas dans la même journée.
+    const after = getStable('rei', 'cerebral', DAY1 + 3600_000)
+    expect(after.desire).toBeNull()
+  })
+
+  it("l'humeur ne dépasse jamais 100, même en enchaînant les bonnes actions", async () => {
+    const { doStableAction } = await import('./stable')
+    for (let i = 0; i < 3; i++) doStableAction('fang', 'fusionnel', 'leisure', 'atk', DAY1)
+    // 3 actions/jour max : on répète sur plusieurs jours pour pousser le plafond.
+    for (let d = 1; d <= 10; d++) {
+      const now = DAY1 + d * 86_400_000
+      for (let i = 0; i < 3; i++) doStableAction('fang', 'fusionnel', 'leisure', 'atk', now)
+    }
+    const { getStable } = await import('./stable')
+    expect(getStable('fang', 'fusionnel', DAY1 + 10 * 86_400_000).mood).toBeLessThanOrEqual(100)
+  })
+
+  it('recordMatchMood : victoire monte, défaite descend, jamais sous 10', async () => {
+    const { recordMatchMood, getStable } = await import('./stable')
+    getStable('goro', 'tetu', DAY1) // seed : crée l'état initial (mood 50)
+    recordMatchMood('goro', true, DAY1)
+    expect(getStable('goro', 'tetu', DAY1).mood).toBe(58)
+    for (let i = 0; i < 10; i++) recordMatchMood('goro', false, DAY1 + i * 1000)
+    expect(getStable('goro', 'tetu', DAY1 + 10_000).mood).toBeGreaterThanOrEqual(10)
+  })
+
+  it('consumeTraining : rendu une seule fois, puis null', async () => {
+    const { doStableAction, consumeTraining } = await import('./stable')
+    doStableAction('yuna', 'sanguin', 'train', 'spd', DAY1)
+    expect(consumeTraining('yuna')).toBe('spd')
+    expect(consumeTraining('yuna')).toBeNull()
+  })
+
+  it('dérive douce vers 50 après plusieurs jours sans interaction', async () => {
+    const { doStableAction, getStable } = await import('./stable')
+    doStableAction('nyx', 'cerebral', 'leisure', 'atk', DAY1) // mood 50 + 10 = 60 (sauf envie comblée)
+    const after = getStable('nyx', 'cerebral', DAY1)
+    const startMood = after.mood
+    const fiveDaysLater = DAY1 + 5 * 86_400_000
+    const drifted = getStable('nyx', 'cerebral', fiveDaysLater)
+    // dérive : 4 points/jour d'absence, jamais au-delà de l'écart à 50.
+    const expectedDrift = Math.min(5 * 4, Math.abs(startMood - 50))
+    const expectedMood = startMood > 50 ? startMood - expectedDrift : startMood + expectedDrift
+    expect(drifted.mood).toBe(expectedMood)
+  })
+
+  it('nouveau jour : les actions se rechargent à 3', async () => {
+    const { doStableAction } = await import('./stable')
+    for (let i = 0; i < 3; i++) expect(doStableAction('shion', 'tetu', 'rest', 'atk', DAY1).ok).toBe(true)
+    expect(doStableAction('shion', 'tetu', 'rest', 'atk', DAY1).ok).toBe(false)
+    const nextDay = DAY1 + 86_400_000
+    expect(doStableAction('shion', 'tetu', 'rest', 'atk', nextDay).ok).toBe(true)
+  })
+
+  it('moodInfo / moodStartHype / moodIgnoresFirstOrder : seuils cohérents', async () => {
+    const { moodInfo, moodStartHype, moodIgnoresFirstOrder } = await import('./stable')
+    expect(moodInfo(80).label).toBe('Radieux')
+    expect(moodInfo(60).label).toBe('Bien')
+    expect(moodInfo(30).label).toBe('Neutre')
+    expect(moodInfo(10).label).toBe('Boudeur')
+    expect(moodStartHype(80)).toBe(15)
+    expect(moodStartHype(60)).toBe(5)
+    expect(moodStartHype(10)).toBe(0)
+    expect(moodIgnoresFirstOrder(10)).toBe(true)
+    expect(moodIgnoresFirstOrder(50)).toBe(false)
   })
 })

@@ -102,6 +102,26 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       l'ordre des paliers, panneau 🎁 sur l'écran de sélection
 - [x] L'entretien nourrit le Lien : 3 envies comblées = 1 victoire
       d'équivalence dans le calcul du niveau (bondLevelFor)
+- [x] Couverture de tests de stable.ts — seul fichier de logique de jeu
+      substantiel (233 lignes) à zéro référence dans engine.test.ts ET
+      dans scripts/sim.ts, repéré en comparant systématiquement chaque
+      fichier de src/game/ à ses usages dans les deux. Piège découvert en
+      le testant : l'environnement de test (Node, sans jsdom) n'a pas de
+      `localStorage` global, et `hasStorage` dans stable.ts est calculé
+      UNE FOIS au chargement du module — sans un faux localStorage posé
+      AVANT le premier `import('./stable')`, chaque test tournerait en
+      mode « stockage indisponible », où toute écriture est un no-op et
+      où la persistance inter-appels (dérive d'humeur, cumul des actions
+      du jour, non-régénération d'une envie comblée) est invisible aux
+      tests. Corrigé avec un faux localStorage en mémoire, posé/vidé
+      avant chaque test. 9 tests vitest (63 au total, exécutés 5× de
+      suite pour écarter toute fragilité liée au tirage aléatoire des
+      envies — DESIRES.sanguin/cerebral/tetu/fusionnel) : limite de 3
+      actions/jour, bonus de comblement d'envie + non-régénération le
+      même jour, plafond d'humeur à 100, plancher à 10 sur les défaites,
+      consommation à usage unique de l'entraînement, dérive vers 50,
+      rechargement des actions au changement de jour, seuils de
+      moodInfo/moodStartHype/moodIgnoresFirstOrder.
 
 ## v1 — Deck & collection (voir GAME_DESIGN.md §4 bis)
 
@@ -476,6 +496,28 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : Couverture de tests pour stable.ts (Vie
+  d'Écurie). Même logique que les itérations précédentes : le ROADMAP
+  restant est bloqué par des crédits/un backend/du matériel réel, donc
+  cherché un autre gap zéro-risque — cette fois côté qualité plutôt que
+  produit. Comparé chaque fichier de src/game/ à ses références dans
+  engine.test.ts ET scripts/sim.ts (certains modules ne sont exercés que
+  par le second) : stable.ts (233 lignes, logique d'humeur/envies/
+  entraînement qui influence directement les conditions de départ d'un
+  match — Hype, premier ordre ignoré) n'apparaissait dans NI L'UN NI
+  L'AUTRE. En l'écrivant, piège réel trouvé avant même le premier test :
+  l'environnement vitest par défaut (Node, sans jsdom) n'a pas de
+  `localStorage`, et stable.ts calcule `hasStorage` une seule fois au
+  chargement du module — sans un faux localStorage posé AVANT le tout
+  premier `import('./stable')`, les tests auraient tourné en mode
+  « stockage indisponible » où toute la logique de persistance testée
+  (dérive d'humeur entre appels, cumul des actions du jour, une envie
+  comblée qui ne renaît pas) serait restée invisible, silencieusement.
+  Résolu avec un faux localStorage en mémoire posé/vidé à chaque test.
+  9 tests vitest (63 au total), exécutés 5× de suite pour écarter toute
+  fragilité liée au tirage aléatoire des envies par trait. Sim/build
+  inchangés (aucun code de production touché, uniquement des tests).
 
 - 2026-08-15 (routine) : Aperçu de partage du LIEN (Open Graph / Twitter
   Card). Après avoir épuisé l'audit CSS (grep de tous les
