@@ -23,6 +23,7 @@ aux couleurs du perso (paramètre du node de swap).
 | `ko-down` | 1 | ~2 s | Slow-motion : le perso s'effondre, poussière, silence puis clameur. |
 | `victory-pose` | 1 | ~2,5 s | Le perso lève le poing, confettis, flashs des photographes. |
 | `crowd` ×2 var. | 0 | ~1 s | Foule en délire, bâtons lumineux. Neutre, boucle. |
+| `idle-loop` | 2 | ~2 s, bouclable | Les deux persos en garde, plan large, léger balancement — PAS un événement (rien n'y est résolu par la simulation). Comble le silence entre deux cuts, ce que le vectoriel fait aujourd'hui « gratuitement » en rendant en continu. Sans lui, une couverture 100 % vidéo d'un archétype laisserait un trou (ou un gel) à chaque pause dans l'échange — c'est le socle qui manquait pour que « plus jamais de vecteur visible » soit vraiment atteignable, pas seulement les cuts d'événements. Demandé par le lecteur (`liveCutPlayer.ts`), jamais produit par `cutsForEvent`. |
 
 ## Priorité 2 — la variété
 
@@ -150,6 +151,18 @@ remplacement total. Idée à instruire : un bouton « Mode Léger » (zéro
 vidéo, zéro data, zéro batterie) comme option assumée, pas un repli
 honteux — cohérent avec l'identité « tout en local ».
 
+**Question posée (2026-08-15, suite) : peut-on un jour faire un combat
+SANS jamais voir le vectoriel, juste vidéo + facecam ?** Oui, en théorie,
+pour un archétype à couverture complète — mais deux conditions
+manquaient à l'architecture avant aujourd'hui : (a) le point (1)
+ci-dessus n'avait pas de mécanisme concret — cutsForEvent() ne produisait
+QUE des cuts déclenchés par un événement, rien pour l'attente continue ;
+comblé par le `CutKind.idle-loop` (voir Priorité 1). (b) le point (3)
+reste vrai même à couverture 100 % : un échec de chargement, une
+bibliothèque incomplète pour un matchup rare, ou un navigateur sans
+codec restent des cas réels où il faut un filet — le vectoriel ne
+disparaît jamais du code, seulement de l'écran, quand tout charge bien.
+
 ## Modèle mental : Final Fantasy VII (confirmé avec l'utilisateur)
 
 L'écran de combat FF7 = notre vectoriel qui tourne en continu ; une
@@ -181,6 +194,8 @@ sert alors aussi de PLAN DE TOURNAGE pour sa propre relève vidéo.
 3. Test de re-teinte des FX sur `special-cast` avec 2 persos de
    couleurs opposées.
 
-Volumétrie indicative : P1+P2 ≈ 16 clips template (~25 s de vidéo à
-produire, une fois). Le séquenceur (`templateShoppingList`) recalcule la
-liste réelle et les fréquences d'usage depuis n'importe quel match.
+Volumétrie indicative : P1+P2 ≈ 17 clips template (~27 s de vidéo à
+produire, une fois — `idle-loop` inclus). Le séquenceur
+(`templateShoppingList`) recalcule la liste réelle et les fréquences
+d'usage depuis n'importe quel match ; `idle-loop`, jamais produit par un
+event, n'y apparaît pas — comptabilisé ici à part.

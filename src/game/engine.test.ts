@@ -519,6 +519,19 @@ describe('CutSequencer (lecture de cuts EN DIRECT, pas a posteriori)', () => {
     const cast = seq.ingest(m).find(c => c.kind === 'special-cast')!
     expect(cast.chars).toEqual(['Nyx'])
   })
+
+  it('activeNames() suit les relèves, pour construire un cut hors-événement (idle-loop)', async () => {
+    const { CutSequencer, idleLoopCut } = await import('./cutPlanner')
+    const m = freshMatch()
+    const seq = new CutSequencer(ROSTER[0], ROSTER[1])
+    expect(seq.activeNames()).toEqual({ player: ROSTER[0].name, enemy: ROSTER[1].name })
+    m.events.push({ kind: 'switch', t: 1, side: 'player', name: 'Nyx' })
+    seq.ingest(m)
+    expect(seq.activeNames()).toEqual({ player: 'Nyx', enemy: ROSTER[1].name })
+    const cut = idleLoopCut(seq.activeNames().player, seq.activeNames().enemy, m.t)
+    expect(cut.kind).toBe('idle-loop')
+    expect(cut.chars).toEqual(['Nyx', ROSTER[1].name])
+  })
 })
 
 describe('LiveCutPlayer (lecteur en direct — respecte la règle « instant déjà résolu »)', () => {
@@ -571,6 +584,41 @@ describe('LiveCutPlayer (lecteur en direct — respecte la règle « instant dé
     // Le cut affiché doit être parmi les plus récents, pas le tout premier englouti
     // sous une pile de retard — c'est tout l'intérêt du garde-fou.
     expect(active!.until).toBeGreaterThan(m.t) // toujours en cours, pas fini
+  })
+
+  it("comble le SILENCE (file vide, round en cours) avec un idle-loop — pas un événement", async () => {
+    const { LiveCutPlayer } = await import('./liveCutPlayer')
+    const seen: string[] = []
+    const fakeLibrary = {
+      getClip: (kind: string, chars: string[]) => {
+        seen.push(kind)
+        return kind === 'idle-loop' ? { url: `fake://idle/${chars.join('-')}`, duration: 2 } : null
+      },
+    }
+    const m = freshMatch()
+    toFighting(m)
+    const player = new LiveCutPlayer(ROSTER[0], ROSTER[1], fakeLibrary)
+    player.update(m) // aucun événement, mais le round tourne : file vide -> idle-loop
+    expect(seen).toContain('idle-loop')
+    const active = player.current()
+    expect(active).not.toBeNull()
+    expect(active!.url).toBe(`fake://idle/${ROSTER[0].name}-${ROSTER[1].name}`)
+  })
+
+  it("ne demande PAS d'idle-loop hors du round (coin du ring, gel, fin de round)", async () => {
+    const { LiveCutPlayer } = await import('./liveCutPlayer')
+    const seen: string[] = []
+    const fakeLibrary = {
+      getClip: (kind: string) => {
+        seen.push(kind)
+        return { url: `fake://${kind}`, duration: 2 }
+      },
+    }
+    const m = freshMatch() // phase 'intro', pas encore 'fighting'
+    const player = new LiveCutPlayer(ROSTER[0], ROSTER[1], fakeLibrary)
+    player.update(m)
+    expect(seen).not.toContain('idle-loop')
+    expect(player.current()).toBeNull()
   })
 })
 

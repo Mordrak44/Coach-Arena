@@ -36,6 +36,13 @@ export type CutKind =
   | 'ko-down' // le perdant s'effondre (slow-motion)
   | 'victory-pose' // le vainqueur célèbre
   | 'crowd' // plan de foule (neutre)
+  | 'idle-loop' // les deux persos en garde, plan large — comble l'ATTENTE
+  // continue entre deux événements résolus (pas déclenché par un event :
+  // rien n'y est encore tranché). C'est le seul cut que le vectoriel
+  // remplace « gratuitement » aujourd'hui en rendant en continu ; sans
+  // lui, du 100 % vidéo laisserait un trou à chaque silence du combat.
+  // Demandé explicitement par le LECTEUR (jamais par cutsForEvent) via
+  // idleLoopCut() — voir CutSequencer.activeNames().
 
 export interface Cut {
   kind: CutKind
@@ -63,6 +70,21 @@ export const TEMPLATE_CHARS: Record<CutKind, 0 | 1 | 2> = {
   'ko-down': 1,
   'victory-pose': 1,
   crowd: 0,
+  'idle-loop': 2,
+}
+
+/** Durée cible d'une boucle d'attente (voir CutKind.idle-loop). */
+export const IDLE_LOOP_DURATION = 2
+
+/**
+ * Cut d'attente à la demande du LECTEUR — jamais produit par
+ * cutsForEvent (rien n'y est résolu par la simulation, ce n'est pas un
+ * événement). À utiliser quand la file du lecteur est vide ET que le
+ * round tourne toujours, pour que la vidéo comble le même silence que le
+ * vectoriel comble aujourd'hui gratuitement.
+ */
+export function idleLoopCut(player: string, enemy: string, t: number): Cut {
+  return { kind: 'idle-loop', chars: [player, enemy], t, duration: IDLE_LOOP_DURATION }
 }
 
 /** Importance d'un événement pour la sélection du montage. */
@@ -225,6 +247,11 @@ export class CutSequencer {
       out.push(...cutsForEvent(e, side => this.active[side]))
     }
     return out
+  }
+
+  /** Qui est actuellement à l'écran (après relèves) — pour un cut d'attente. */
+  activeNames(): { player: string; enemy: string } {
+    return { ...this.active }
   }
 }
 

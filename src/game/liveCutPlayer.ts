@@ -1,5 +1,5 @@
 import type { Character, MatchState } from './types'
-import { CutSequencer, type Cut } from './cutPlanner'
+import { CutSequencer, idleLoopCut, type Cut } from './cutPlanner'
 import { EMPTY_CUT_LIBRARY, type CutClip, type CutClipLibrary } from './cutLibrary'
 
 // Le lecteur de cuts EN DIRECT — respecte la règle posée dans
@@ -58,6 +58,15 @@ export class LiveCutPlayer {
     if (!this.active && this.queue.length > 0) {
       const { cut, clip } = this.queue.shift()!
       this.active = { cut, url: clip.url, until: m.t + cut.duration }
+    }
+    // File vide, round toujours en cours : sans ça, le SILENCE entre deux
+    // événements résolus resterait un trou vidéo (voir CutKind.idle-loop).
+    // Bibliothèque vide aujourd'hui → getClip renvoie null → aucun effet.
+    if (!this.active && this.queue.length === 0 && m.phase === 'fighting') {
+      const { player, enemy } = this.sequencer.activeNames()
+      const cut = idleLoopCut(player, enemy, m.t)
+      const clip = this.library.getClip(cut.kind, cut.chars)
+      if (clip) this.active = { cut, url: clip.url, until: m.t + cut.duration }
     }
   }
 

@@ -213,6 +213,21 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       ArenaScreen — mécanique, mais sans valeur observable tant
       qu'aucun vrai clip n'existe, donc pas fait tant que ce n'est pas
       vérifiable en capture.
+- [x] CutKind.idle-loop — suite à la question utilisateur « théoriquement
+      on pourra faire un combat juste vidéo + facecam, sans jamais voir
+      le vectoriel ? ». Répondu : oui en théorie, mais un vrai trou
+      manquait à l'architecture — cutsForEvent() ne produit QUE des cuts
+      déclenchés par un événement résolu ; rien ne couvrait le SILENCE
+      continu entre deux événements (l'attente, la garde), que le
+      vectoriel comble aujourd'hui gratuitement en rendant en continu.
+      Ajouté : `idleLoopCut()` + `CutSequencer.activeNames()` (suit les
+      relèves) + LiveCutPlayer demande un idle-loop dès que sa file est
+      vide ET que le round tourne (`m.phase === 'fighting'`) — jamais
+      hors round. Bibliothèque vide aujourd'hui → toujours null → zéro
+      changement visible (bundle identique en taille, vérifié). Doc :
+      nouvelle entrée Priorité 1 dans TEMPLATES_SPEC.md (17 templates
+      désormais) + réponse écrite à la question. 4 tests vitest (50 au
+      total).
 - [ ] File de génération asynchrone (jobs Kling en arrière-plan, affichage
       quand prêt, fallback arcade si échec/retard)
 - [ ] Portrait de référence par perso (Kling image) — ⚠️ crédits, accord requis
@@ -394,6 +409,23 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : CutKind.idle-loop — l'utilisateur a demandé si un
+  combat pourrait un jour être 100 % vidéo + facecam, jamais de
+  vectoriel. Réponse déjà donnée en conversation (oui en théorie, deux
+  conditions manquantes) ; cette itération comble la première :
+  cutsForEvent() ne couvrait que les instants RÉSOLUS par un événement,
+  rien pour le silence continu entre deux événements que le vectoriel
+  seul comblait jusqu'ici. Nouveau CutKind 'idle-loop' (2 persos, ~2 s,
+  bouclable), `idleLoopCut()`, `CutSequencer.activeNames()` (pour savoir
+  qui swapper hors contexte d'événement), et LiveCutPlayer qui le
+  demande dès que sa file est vide en plein round. Toujours zéro
+  changement observable (EMPTY_CUT_LIBRARY reste kind-agnostique, bundle
+  de taille identique) — même discipline que le reste de l'architecture
+  cuts : câblé et testé avant d'avoir un seul vrai clip. Doc mise à jour
+  (TEMPLATES_SPEC.md : nouvelle ligne Priorité 1, réponse écrite à la
+  question, volumétrie 16 → 17). 4 tests vitest (50 au total), build/sim
+  inchangés.
 
 - 2026-08-15 (routine) : Le Temps Mort, suite — deux retours utilisateur
   traités dans la foulée. (1) « 1 par round plutôt » que 1 par match :
