@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   HAND_SIZE,
   HYPE_MAX,
@@ -961,5 +961,169 @@ describe('Progression / Lien (progression.ts) — couverture des cas limites', (
     const found = loadCustoms().find(x => x.id === 'ancien')
     expect(found?.ulti).toBeTruthy()
     expect(found?.ulti.name).toContain('Zénith')
+  })
+})
+
+describe('Commentateur (commentator.ts) — jamais testé directement (0 référence)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // createMatch() précharge TOUJOURS m.events avec un premier 'roundStart'
+  // (voir combat.ts) — un vrai piège pour ces tests : sans le consommer
+  // explicitement, il pollue silencieusement la 1re assertion de chaque
+  // test (une ligne "gratuite" en plus, et une fenêtre de silence de 3 s
+  // qui démarre dès t=0). On le consomme donc systématiquement ici pour
+  // partir d'un commentateur propre, comme le ferait un vrai match.
+
+  it('ingest : incrémental, ne rejoue jamais un événement déjà consommé', async () => {
+    const { Commentator } = await import('./commentator')
+    const m = freshMatch()
+    const c = new Commentator()
+    expect(c.ingest(m)).not.toBeNull() // le roundStart initial de createMatch()
+    expect(c.ingest(m)).toBeNull() // déjà consommé, pas de doublon
+    m.t = 10
+    m.events.push({ kind: 'roundEnd', t: 10, winner: 'player' })
+    const line = c.ingest(m)
+    expect(line).not.toBeNull()
+    expect(c.ingest(m)).toBeNull() // à nouveau : pas de rejeu
+  })
+
+  it("un coup non critique ne parle JAMAIS (seul le crit déclenche 'hit')", async () => {
+    const { Commentator } = await import('./commentator')
+    const m = freshMatch()
+    const c = new Commentator()
+    c.ingest(m) // consomme le roundStart initial
+    m.t = 10
+    m.events.push({ kind: 'hit', t: 10, target: 'enemy', dmg: 3, crit: false, onoma: 'PAF' })
+    expect(c.ingest(m)).toBeNull()
+    m.t = 20 // même loin de tout silence, un non-crit ne parle pas
+    m.events.push({ kind: 'hit', t: 20, target: 'enemy', dmg: 3, crit: false, onoma: 'PAF' })
+    expect(c.ingest(m)).toBeNull()
+  })
+
+  it('les événements MINEURS respectent 3 s de silence, les MAJEURS parlent toujours', async () => {
+    const { Commentator } = await import('./commentator')
+    const m = freshMatch()
+    const c = new Commentator()
+    c.ingest(m) // le roundStart initial (majeur) a déjà parlé à t=0
+    // Un événement mineur (dodged) 1s après : encore dans la fenêtre de silence -> rien.
+    m.t = 1
+    m.events.push({ kind: 'dodged', t: 1, target: 'player' })
+    expect(c.ingest(m)).toBeNull()
+    // Un événement MAJEUR (countered) dans la même fenêtre : parle quand même.
+    m.t = 1.5
+    m.events.push({ kind: 'countered', t: 1.5, by: 'player', dmg: 10 })
+    expect(c.ingest(m)).not.toBeNull()
+    // Le mineur, lui, ne parle qu'une fois les 3 s écoulées depuis le DERNIER commentaire.
+    m.t = 5
+    m.events.push({ kind: 'blocked', t: 5, target: 'enemy', dmg: 2 })
+    expect(c.ingest(m)).not.toBeNull()
+  })
+
+  it("anti-répétition : jamais deux fois le même gabarit D'AFFILÉE, même si le tirage aléatoire est forcé identique", async () => {
+    const { Commentator } = await import('./commentator')
+    const m = freshMatch() // m.round ne bouge pas ici : seul le gabarit choisi peut faire varier le texte
+    const c = new Commentator()
+    c.ingest(m) // consomme le roundStart initial (avant de figer le tirage aléatoire)
+    vi.spyOn(Math, 'random').mockReturnValue(0) // toujours le même index tiré (0) sans le garde-fou
+    m.t = 10
+    m.events.push({ kind: 'roundStart', t: 10, round: 2 })
+    const first = c.ingest(m)!
+    m.t = 20
+    m.events.push({ kind: 'roundStart', t: 20, round: 3 })
+    const second = c.ingest(m)!
+    m.t = 30
+    m.events.push({ kind: 'roundStart', t: 30, round: 4 })
+    const third = c.ingest(m)!
+    // La règle porte sur la CONSÉCUTIVITÉ : jamais deux gabarits identiques
+    // à la suite — mais un gabarit PEUT revenir plus tard (ici 1 et 3 sont
+    // bien identiques : le tirage forcé à l'index 0 n'est plus « le dernier
+    // utilisé » une fois qu'on est passé par un autre gabarit entre les
+    // deux). C'est le contrat réel de pick(), pas une supposition plus large.
+    expect(second.text).not.toBe(first.text)
+    expect(third.text).not.toBe(second.text)
+    expect(third.text).toBe(first.text)
+  })
+
+  it('emit : substitue correctement les variables ({P}, {E}, {S}…), aucune accolade ne doit rester', async () => {
+    const { Commentator } = await import('./commentator')
+    const m = freshMatch()
+    const c = new Commentator()
+    c.ingest(m) // consomme le roundStart initial
+    m.t = 10
+    m.events.push({ kind: 'special', t: 10, by: 'player', name: 'Poing du Volcan', onoma: 'DOKAAN', dmg: 10 })
+    const line = c.ingest(m)!
+    expect(line.text).not.toContain('{')
+    expect(line.text).not.toContain('}')
+    expect(line.text).toContain('Poing du Volcan')
+  })
+
+  it("emit : {A} (l'auteur) est bien substitué quand le gabarit tiré le contient", async () => {
+    const { Commentator } = await import('./commentator')
+    vi.spyOn(Math, 'random').mockReturnValue(0) // force le 1er gabarit de T.special, qui contient {A}
+    const m = freshMatch()
+    const c = new Commentator()
+    c.ingest(m) // consomme le roundStart initial
+    m.t = 10
+    m.events.push({ kind: 'special', t: 10, by: 'player', name: 'Poing du Volcan', onoma: 'DOKAAN', dmg: 10 })
+    const line = c.ingest(m)!
+    expect(line.text).toBe('INCROYABLE !! Kenta déchaîne Poing du Volcan !!')
+  })
+
+  it('poids (weight) cohérents par famille d\'événement', async () => {
+    const { Commentator } = await import('./commentator')
+    const cases: Array<[import('./types').CombatEvent, 1 | 2 | 3]> = [
+      [{ kind: 'roundStart', t: 10, round: 2 }, 2],
+      [{ kind: 'dodged', t: 10, target: 'player' }, 1],
+      [{ kind: 'blocked', t: 10, target: 'player', dmg: 1 }, 1],
+      [{ kind: 'countered', t: 10, by: 'player', dmg: 1 }, 2],
+      [{ kind: 'special', t: 10, by: 'player', name: 'X', onoma: 'X', dmg: 1 }, 3],
+      [{ kind: 'ulti', t: 10, by: 'player', name: 'X', onoma: 'X', dmg: 1 }, 3],
+      [{ kind: 'hypeFull', t: 10, who: 'player' }, 2],
+      [{ kind: 'ultiReady', t: 10, who: 'player' }, 3],
+      [{ kind: 'confused', t: 10, who: 'player' }, 1],
+      [{ kind: 'card', t: 10, name: 'X' }, 1],
+      [{ kind: 'roundEnd', t: 10, winner: 'player' }, 3],
+      [{ kind: 'matchEnd', t: 10, winner: 'player' }, 3],
+    ]
+    for (const [ev, weight] of cases) {
+      const m = freshMatch()
+      const c = new Commentator()
+      c.ingest(m) // consomme le roundStart initial, hors du champ testé
+      m.t = 10
+      m.events.push(ev)
+      const line = c.ingest(m)
+      expect(line?.weight, `weight for ${ev.kind}`).toBe(weight)
+    }
+  })
+
+  it('les événements que le commentateur ne connaît pas (cardProc, switch, timeout…) sont ignorés sans erreur', async () => {
+    const { Commentator } = await import('./commentator')
+    const m = freshMatch()
+    const c = new Commentator()
+    c.ingest(m) // consomme le roundStart initial
+    m.t = 10
+    m.events.push({ kind: 'cardProc', t: 10, text: 'BOOM' })
+    m.events.push({ kind: 'switch', t: 11, side: 'player', name: 'Rei' })
+    expect(c.ingest(m)).toBeNull()
+    expect(c.lines.length).toBe(1) // seul le roundStart initial a produit une ligne
+  })
+
+  it('recent(n) : renvoie les n dernières lignes, dans l\'ordre', async () => {
+    const { Commentator } = await import('./commentator')
+    const m = freshMatch()
+    const c = new Commentator()
+    c.ingest(m) // consomme le roundStart initial (round 1)
+    for (let i = 2; i <= 5; i++) {
+      m.t = i * 10
+      m.round = i
+      m.events.push({ kind: 'roundStart', t: m.t, round: i })
+      c.ingest(m)
+    }
+    const last2 = c.recent(2)
+    expect(last2.length).toBe(2)
+    expect(last2[0].text).toContain('4') // round 4 -> avant-dernière ligne
+    expect(last2[1].text).toContain('5') // round 5 -> dernière ligne
   })
 })

@@ -221,6 +221,19 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       toujours), dessinée dans le canvas donc présente dans les clips.
       Toutes les lignes sont datées et conservées → nourriront les
       prompts des scènes Kling et le montage. API Claude ensuite.
+      Couverture de tests directe ajoutée le 2026-08-15 (jusque-là 0
+      référence — seulement exercé indirectement via scripts/sim.ts).
+      Piège réel trouvé en écrivant les tests : `createMatch` précharge
+      TOUJOURS `m.events` avec un premier `roundStart` (voir combat.ts) —
+      sans le consommer explicitement en premier, il pollue silencieusement
+      chaque test (une ligne « gratuite » en plus, ET une fenêtre de
+      silence de 3 s qui démarre dès t=0, faisant échouer les événements
+      mineurs poussés juste après). 9 tests vitest (80 au total, dont un
+      qui verrouille précisément le contrat de l'anti-répétition : jamais
+      deux gabarits identiques D'AFFILÉE, mais un gabarit PEUT revenir
+      après être passé par un autre — pas une règle plus large qu'elle ne
+      l'est réellement), exécutés 5× de suite pour la stabilité malgré le
+      `Math.random` mocké dans certains cas.
 - [x] Le Séquenceur de cuts (cutPlanner.ts) — le contrat du « combat en
       cuts » en code : événements du match → EDL (liste de cuts avec
       template, persos à swapper, habillage, durées), grammaire anime
@@ -540,6 +553,29 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : Couverture de tests pour commentator.ts — suite
+  de la série stable.ts/progression.ts, prochain fichier de logique
+  substantiel (180 lignes) à 0 référence directe dans engine.test.ts
+  (seulement exercé indirectement via l'assertion globale de
+  scripts/sim.ts). Contrairement aux deux précédents, pas de piège
+  localStorage ici (module pur, aucun stockage) — mais un piège différent
+  et tout aussi silencieux : `createMatch()` précharge `m.events` avec un
+  `roundStart` initial dès la création du match. Mes tout premiers jets
+  de tests ignoraient ce détail et échouaient en cascade (5 sur 7) pour
+  des raisons qui semblaient n'avoir aucun rapport entre elles — une ligne
+  "Round 1..." apparaissant sans qu'aucun roundStart n'ait été poussé
+  explicitement, un poids attendu de 1 recevant 2, un texte de round 4
+  attendu recevant du round 1 — jusqu'à remonter à la source commune :
+  chaque `ingest()` traitait aussi cet événement caché. Fixé en le
+  consommant explicitement en début de chaque test. Au passage, verrouillé
+  précisément (pas supposé) le contrat de l'anti-répétition de `pick()` :
+  jamais deux gabarits identiques D'AFFILÉE, mais un gabarit revient
+  légitimement après être passé par un autre — un test qui aurait supposé
+  l'inverse (jamais de répétition du tout) aurait été un faux verrou,
+  cassé par le comportement réel dès le premier vrai match. 9 tests
+  vitest (80 au total, exécutés 5× de suite), sim/build inchangés, aucun
+  code de production touché.
 
 - 2026-08-15 : Kling débloqué par l'utilisateur — pilote sur 2
   catégories (Kenta/brawler, Rei/rival), le choix suit directement le
