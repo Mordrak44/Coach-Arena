@@ -201,6 +201,18 @@ h1.logo {
   object-fit: cover;
   display: block;
 }
+/* Combat en cuts : un clip habille le vectoriel par-dessus, jamais
+   au-dessus du HUD/coin du ring (voir z-index de .overlay/.facecam). */
+.cutVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+  pointer-events: none;
+  z-index: 1;
+}
 
 /* Disposition « visio de coachs » : toi en bas à gauche, le coach adverse
    en bas à droite — visibles au-dessus de l'overlay du coin du ring

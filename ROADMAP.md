@@ -209,10 +209,8 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       battement de décalage avec la réalité. Bibliothèque vide
       aujourd'hui → current() toujours null → zéro changement visible
       (le vectoriel reste seul à l'écran). 3 tests vitest (42 au
-      total). Reste : câbler un `<video>` par-dessus le canvas dans
-      ArenaScreen — mécanique, mais sans valeur observable tant
-      qu'aucun vrai clip n'existe, donc pas fait tant que ce n'est pas
-      vérifiable en capture.
+      total). Le `<video>` par-dessus le canvas est câblé plus bas
+      (entrée suivante).
 - [x] CutKind.idle-loop — suite à la question utilisateur « théoriquement
       on pourra faire un combat juste vidéo + facecam, sans jamais voir
       le vectoriel ? ». Répondu : oui en théorie, mais un vrai trou
@@ -228,6 +226,28 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       nouvelle entrée Priorité 1 dans TEMPLATES_SPEC.md (17 templates
       désormais) + réponse écrite à la question. 4 tests vitest (50 au
       total).
+- [x] Le `<video>` câblé dans ArenaScreen — la dernière pièce mécanique
+      du combat en cuts, repoussée depuis LiveCutPlayer faute d'un moyen
+      de la vérifier en capture. `prefetchForMatchup(player, enemy, [])`
+      lancé à l'entrée en arène (le stub reste instantané, donc pas de
+      latence ajoutée) ; `sys.cutPlayer.update(m)` à chaque frame ;
+      `<video className="cutVideo">` remonté par `key={url}` dès que
+      `current()` renvoie un clip, superposé au canvas (z-index sous le
+      HUD/coin du ring — jamais au-dessus). Le canvas caché du recorder
+      dessine le clip vidéo AU LIEU du canvas visible pendant qu'un cut
+      joue, pour que l'export garde le même habillage que ce que le
+      joueur voit. LiveCutPlayer.setLibrary() ajouté (le prefetch est
+      async, le lecteur doit exister dès la création du match).
+      Vérifié par un patch TEMPORAIRE de prefetchForMatchup (généré un
+      clip de test via canvas+MediaRecorder — même technique que
+      systems/recorder.ts — donc zéro crédit Kling dépensé), capturé en
+      3 niveaux (page complète, `<video>` isolé, canvas composite caché
+      via toDataURL), PUIS entièrement retiré avant de committer — le
+      code livré n'utilise QUE le vrai `prefetchForMatchup` (toujours
+      `EMPTY_CUT_LIBRARY`). Regression : capture du funnel standard
+      identique à avant, bundle production +3 Ko gzip (le code du
+      combat en cuts est désormais réellement importé par l'appli, plus
+      seulement par les tests).
 - [ ] File de génération asynchrone (jobs Kling en arrière-plan, affichage
       quand prêt, fallback arcade si échec/retard)
 - [ ] Portrait de référence par perso (Kling image) — ⚠️ crédits, accord requis
@@ -409,6 +429,30 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : Le `<video>` du combat en cuts, câblé — suite à
+  la question « donc si tous les templates sont bons je vois pas le
+  vecteur mais vidéo ? et si je veux tester déjà en vecteur ? ». Réponse
+  donnée en conversation : aujourd'hui le joueur ne voit QUE du vecteur,
+  car le `<video>` lui-même n'était pas branché dans ArenaScreen (noté
+  « pas fait tant que ce n'est pas vérifiable en capture » dans l'entrée
+  LiveCutPlayer). Cette itération le branche pour de vrai : boucle de jeu
+  → `cutPlayer.update(m)` → `current()` comparé par URL (évite un rendu
+  React à chaque frame) → `<video>` remonté par clé quand ça change,
+  superposé au canvas, ET le canvas composite caché (celui que le
+  recorder exporte) dessine la vidéo au lieu du vectoriel pendant qu'un
+  cut joue — sinon le clip exporté aurait montré autre chose que ce que
+  le joueur voit à l'écran. Vérification à trois niveaux SANS dépenser un
+  crédit Kling : patch temporaire de `prefetchForMatchup` générant un
+  clip de test avec canvas+MediaRecorder (la même technique que
+  systems/recorder.ts, donc déjà prouvée dans ce bac à sable), capturé en
+  page complète / `<video>` isolé / canvas composite via `toDataURL()`,
+  puis intégralement retiré avant de committer — `git status` vérifié
+  propre sur les 3 fichiers voulus avant le commit. Régression : capture
+  du funnel standard identique pixel pour pixel à avant ; le bundle
+  production grossit de ~3 Ko gzip (le module cutPlanner/cutLibrary
+  n'était importé que par les tests jusqu'ici, il l'est maintenant par
+  l'appli — attendu, pas un bug). 50 tests vitest inchangés, sim OK.
 
 - 2026-08-15 (routine) : CutKind.idle-loop — l'utilisateur a demandé si un
   combat pourrait un jour être 100 % vidéo + facecam, jamais de

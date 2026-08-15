@@ -44,6 +44,15 @@ export class LiveCutPlayer {
     this.sequencer = new CutSequencer(player, enemy)
   }
 
+  /**
+   * Remplace la bibliothèque après coup — utile car prefetchForMatchup()
+   * est async (préchargement pendant le coin du ring) alors que le
+   * lecteur, lui, doit exister dès la création du match.
+   */
+  setLibrary(library: CutClipLibrary): void {
+    this.library = library
+  }
+
   /** À appeler à chaque tick avec l'état de match courant. */
   update(m: MatchState): void {
     for (const cut of this.sequencer.ingest(m)) {

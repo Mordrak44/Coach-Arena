@@ -28,6 +28,8 @@ import {
 import { buildScenePlans, type ScenePlan } from '../game/sceneDirector'
 import { TIMING_LABEL, getCard } from '../game/cards'
 import { Commentator } from '../game/commentator'
+import { prefetchForMatchup } from '../game/cutLibrary'
+import { LiveCutPlayer, type ActiveCut } from '../game/liveCutPlayer'
 import { ArenaRenderer, CANVAS_H, CANVAS_W } from '../render/arenaRenderer'
 import { VoiceCoach } from '../systems/voice'
 import { FaceCoach } from '../systems/facecam'
@@ -86,6 +88,7 @@ export default function ArenaScreen({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const camRef = useRef<HTMLVideoElement>(null)
+  const cutVideoRef = useRef<HTMLVideoElement>(null)
   const matchRef = useRef<MatchState>(createMatch(player, enemy, deck, matchOpts))
   const pendingCmd = useRef<CoachCommand | null>(null)
 
@@ -98,6 +101,10 @@ export default function ArenaScreen({
     renderer: ArenaRenderer
     sound: SoundSystem
     commentator: Commentator
+    /** lecteur de cuts EN DIRECT — bibliothèque vide par défaut (voir
+     * cutLibrary.ts) : reste silencieux tant qu'aucun vrai clip n'existe,
+     * le rendu vectoriel du canvas continue d'être ce qui s'affiche. */
+    cutPlayer: LiveCutPlayer
     stream: MediaStream | null
     /** canvas caché : jeu + facecam + watermark — c'est LUI qui est enregistré */
     composite: HTMLCanvasElement
@@ -114,6 +121,7 @@ export default function ArenaScreen({
       renderer: new ArenaRenderer(),
       sound: new SoundSystem(),
       commentator: new Commentator(),
+      cutPlayer: new LiveCutPlayer(player, enemy),
       stream: null,
       composite,
     }
@@ -158,6 +166,12 @@ export default function ArenaScreen({
   const [specialReady, setSpecialReady] = useState(false)
   const [ultiReady, setUltiReady] = useState(false)
   const [muted, setMuted] = useState(false)
+  // Le combat en cuts : quel clip vidéo jouer PAR-DESSUS le canvas en ce
+  // moment (null tant qu'aucune bibliothèque de clips n'existe — voir
+  // cutLibrary.ts). Suivi par URL (pas par référence) pour ne déclencher
+  // un rendu que quand le clip affiché change vraiment.
+  const [activeCut, setActiveCut] = useState<ActiveCut | null>(null)
+  const activeCutUrlRef = useRef<string | null>(null)
 
   // -- setup : médias + boucle de jeu ---------------------------------------
   useEffect(() => {
@@ -218,6 +232,14 @@ export default function ArenaScreen({
       sys.highlight.start(sys.composite, hasAudio ? stream : null)
     }
     setup()
+
+    // Préchargement des cuts vidéo PENDANT que le match démarre — le timer
+    // du premier coin du ring est la vraie fenêtre voulue (voir
+    // cutLibrary.ts), mais lancer dès l'entrée en arène ne coûte rien de
+    // plus tant que prefetchForMatchup() est un stub instantané.
+    prefetchForMatchup(player, enemy, []).then(lib => {
+      if (!disposed) sys.cutPlayer.setLibrary(lib)
+    })
 
     const loop = (now: number) => {
       if (disposed) return
@@ -407,10 +429,26 @@ export default function ArenaScreen({
         sys.renderer.draw(ctx, m, m.t, timeLeft)
       }
 
-      // Composite pour le clip : jeu + facecam incrustée + watermark
+      // Combat en cuts : demande au lecteur le clip du moment (null tant
+      // qu'aucune bibliothèque de clips n'existe — le vectoriel reste seul
+      // à l'écran). Comparé par URL pour ne resynchroniser React QUE quand
+      // le clip affiché change réellement, pas à chaque frame.
+      sys.cutPlayer.update(m)
+      const cutNow = sys.cutPlayer.current()
+      if ((cutNow?.url ?? null) !== activeCutUrlRef.current) {
+        activeCutUrlRef.current = cutNow?.url ?? null
+        setActiveCut(cutNow)
+      }
+
+      // Composite pour le clip : jeu (ou le cut vidéo actif) + facecam + watermark
       const cctx = sys.composite.getContext('2d')
       if (cctx && canvasRef.current) {
-        cctx.drawImage(canvasRef.current, 0, 0)
+        const cutVideo = cutVideoRef.current
+        if (cutNow && cutVideo && cutVideo.readyState >= 2) {
+          cctx.drawImage(cutVideo, 0, 0, CANVAS_W, CANVAS_H)
+        } else {
+          cctx.drawImage(canvasRef.current, 0, 0)
+        }
         const video = sys.face.video
         const tw = CANVAS_W * 0.27
         const th = (tw * 4) / 3
@@ -587,6 +625,22 @@ export default function ArenaScreen({
   return (
     <div className="arenaWrap">
       <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} />
+
+      {/* Combat en cuts : un clip vidéo par-dessus le vectoriel, uniquement
+          quand le lecteur en a un (jamais aujourd'hui — bibliothèque vide).
+          remonté (key=url) pour forcer le chargement + la lecture du
+          nouveau clip à chaque changement, sans gestion impérative. */}
+      {activeCut && (
+        <video
+          key={activeCut.url}
+          ref={cutVideoRef}
+          className="cutVideo"
+          src={activeCut.url}
+          autoPlay
+          muted
+          playsInline
+        />
+      )}
 
       <button
         onClick={toggleMute}
