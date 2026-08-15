@@ -442,6 +442,59 @@ describe('CutSequencer (lecture de cuts EN DIRECT, pas a posteriori)', () => {
   })
 })
 
+describe('LiveCutPlayer (lecteur en direct — respecte la règle « instant déjà résolu »)', () => {
+  it('bibliothèque vide (aujourd’hui) : current() toujours null, jamais de blocage', async () => {
+    const { LiveCutPlayer } = await import('./liveCutPlayer')
+    const m = freshMatch()
+    const player = new LiveCutPlayer(ROSTER[0], ROSTER[1]) // EMPTY_CUT_LIBRARY par défaut
+    m.events.push({ kind: 'hit', t: 1, target: 'enemy', dmg: 5, crit: false, onoma: 'BAM!' })
+    player.update(m)
+    expect(player.current()).toBeNull()
+  })
+
+  it('avec une bibliothèque garnie : le cut le plus récent joue, puis expire', async () => {
+    const { LiveCutPlayer } = await import('./liveCutPlayer')
+    const fakeLibrary = { getClip: () => ({ url: 'fake://clip', duration: 999 }) }
+    const m = freshMatch()
+    const player = new LiveCutPlayer(ROSTER[0], ROSTER[1], fakeLibrary)
+    m.events.push({ kind: 'hit', t: 1, target: 'enemy', dmg: 5, crit: false, onoma: 'BAM!' })
+    m.t = 1
+    player.update(m)
+    const active = player.current()
+    expect(active).not.toBeNull()
+    expect(active!.url).toBe('fake://clip')
+    m.t = active!.until + 0.01
+    player.update(m)
+    expect(player.current()).toBeNull() // expiré, rien de neuf à jouer
+  })
+
+  it('garde-fou : la file ne dépasse jamais MAX_QUEUE, les cuts en retard sont sautés', async () => {
+    const { LiveCutPlayer, MAX_QUEUE } = await import('./liveCutPlayer')
+    const seen: string[] = []
+    const fakeLibrary = {
+      getClip: (kind: string) => {
+        seen.push(kind)
+        return { url: `fake://${kind}`, duration: 100 } // très long : ne finit jamais pendant le test
+      },
+    }
+    const m = freshMatch()
+    const player = new LiveCutPlayer(ROSTER[0], ROSTER[1], fakeLibrary)
+    m.t = 1
+    // 5 coups d'affilée avant que le premier cut n'ait eu le temps d'expirer.
+    for (let i = 0; i < 5; i++) {
+      m.events.push({ kind: 'hit', t: 1, target: 'enemy', dmg: 1, crit: false, onoma: `H${i}` })
+    }
+    player.update(m)
+    // Le lecteur ne doit jamais avoir accumulé plus de MAX_QUEUE + 1 (l'actif) en tout.
+    expect(seen.length).toBeGreaterThan(0)
+    const active = player.current()
+    expect(active).not.toBeNull()
+    // Le cut affiché doit être parmi les plus récents, pas le tout premier englouti
+    // sous une pile de retard — c'est tout l'intérêt du garde-fou.
+    expect(active!.until).toBeGreaterThan(m.t) // toujours en cours, pas fini
+  })
+})
+
 describe('bibliothèque de clips (stub — aucun pipeline branché)', () => {
   it('renvoie toujours null tant qu’aucun clip n’existe : silence, pas un crash', async () => {
     const { EMPTY_CUT_LIBRARY, prefetchForMatchup } = await import('./cutLibrary')

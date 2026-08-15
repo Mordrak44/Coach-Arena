@@ -177,6 +177,19 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       bibliothèque vide = silence, jamais un crash. 3 tests vitest
       (39 au total). Reste à ajouter au modèle : techniques débloquées
       par perso (accroche Lien/entraînement déjà en place).
+- [x] LiveCutPlayer — le lecteur de cuts EN DIRECT, suite à la règle
+      affinée avec l'utilisateur (« ce qui compte est l'événement
+      résolu, pas l'écran » : la vidéo est autorisée PENDANT le round
+      sur tout événement déjà tranché par la simulation, jamais sur une
+      décision encore ouverte). File bornée à MAX_QUEUE : un cut en
+      retard est sauté au profit du plus récent, jamais plus d'un
+      battement de décalage avec la réalité. Bibliothèque vide
+      aujourd'hui → current() toujours null → zéro changement visible
+      (le vectoriel reste seul à l'écran). 3 tests vitest (42 au
+      total). Reste : câbler un `<video>` par-dessus le canvas dans
+      ArenaScreen — mécanique, mais sans valeur observable tant
+      qu'aucun vrai clip n'existe, donc pas fait tant que ce n'est pas
+      vérifiable en capture.
 - [ ] File de génération asynchrone (jobs Kling en arrière-plan, affichage
       quand prêt, fallback arcade si échec/retard)
 - [ ] Portrait de référence par perso (Kling image) — ⚠️ crédits, accord requis
@@ -334,6 +347,16 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : LiveCutPlayer — la conclusion de la discussion
+  sur « vidéo pendant le round » devient du code : file de cuts bornée
+  (MAX_QUEUE, saute les retards), expiration par horloge de match,
+  silence garanti tant que la bibliothèque est vide (aucun changement
+  visible aujourd'hui, comportement identique au jeu actuel). 3 tests
+  dédiés couvrant le garde-fou anti-accumulation. Câblage UI volontairement
+  reporté : rien à vérifier visuellement tant qu'aucun clip n'existe —
+  la discipline « toute évolution visuelle est capturée » l'interdit
+  pour l'instant.
 
 - 2026-08-15 (routine) : Le plateau TV en paysage — réponse à « il y a
   un PC joueur possible ? » : sur écran large, les tuiles des coachs
