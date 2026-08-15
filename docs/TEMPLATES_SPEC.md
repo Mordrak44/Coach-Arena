@@ -40,47 +40,50 @@ aux couleurs du perso (paramètre du node de swap).
 | `ulti-cast` — 1 par archétype du roster (6) | 1 | ~3,2 s | Débloqués par les chapitres d'Histoire (ch. vaincu → le style d'Ulti de son adversaire). FX re-teintables, le NOM de l'Ulti vient du jeu. |
 | Entrées en scène, célébrations premium | 1 | 3-5 s | Cosmétiques vendables (boutique / Écurie / Lien). |
 
-## ⚠️ CORRECTION (2026-08-15, suite à retour utilisateur) : PAS de vidéo
-pendant le round actif — retour au principe fondateur §7
+## La règle définitive (2026-08-15, après deux allers-retours avec
+l'utilisateur) : ce qui compte, c'est la simulation, pas l'écran
 
-**Ce qui suit a été RÉTRACTÉ** : injecter des cuts vidéo comme visuel
-PENDANT que le round se joue, même déclenchés par de vrais événements
-en direct. Raison : une vidéo pré-enregistrée, une fois lancée, ne peut
-JAMAIS incorporer un nouvel ordre du coach donné pendant qu'elle joue —
-même bien déclenchée, elle est perçue (et EST, structurellement) en
-décalage avec l'influence en direct. C'est précisément ce que le
-principe fondateur §7 (posé dès le début du projet) protégeait déjà :
-*« le coach coache toujours sur le direct ; les scènes ne sont que la
-diffusion TV, jamais le direct lui-même »*. `CutSequencer` (lecture
-incrémentale) avait fait dériver l'architecture de ce principe — son
-usage EN DIRECT PENDANT LE ROUND est abandonné.
+`tick()` tourne en continu, INDÉPENDAMMENT de ce qui est affiché. Un
+ordre du coach est traité par la simulation à l'instant où il arrive,
+que l'écran montre du vectoriel ou un cut vidéo. Rien ne bloque jamais
+la voix. La bonne question n'est donc pas « vidéo ou temps réel » mais :
+**ce cut illustre-t-il un instant DÉJÀ résolu par la simulation, ou
+bloque-t-il une décision qui n'a pas encore eu lieu ?**
 
-**Où la vidéo garde sa place, sans exception** — uniquement dans les
-instants où il n'y a RIEN à influencer :
-- l'entrée en scène (avant que le round ne commence)
-- le replay du moment fort **à la pause suivante** (on REVOIT ce qui
-  vient de se passer, on ne peut plus rien y changer — c'était déjà le
-  design correct dès §7, jamais remis en cause)
-- le KO et la pose de victoire (l'issue est scellée)
-- l'export pour TikTok / le montage post-match
+- Un coup qui vient de toucher, une esquive réussie, un contre qui
+  vient de tomber, un spécial déclenché : DÉJÀ entièrement résolus dans
+  la simulation au moment où le cut démarre. **La vidéo est autorisée
+  ici, PENDANT le round, sur tout événement déjà résolu** — c'est le
+  wow recherché, sans rien sacrifier de l'influence en direct. Même
+  principe que la fenêtre d'animation verrouillée après un coup dans
+  Street Fighter/Tekken : personne n'a l'impression que le jeu ignore
+  ses inputs pendant ce court instant, parce que le jeu ne les ignore
+  jamais réellement — il les met en file, la simulation tourne dessous.
+- **La seule chose qui doit rester du temps réel sans exception : l'état
+  d'ATTENTE continu** entre deux événements (le perso qui se tient prêt,
+  se replace, respire) — là, rien n'est encore décidé, il n'y a aucun
+  instant résolu à filmer, ce serait littéralement inventer un futur.
+- **Garde-fou obligatoire pour le futur lecteur de cuts en direct** : ne
+  jamais laisser la file d'attente des cuts grossir sans limite — si
+  plusieurs événements tombent pendant qu'un cut joue encore, le
+  lecteur doit pouvoir SAUTER un cut en retard pour rattraper l'état le
+  plus récent, afin de ne jamais paraître décroché de plus d'un
+  battement derrière la réalité. `CutSequencer` fournit déjà les cuts
+  au fil de l'eau ; c'est au futur lecteur (pas encore construit) de
+  respecter cette borne.
 
-**Le rendu PENDANT le round actif reste du temps réel, sans exception**
-— vectoriel aujourd'hui ; éventuellement du 3D temps réel plus tard
-(assets générés par IA — Meshy/Tripo, ~1 min/modèle riggé — importés
-dans un moteur qui tourne à 60 fps, piloté par la simulation : ça
-préserve l'influence en direct à 100 %, contrairement à toute vidéo,
-aussi bien montée soit-elle). Pivot moteur (Unity/Three.js) noté comme
-ambition v2+, pas un chantier immédiat — le risque principal n'est pas
-le coût des assets IA (résolu) mais la perte de « clique et joue en 15 s
-dans le navigateur », cœur de la stratégie de viralité TikTok.
+Entrée en scène, KO, victoire, replay à la pause : ce sont des cas
+particuliers de la même règle (des instants déjà résolus), pas une
+catégorie à part. `planCuts` (a posteriori, pour l'export/replay) et
+`CutSequencer` (au fil de l'eau, pour un futur lecteur en direct) sont
+TOUS LES DEUX des usages valides — la règle qui les gouverne est
+au-dessus des deux : jamais un cut sur une décision encore ouverte.
 
-`planCuts` (l'EDL a posteriori, pour le replay-entre-rounds et le
-montage post-match) reste valide et correct. `CutSequencer` (lecture
-incrémentale) reste dans le code, inoffensif car non branché à l'UI —
-mais NE DOIT PAS être utilisé pour afficher de la vidéo pendant un
-round actif. Le préchargement pendant le coin du ring reste pertinent,
-mais pour préparer le REPLAY de ce qui vient de se jouer, jamais pour
-« pré-jouer » le round suivant.
+3D temps réel avec assets générés par IA (Meshy/Tripo) reste une
+ambition v2+ notée pour améliorer encore l'état d'attente continu
+au-delà du vectoriel — pas un chantier immédiat, le risque principal
+étant la migration de moteur (Unity WebGL vs « clique et joue en 15 s
+dans le navigateur »), pas le coût des assets.
 
 **« Techniques débloquées »** (l'idée tamagotchi de l'Écurie appliquée
 aux gestes) implique un état par perso qui n'existe pas encore dans le

@@ -5,15 +5,18 @@ import type { Character, CombatEvent, MatchState } from './types'
 // pour chacun le TEMPLATE à utiliser, les persos à y swapper et
 // l'habillage (onomatopées, noms de techniques).
 //
-// ⚠️ USAGE AUTORISÉ : uniquement pour des moments SANS décision en
-// cours — le replay du round précédent (affiché à la pause suivante),
-// le montage post-match, l'export TikTok. JAMAIS comme visuel pendant
-// qu'un round est activement joué : une vidéo pré-enregistrée, une fois
-// lancée, ne peut pas incorporer un nouvel ordre du coach donné pendant
-// qu'elle joue — ça romprait le principe fondateur (GAME_DESIGN §7 :
-// « le coach coache toujours sur le direct »). Voir TEMPLATES_SPEC.md
-// pour la correction complète (2026-08-15). Le rendu PENDANT un round
-// actif reste exclusivement du temps réel (ArenaRenderer aujourd'hui).
+// RÈGLE (voir TEMPLATES_SPEC.md, 2026-08-15) : ce qui gouverne l'usage
+// vidéo n'est pas « pendant vs après le round », c'est « l'événement
+// est-il déjà résolu par la simulation ? ». tick() tourne en continu,
+// indépendamment du rendu — un ordre du coach est traité immédiatement
+// par la simulation, jamais bloqué par un cut en cours. Un cut illustre
+// TOUJOURS un instant déjà tranché (un coup qui a touché, un contre qui
+// est tombé) — jamais une décision encore ouverte. La vidéo est donc
+// AUTORISÉE pendant le round, sur tout événement déjà résolu ; seul
+// l'état d'ATTENTE continu entre deux événements doit rester du temps
+// réel (rien n'y est encore décidé). Un futur lecteur en direct DOIT
+// pouvoir sauter un cut en retard si la file s'accumule (jamais plus
+// d'un battement de décalage avec la réalité).
 //
 // Grammaire anime : les cuts solo ne montrent qu'UN perso (banque par
 // perso, pré-générée) ; les échanges à deux (counter, faceoff) sont des
@@ -190,17 +193,15 @@ export function planCuts(
 }
 
 /**
- * Consommation INCRÉMENTALE des cuts, événement par événement.
- *
- * ⚠️ RÉTRACTÉ comme lecteur EN DIRECT pendant un round actif (voir la
- * correction en tête de fichier et TEMPLATES_SPEC.md, 2026-08-15) :
- * même déclenchée par un vrai événement, une vidéo pré-enregistrée ne
- * peut pas incorporer un ordre du coach donné PENDANT qu'elle joue —
- * ça romprait le principe fondateur, pas le contraire de ce qu'on
- * croyait en écrivant cette classe. Conservée car réutilisable pour
- * consommer le flux d'un round déjà TERMINÉ (ex. construire le replay
- * affiché à la pause suivante sans revalider tout planCuts) — mais ne
- * jamais la brancher sur le flux d'un round en cours.
+ * Consommation INCRÉMENTALE des cuts, événement par événement — la
+ * pièce destinée à un futur LECTEUR DE CUTS EN DIRECT, pendant que le
+ * round se joue (voir la règle en tête de fichier : autorisé, car
+ * chaque cut illustre un instant déjà résolu par la simulation, jamais
+ * une décision encore ouverte). Même contrat que
+ * ArenaRenderer.ingestEvents : ne renvoie que les cuts NOUVEAUX depuis
+ * le dernier appel — au futur lecteur de respecter le garde-fou de file
+ * bornée (sauter un cut en retard plutôt que de prendre du retard sur
+ * la réalité).
  */
 export class CutSequencer {
   private lastEventIndex = 0
