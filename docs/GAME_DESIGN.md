@@ -260,6 +260,30 @@ gratuit / mode cinématique premium. Optimisations possibles : ne générer en
 vidéo que LE moment fort du match (1 clip), images statiques + FX caméra
 pour le reste.
 
+### La fabrique à scènes v2 : templates + swap (décision 2026-08-15)
+
+Insight utilisateur validé par l'état de l'art : ne PAS générer chaque
+vidéo — fabriquer des « moules » et y couler les persos.
+
+- **Templates** : scènes génériques générées/produites UNE fois (entrée
+  en scène façon boxe, célébration, KO slow-motion…) : décor, foule,
+  caméra, gestuelle — sans identité de personnage.
+- **Swap** : le perso du joueur (sa planche de référence — on l'a déjà)
+  est injecté dans le template par transfert de pose/identité :
+  Viggle API (templates + Multi-Track, jusqu'à 7 éléments swappés par
+  vidéo) côté service, ou workflow ComfyUI (Wan Animate : image de réf
+  + clip de mouvement → le perso joue la scène) auto-hébergé.
+- **Économie** : coût du template amorti à l'infini ; swap = centimes
+  (API) à ~0 (GPU loué). Les **gestuelles/décors/entrées deviennent des
+  cosmétiques vendables à coût marginal quasi nul** — le modèle
+  cosmétique de TFT (arènes/booms) appliqué à la vidéo, et chaque
+  gestuelle achetée marche avec TON perso créé par prompt.
+- **La génération Kling pure** reste pour l'unique : l'Ulti nommé du
+  perso, le KO spécifique du match, le tier premium.
+- Pipeline : les ScenePlan du Réalisateur référencent déjà les persos —
+  un plan devient « template X + swap(planche du perso) » au lieu d'un
+  prompt de génération complète.
+
 ### Modèle de monétisation (proposition chiffrée)
 
 Coûts réels mesurés par action (base : clip Kling 5 s ≈ 0,30 €, appel
