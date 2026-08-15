@@ -3,9 +3,17 @@ import type { Character, CombatEvent, MatchState } from './types'
 // Le Séquenceur de cuts — convertit les événements d'un match en EDL
 // (edit decision list) : la liste ordonnée des cuts vidéo à jouer, avec
 // pour chacun le TEMPLATE à utiliser, les persos à y swapper et
-// l'habillage (onomatopées, noms de techniques). C'est le contrat entre
-// le moteur (qui émet des événements) et le futur lecteur de cuts /
-// pipeline d'assets (voir GAME_DESIGN — « le combat en cuts »).
+// l'habillage (onomatopées, noms de techniques).
+//
+// ⚠️ USAGE AUTORISÉ : uniquement pour des moments SANS décision en
+// cours — le replay du round précédent (affiché à la pause suivante),
+// le montage post-match, l'export TikTok. JAMAIS comme visuel pendant
+// qu'un round est activement joué : une vidéo pré-enregistrée, une fois
+// lancée, ne peut pas incorporer un nouvel ordre du coach donné pendant
+// qu'elle joue — ça romprait le principe fondateur (GAME_DESIGN §7 :
+// « le coach coache toujours sur le direct »). Voir TEMPLATES_SPEC.md
+// pour la correction complète (2026-08-15). Le rendu PENDANT un round
+// actif reste exclusivement du temps réel (ArenaRenderer aujourd'hui).
 //
 // Grammaire anime : les cuts solo ne montrent qu'UN perso (banque par
 // perso, pré-générée) ; les échanges à deux (counter, faceoff) sont des
@@ -182,19 +190,17 @@ export function planCuts(
 }
 
 /**
- * Consommation INCRÉMENTALE des cuts, événement par événement — le
- * lecteur de cuts EN DIRECT pendant le round, par opposition à planCuts
- * (qui monte un récap a posteriori sur tout le match terminé). Même
- * contrat que ArenaRenderer.ingestEvents : ne renvoie que les cuts
- * NOUVEAUX depuis le dernier appel.
+ * Consommation INCRÉMENTALE des cuts, événement par événement.
  *
- * C'est la pièce qui garde le combat en cuts fidèle au principe fondateur
- * (§7 GAME_DESIGN) : un cut illustre un événement qui vient RÉELLEMENT
- * de se produire dans la simulation — il ne remplace jamais la décision
- * du coach par une vidéo déjà jouée d'avance. Le préchargement pendant
- * le coin du ring (voir cutLibrary.ts) porte sur le matchup et les
- * techniques débloquées, JAMAIS sur le déroulé du round à venir : ça,
- * personne ne le connaît avant que le coach n'agisse.
+ * ⚠️ RÉTRACTÉ comme lecteur EN DIRECT pendant un round actif (voir la
+ * correction en tête de fichier et TEMPLATES_SPEC.md, 2026-08-15) :
+ * même déclenchée par un vrai événement, une vidéo pré-enregistrée ne
+ * peut pas incorporer un ordre du coach donné PENDANT qu'elle joue —
+ * ça romprait le principe fondateur, pas le contraire de ce qu'on
+ * croyait en écrivant cette classe. Conservée car réutilisable pour
+ * consommer le flux d'un round déjà TERMINÉ (ex. construire le replay
+ * affiché à la pause suivante sans revalider tout planCuts) — mais ne
+ * jamais la brancher sur le flux d'un round en cours.
  */
 export class CutSequencer {
   private lastEventIndex = 0
