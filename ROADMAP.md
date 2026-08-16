@@ -386,6 +386,14 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       (titre, countdown, tagline) devenait injoignable au scroll dès
       que le contenu dépassait un écran (systématique avec deck+banc) ;
       passé à `flex-start`, entièrement atteignable désormais.
+      Couverture de tests ajoutée le 2026-08-15 : dernier module
+      localStorage de src/game/ sans test direct (les trois autres —
+      stable.ts, progression.ts, commentator.ts — l'étaient déjà). Petit
+      (52 lignes) mais même famille de piège potentiel désormais bien
+      connue dans ce projet. 3 tests vitest (83 au total) : chaque bulle
+      vue une seule fois (persistant, idempotent au second appel), et
+      les deux bulles (combat / coin du ring) prouvées indépendantes
+      l'une de l'autre — pas juste supposées.
 - [x] Passe de rendu 2.5D (fausse perspective, zéro 3D) : horizon lumineux
       lié à la Hype, projecteurs qui balaient, foule étagée en perspective
       avec fans à bâtons lumineux, ring à lattes convergentes (point de
@@ -562,6 +570,18 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-15 (routine) : Couverture de tests pour onboarding.ts — clôt le
+  balayage entamé avec stable.ts : les trois modules localStorage de
+  src/game/ (stable, progression, onboarding) ont désormais tous une
+  couverture directe (commentator.ts, testé juste avant, n'utilise en
+  fait aucun stockage — son piège était différent, voir l'entrée
+  précédente). Petit fichier
+  (52 lignes, deux bulles d'aide) mais valeur réelle : le seul risque qui
+  compte ici — deux bulles indépendantes qui se marchent dessus par
+  accident — est maintenant verrouillé par un test, pas seulement par la
+  lecture du code. 3 tests vitest (83 au total, stables sur 3 exécutions),
+  sim/build inchangés, aucun code de production touché.
 
 - 2026-08-15 (routine) : Watermark « ✨ Généré par IA » — le pilote Kling
   d'hier a rendu concret un engagement jusque-là abstrait dans ROADMAP.md

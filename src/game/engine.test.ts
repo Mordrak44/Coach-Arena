@@ -1127,3 +1127,33 @@ describe('Commentateur (commentator.ts) — jamais testé directement (0 référ
     expect(last2[1].text).toContain('5') // round 5 -> dernière ligne
   })
 })
+
+describe('Onboarding (onboarding.ts) — dernier module localStorage jamais testé (0 référence)', () => {
+  beforeEach(() => {
+    ;(globalThis as any).localStorage = fakeLocalStorage()
+  })
+
+  it("chaque bulle n'est vue qu'une fois : false avant, true après, et ça persiste", async () => {
+    const { hasSeenCombatHint, markCombatHintSeen } = await import('./onboarding')
+    expect(hasSeenCombatHint()).toBe(false)
+    markCombatHintSeen()
+    expect(hasSeenCombatHint()).toBe(true)
+    // Un second appel (deuxième fermeture, ou re-render) ne doit rien casser.
+    markCombatHintSeen()
+    expect(hasSeenCombatHint()).toBe(true)
+  })
+
+  it('les deux bulles (combat / coin du ring) sont indépendantes l\'une de l\'autre', async () => {
+    const { hasSeenCombatHint, hasSeenCornerHint, markCombatHintSeen } = await import('./onboarding')
+    markCombatHintSeen()
+    expect(hasSeenCombatHint()).toBe(true)
+    expect(hasSeenCornerHint()).toBe(false) // pas affectée par l'autre bulle
+  })
+
+  it('markCornerHintSeen ne touche pas au flag combat', async () => {
+    const { hasSeenCombatHint, hasSeenCornerHint, markCornerHintSeen } = await import('./onboarding')
+    markCornerHintSeen()
+    expect(hasSeenCornerHint()).toBe(true)
+    expect(hasSeenCombatHint()).toBe(false)
+  })
+})
