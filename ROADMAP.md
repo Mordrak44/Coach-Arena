@@ -713,6 +713,24 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       service worker (cache-first sur les assets hashés, network-first
       ailleurs avec repli hors-ligne — le jeu 100 % client tourne sans
       réseau), meta iOS. Enregistré en prod uniquement.
+      2026-08-16 : le repli hors-ligne **vérifié en conditions réelles**
+      pour la première fois (Chromium headless, `context.setOffline`),
+      jamais testé bout-en-bout jusqu'ici — seulement relu au code. 1re
+      visite : `sw.js` ne peut RIEN mettre en cache (il s'enregistre
+      après l'événement `load`, donc ne contrôle pas encore la toute
+      première navigation ni ses assets — caractéristique du cycle de
+      vie standard des service workers, pas un bug de ce dépôt). 2e
+      visite EN LIGNE (le SW contrôle déjà la page) : navigation + CSS +
+      JS + une icône correctement mis en cache, confirmé en inspectant
+      `caches.open('coach-arena-v1').keys()` directement. 3e visite HORS
+      LIGNE : succès, l'écran titre s'affiche intégralement (capture à
+      l'appui), pas une page d'erreur navigateur. Concrètement peu
+      limitant pour un vrai joueur : le prompt d'installation PWA
+      n'apparaît lui-même qu'après un premier chargement réussi (le SW
+      est donc déjà actif au moment où l'appli installée est rouverte).
+      Aucun code changé — vérification pure, comportement confirmé
+      conforme à l'intention documentée dans `sw.js` (« network-first
+      avec repli cache »).
 
 ## Vers la version vendable (gap analysis 2026-08-14)
 
@@ -1207,6 +1225,35 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Après le balayage `scripts/`, cherché un autre
+  angle jamais couvert. Tenté le skill `security-review`, mais il
+  dépend d'un diff contre `origin/HEAD` que la structure du dépôt (une
+  seule branche, pas de base distincte) ne fournit pas — échec
+  d'environnement, pas un refus de faire la passe. Fait une revue
+  sécurité manuelle ciblée à la place (grep de `dangerouslySetInnerHTML`
+  /`eval`/`innerHTML` — rien ; regex à quantificateurs imbriqués
+  (ReDoS) dans les fichiers de règles — rien) : rien d'exploitable, ce
+  qui est cohérent avec la nature de l'appli (100 % client, aucun
+  serveur, aucune frontière de confiance à franchir — la vraie
+  catégorie de risque ici est la DISPONIBILITÉ, un plantage, pas la
+  confidentialité, déjà couverte par le grand ménage `JSON.parse` de
+  plus tôt cette session). Plutôt que de forcer un résultat qui n'existe
+  pas, pivoté vers une VÉRIFICATION concrète jamais faite : le repli
+  hors-ligne de la PWA, testé bout-en-bout en Chromium headless
+  (`context.setOffline`) pour la première fois — jusqu'ici seulement
+  relu au code, jamais réellement exécuté sans réseau. Résultat : ça
+  marche, avec une nuance découverte en creusant (pas un bug, le cycle
+  de vie standard des service workers) — la toute PREMIÈRE visite ne
+  peut rien mettre en cache (le SW s'enregistre après `load`, donc ne
+  contrôle pas encore cette première navigation), mais dès la 2e visite
+  en ligne tout se met en cache correctement (vérifié en lisant
+  `caches.keys()` directement), et la 3e visite hors ligne affiche
+  l'écran titre intégralement. Concrètement peu limitant pour un vrai
+  joueur, puisque le prompt d'installation PWA lui-même n'apparaît
+  qu'après un premier chargement réussi. Aucun code changé — pure
+  vérification, comportement confirmé conforme à l'intention déjà
+  documentée dans `sw.js`.
 
 - 2026-08-16 (routine) : Nouveau périmètre jamais audité — `scripts/`
   (les 8 rounds de code-review précédents ne ciblaient que `src/`).
