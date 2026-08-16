@@ -101,6 +101,33 @@ h1.logo {
   max-width: 320px;
 }
 
+/* Lien d'évitement clavier : invisible tant qu'il n'a pas le focus. Le
+   deck-builder pose ~40 boutons −/+ (2 par carte du pool) entre le début
+   de l'écran et la confirmation — sans repli, un joueur 100 % clavier
+   doit Tab-er au travers de tout ça (vérifié : 62 appuis). */
+.skipLink {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.skipLink:focus {
+  position: fixed;
+  left: 12px;
+  top: 12px;
+  width: auto;
+  height: auto;
+  z-index: 999;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: #14120a;
+  font-weight: 800;
+  border-radius: 8px;
+  box-shadow: 4px 4px 0 #000;
+}
+
 .btn {
   font: inherit;
   font-weight: 800;

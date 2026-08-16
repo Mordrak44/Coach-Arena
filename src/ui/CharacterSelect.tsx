@@ -506,6 +506,14 @@ export default function CharacterSelect({
         )}
       </div>
 
+      {/* Lien d'évitement : le deck-builder qui suit pose ~40 boutons −/+
+          (2 par carte du pool) avant la confirmation — un joueur 100 %
+          clavier qui accepte le deck par défaut peut sauter tout ça d'un
+          coup plutôt que de les Tab-er un par un (vérifié : 62 appuis
+          sans ce lien). Invisible tant qu'il n'a pas le focus. */}
+      <a href="#confirmDeckBtn" className="skipLink">
+        ⏭️ Passer la composition du deck, aller à la confirmation
+      </a>
       <h2 style={{ fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--accent)' }}>
         🃏 Ton Deck de Coach ({deck.length} cartes)
       </h2>
@@ -585,6 +593,7 @@ export default function CharacterSelect({
       </div>
 
       <button
+        id="confirmDeckBtn"
         className="btn"
         disabled={!selected || !tplValid}
         onClick={() =>

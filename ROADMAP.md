@@ -748,12 +748,27 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       (`text-transform: uppercase` sur `.btn`/`h2`), donc chercher
       `'Coin du ring'` en respectant la casse échouait alors que l'overlay
       était bel et bien affiché — corrigé en comparant en minuscules.
-      Seule observation notée (pas un bug, pas corrigé) : atteindre le
-      bouton de confirmation du deck prend 62 appuis Tab (le
-      deck-builder a ~20 cartes × 2 boutons −/+ chacune) — un peu long
-      pour un joueur 100 % clavier, mais pas cassé ; à revisiter si un
-      jour l'ergonomie clavier devient une priorité produit. Aucun code
+      Seule observation notée (pas un bug, pas corrigé sur le moment) :
+      atteindre le bouton de confirmation du deck prend 62 appuis Tab
+      (le deck-builder a ~20 cartes × 2 boutons −/+ chacune) — un peu
+      long pour un joueur 100 % clavier, mais pas cassé. Aucun code
       changé — vérification pure.
+- [x] Friction clavier de l'observation précédente corrigée : un lien
+      d'évitement (« ⏭️ Passer la composition du deck, aller à la
+      confirmation ») posé juste avant les ~40 boutons −/+ du
+      deck-builder, invisible tant qu'il n'a pas le focus (patron
+      standard des « skip links »), sautant directement au bouton de
+      confirmation quand activé. Un joueur souris/tactile ne le voit
+      jamais ; un joueur 100 % clavier qui accepte le deck par défaut
+      peut sauter les ~40 boutons d'un coup au lieu de les Tab-er un par
+      un. Vérifié en conditions réelles via Chromium headless + vraies
+      touches clavier (pas juste la présence de l'attribut/classe) :
+      hors-écran avant focus, visible et lisible une fois focus (capture
+      à l'appui), et son activation déplace bien le focus sur le bouton
+      de confirmation. Capture avant/après confirmant zéro régression
+      visuelle pour le flux souris. `tsc --noEmit` + `npm run build` +
+      130 tests vitest inchangés (pur ajout de markup, aucune logique
+      touchée).
 
 ## Vers la version vendable (gap analysis 2026-08-14)
 
@@ -1248,6 +1263,25 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Correction de la friction clavier notée hier
+  (62 appuis Tab pour atteindre la confirmation du deck) plutôt qu'une
+  nouvelle passe de vérification pure — après plusieurs itérations
+  « rien à changer, juste confirmé », celle-ci avait un vrai correctif
+  concret déjà identifié. Ajout d'un lien d'évitement standard (« skip
+  link », patron connu du web accessible) juste avant les ~40
+  boutons −/+ du deck-builder : invisible hors focus (`position:
+  absolute; left: -9999px`), redevient visible et lisible dès qu'il
+  reçoit le focus clavier, saute directement au bouton de confirmation
+  quand activé. Un joueur souris/tactile ne le voit jamais ; un joueur
+  100 % clavier qui accepte le deck par défaut peut désormais sauter
+  d'un coup ce qui prenait 62 Tab. Vérifié en conditions réelles
+  (Chromium headless, vraies touches clavier, pas juste la présence du
+  markup) : hors-écran avant focus, visible une fois focus (capture),
+  activation déplace bien le focus sur le bon bouton — et capture
+  avant/après confirmant zéro régression visuelle pour le flux souris.
+  `tsc --noEmit`/`npm run build`/130 tests vitest inchangés (pur ajout
+  de markup, aucune logique de jeu touchée).
 
 - 2026-08-16 (routine) : Suite logique de l'audit d'accessibilité de la
   veille (qui avait confirmé que chaque élément cliquable est un vrai
