@@ -113,7 +113,17 @@ export default function CharacterSelect({
   const signatureUnlocked =
     !!selected && !!signature && bondLevelFor(selected.id) >= SIGNATURE_BOND_LEVEL
 
-  const pickChar = (c: Character) => setSelected(c)
+  const pickChar = (c: Character) => {
+    setSelected(c)
+    // Un perso ne peut pas être à la fois le combattant principal ET son
+    // propre équipier de relève — s'il était déjà dans l'équipe avant de
+    // devenir le principal, on le retire (trouvé en audit, 2026-08-16).
+    setTeammates(prev => prev.filter(t => t.id !== c.id))
+    // Le message d'écurie appartient à l'ANCIEN perso — sans ce reset, le
+    // nouveau perso affiche le message d'entraînement de son prédécesseur
+    // au lieu de son propre décompte d'actions restantes.
+    setStableMsg('')
+  }
 
   // Récompense de palier de Lien : « choisis 1 carte parmi 2 »
   const reward = selected ? pendingReward(selected.id) : null
@@ -183,7 +193,14 @@ export default function CharacterSelect({
   const forgeFromPrompt = (p: string) => {
     const c = createFromPrompt(p)
     saveCustom(c) // le perso survivra aux sessions (et gardera son Lien)
-    setCustoms(loadCustoms())
+    const next = loadCustoms()
+    setCustoms(next)
+    // Un forge peut évincer un ancien perso custom du plafond MAX_CUSTOMS
+    // (voir progression.ts) — s'il était en équipe, il en sort avec lui
+    // plutôt que de rester un « équipier fantôme » qu'on ne peut plus
+    // retirer (trouvé en audit, 2026-08-16).
+    setTeammates(prev => prev.filter(t => next.some(x => x.id === t.id) || ROSTER.some(r => r.id === t.id)))
+    setStableMsg('') // idem pickChar : le message d'écurie appartient à l'ancien perso
     setSelected(c)
   }
 

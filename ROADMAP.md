@@ -121,6 +121,46 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       échec sur 15-30) a été trouvé et corrigé dans le lot de bugs
       PRÉCÉDENT (« le temps mort d'urgence adverse ») — détails dans le
       Journal.
+- [x] Audit de code round 3 (2026-08-16), ciblé sur CharacterSelect.tsx
+      (le plus gros fichier UI, jamais audité) + story.ts. 4 pistes
+      trouvées, toutes réelles et corrigées, chacune revérifiée
+      manuellement PUIS en capture Chromium headless (pas juste supposé
+      corrigé après relecture du code) :
+      1. **Message d'écurie qui fuit d'un perso à l'autre** :
+         `stableMsg` (« Entraînement ATK : +1 ATK… ») n'était jamais
+         réinitialisé au changement de perso sélectionné — basculer sur
+         un AUTRE perso continuait d'afficher le message du précédent à
+         la place de son propre décompte d'actions restantes. Corrigé
+         en vidant `stableMsg` dans `pickChar` (et `forgeFromPrompt`,
+         qui change aussi `selected` sans passer par `pickChar`).
+      2. **Un équipier qui devient le combattant principal restait
+         listé comme équipier** : `teammates` n'était jamais reconcilié
+         au changement de `selected` — le texte « Relève : … » pouvait
+         afficher le perso PRINCIPAL comme son propre équipier de
+         relève (le filtre existait déjà à la confirmation du match,
+         mais pas dans ce qui s'affichait avant). Corrigé en retirant
+         `selected` de `teammates` dans `pickChar`.
+      3. **Équipier custom « fantôme »** : forger un 5e perso custom
+         dans la même session évince le plus ancien du plafond
+         `MAX_CUSTOMS=4` (voir progression.ts) — s'il était en équipe,
+         il disparaissait de la liste de boutons (donc plus possible à
+         retirer) tout en restant un vrai équipier de match. Corrigé en
+         reconciliant `teammates` avec la liste fraîche à chaque forge.
+      4. `isUnlocked()` plantait (`STORY_CHAPTERS[-2].id`) si jamais
+         appelée avec un chapitre absent de `STORY_CHAPTERS` —
+         non-atteignable aujourd'hui par un vrai chemin de jeu (comme
+         `getCard()` à l'audit précédent), mais corrigé quand même :
+         contrairement à `getCard()`, le fix ici est une simple borne
+         `if (idx < 0) return false` dans LA MÊME fonction, sans
+         ajouter de nouvelle surface de validation — pas le même calcul
+         coût/bénéfice.
+      1 test vitest (89 au total, inchangé en nombre — ajouté à un test
+      existant plutôt qu'un nouveau, les 3 bugs UI n'étant pas
+      directement testables en vitest), 2 corrections vérifiées en
+      capture Chromium headless réelle (bascule de perso : le message
+      d'écurie de Rei remplace bien celui de Kenta ; un équipier qui
+      devient principal fait bien passer le texte de « Relève : Rei »
+      à « Sans équipiers »), sim/build inchangés.
 - [x] Carnet du Coach : cartes jouables au coin du ring (3 familles :
       directes, armées, conditionnelles) — voir GAME_DESIGN.md §4 bis
       (v0 : pool de 6 cartes, sélection de 3 avant match, 1 par coin du
@@ -658,6 +698,29 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Audit de code round 3, ciblé sur
+  CharacterSelect.tsx (le plus gros fichier UI, 571 lignes, jamais
+  audité) + story.ts. Troisième passe de la même série (moteur → DSL de
+  cartes → UI) : chaque round cible la zone la plus risquée qui reste,
+  pas encore vue par un outil dédié. Les 4 pistes trouvées cette fois
+  étaient toutes des bugs d'état React (pas de logique métier cassée) :
+  un message d'écurie qui fuit d'un perso à l'autre au changement de
+  sélection, un équipier de relève qui reste affiché comme tel après
+  être devenu le combattant principal, un équipier custom évincé du
+  plafond de la Forge qui devient un « fantôme » impossible à retirer,
+  et un `isUnlocked()` qui plante sur un chapitre inconnu (non-atteignable
+  aujourd'hui, corrigé quand même car le fix est une simple borne dans
+  la même fonction — contrairement à `getCard()` à l'audit précédent, où
+  le calcul coût/bénéfice avait justifié de différer). Fait notable :
+  ces 3 bugs UI ne sont PAS testables en vitest (logique de composant
+  React, pas de logique de jeu pure) — vérifiés à la place en capture
+  Chromium headless réelle, en reproduisant le scénario exact (entraîner
+  Kenta puis basculer sur Rei ; ajouter Rei comme équipière puis la
+  faire devenir principale) et en lisant le texte affiché réellement à
+  l'écran, pas en supposant que le code corrigé se comporte comme prévu.
+  1 test vitest (89 au total, ajouté à un test existant), sim/build
+  inchangés.
 
 - 2026-08-16 (routine) : Audit de code round 2, ciblé sur le DSL de
   cartes (cards.ts/cardForge.ts/deckBuilder.ts) — la même démarche que

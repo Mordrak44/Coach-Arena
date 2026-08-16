@@ -221,6 +221,7 @@ export function markCleared(id: string): void {
 /** Un chapitre est jouable si le précédent est vaincu (le 1er, toujours). */
 export function isUnlocked(ch: StoryChapter, cleared: Set<string>): boolean {
   const idx = STORY_CHAPTERS.findIndex(c => c.id === ch.id)
+  if (idx < 0) return false // chapitre inconnu : par défaut verrouillé, jamais un crash
   return idx === 0 || cleared.has(STORY_CHAPTERS[idx - 1].id)
 }
 

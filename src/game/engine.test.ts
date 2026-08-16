@@ -410,6 +410,10 @@ describe('mode Histoire', () => {
     expect(isUnlocked(STORY_CHAPTERS[0], new Set())).toBe(true)
     expect(isUnlocked(STORY_CHAPTERS[1], new Set())).toBe(false)
     expect(isUnlocked(STORY_CHAPTERS[1], new Set(['ch1']))).toBe(true)
+    // Chapitre inconnu (absent de STORY_CHAPTERS) : verrouillé par défaut,
+    // jamais un crash (bug trouvé en audit, 2026-08-16 — findIndex renvoie
+    // -1, et STORY_CHAPTERS[-2].id plantait avant le garde-fou).
+    expect(isUnlocked({ ...STORY_CHAPTERS[0], id: 'ch-inconnu' }, new Set())).toBe(false)
   })
 
   it("un match de chapitre se joue avec l'équipe et le deck adverses du chapitre", async () => {
