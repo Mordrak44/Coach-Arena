@@ -33,6 +33,47 @@ portraits du roster qu'après accord explicite de l'utilisateur.
 
 ## v0.5 — Polish & profondeur
 
+- [x] Audit de code (skill code-review, 2026-08-16) sur combat.ts/
+      ArenaScreen.tsx/arenaRenderer.ts — 3 bugs réels trouvés dans le
+      moteur, chacun vérifié manuellement avant correction (le skill
+      n'avait pas fait de passe de vérification lui-même) :
+      1. **Double-KO injuste** : la boucle d'actions par tick ne
+         vérifiait pas qu'un combattant était toujours vivant avant de
+         le laisser frapper — un perso tombé à 0 PV plus tôt DANS LE
+         MÊME tick pouvait quand même riposter et tuer l'autre, et le
+         départage ne regardait QUE le PV du joueur (`m.player.hp <= 0
+         ? 'enemy' : 'player'`), donnant systématiquement la victoire à
+         l'adversaire sur un double-KO — même si le joueur avait frappé
+         en premier. Corrigé par un simple `if (f.hp <= 0) continue`.
+      2. **`cheer` (encourager) ignorait la confusion** : contrairement
+         à `special`/`ulti`/aux ordres de posture, l'ordre
+         « encourage-le » ne vérifiait jamais `confusedUntil` — un coach
+         pouvait continuer à charger la Hype (et déclencher un Cri de
+         Guerre armé) PENDANT toute la fenêtre de pénalité de confusion,
+         vidant la mécanique de son coût voulu.
+      3. **Temps mort d'urgence adverse incomplet** : la condition de
+         déclenchement acceptait une carte `heal` OU `lowHpHypeFull` en
+         main, mais la logique de jeu ne cherchait QUE `heal` — un
+         adversaire n'ayant que « Dernière Chance » (lowHpHypeFull) en
+         main à PV critiques ne recevait jamais son geste d'urgence,
+         silencieusement, sans erreur ni log.
+      + 1 nettoyage perf (non fonctionnel) : la table de morphologie par
+      archétype dans `drawFighter()` était réallouée (6 objets) à
+      CHAQUE combattant à CHAQUE frame (120×/s à 60 fps) — hissée en
+      constante de module.
+      4 tests de régression vitest (87 au total, exécutés 5× de suite) :
+      chacun verrouille précisément le bug corrigé, y compris un
+      contrôle positif pour le cas `cheer` (prouve que le test détecte
+      bien un vrai gain quand il devrait y en avoir un, pas seulement
+      l'absence de gain). Un piège trouvé en écrivant le test `cheer` :
+      un trickle de Hype AMBIANT (auto-motivation + énergie vocale
+      continue) tourne CHAQUE tick indépendamment de toute commande —
+      un test qui aurait supposé « la Hype ne bouge pas du tout » aurait
+      été faux ; corrigé en comparant deux runs identiques (avec/sans la
+      commande) pour isoler la contribution propre à `cheer`. Sim
+      inchangée (78/10/76 avant, 74/11/80 après — dans la variance
+      normale, pas de dérive d'équilibrage), build inchangé, vérifié en
+      capture (funnel standard identique).
 - [x] Carnet du Coach : cartes jouables au coin du ring (3 familles :
       directes, armées, conditionnelles) — voir GAME_DESIGN.md §4 bis
       (v0 : pool de 6 cartes, sélection de 3 avant match, 1 par coin du
@@ -570,6 +611,25 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Audit de code du moteur (skill code-review) —
+  avec le puits des tâches sûres/gratuites qui s'épuisait (dit
+  explicitement à l'utilisateur en fin de session précédente), changé
+  d'angle : au lieu d'ajouter, chercher des bugs RÉELS dans ce qui existe
+  déjà. Ciblé combat.ts/ArenaScreen.tsx/arenaRenderer.ts (le cœur du
+  moteur, jamais audité par un outil dédié). 4 pistes trouvées, chacune
+  vérifiée manuellement (lecture du code, pas juste confiance dans le
+  skill) avant correction : 3 vrais bugs de logique de jeu (double-KO
+  injuste, `cheer` qui ignorait la confusion, temps mort d'urgence
+  adverse muet sur les cartes lowHpHypeFull) + 1 nettoyage perf
+  (allocation d'objets inutile dans le rendu). Fixes minimaux et ciblés,
+  chacun verrouillé par un test de régression écrit APRÈS coup pour
+  prouver le comportement corrigé. Un des tests a d'abord échoué pour une
+  bonne raison — pas un faux positif de ma part, mais une découverte
+  réelle d'un mécanisme ambiant (trickle de Hype continu) que je ne
+  connaissais pas encore en détail, qui a affiné le test plutôt que de
+  l'invalider. 4 tests vitest (87 au total, 5× de suite), sim dans la
+  variance normale, build/capture inchangés.
 
 - 2026-08-15 (routine) : Couverture de tests pour onboarding.ts — clôt le
   balayage entamé avec stable.ts : les trois modules localStorage de

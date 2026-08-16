@@ -7,6 +7,18 @@ import { HYPE_MAX, ULTI_MAX } from '../game/combat'
 export const CANVAS_W = 540
 export const CANVAS_H = 960
 
+// Morphologie par archétype : le vétéran est massif, l'insaisissable
+// fluette. Table statique — hors de drawFighter() pour ne pas réallouer
+// 6 objets à chaque combattant à chaque frame (2× par frame, 60 fps).
+const BODY: Record<string, { scale: number; torso: number; limb: number; head: number }> = {
+  brawler: { scale: 1.08, torso: 27, limb: 13, head: 21 },
+  rival: { scale: 1.0, torso: 18, limb: 10, head: 19 },
+  prodigy: { scale: 0.97, torso: 17, limb: 9, head: 19 },
+  veteran: { scale: 1.16, torso: 31, limb: 14, head: 20 },
+  beast: { scale: 1.05, torso: 22, limb: 12, head: 20 },
+  trickster: { scale: 0.92, torso: 14, limb: 8, head: 18 },
+}
+
 interface FloatingText {
   text: string
   x: number
@@ -431,15 +443,6 @@ export class ArenaRenderer {
     const facing = f.facing
     const c = f.char.color
     const c2 = f.char.color2
-    // Morphologie par archétype : le vétéran est massif, l'insaisissable fluette.
-    const BODY: Record<string, { scale: number; torso: number; limb: number; head: number }> = {
-      brawler: { scale: 1.08, torso: 27, limb: 13, head: 21 },
-      rival: { scale: 1.0, torso: 18, limb: 10, head: 19 },
-      prodigy: { scale: 0.97, torso: 17, limb: 9, head: 19 },
-      veteran: { scale: 1.16, torso: 31, limb: 14, head: 20 },
-      beast: { scale: 1.05, torso: 22, limb: 12, head: 20 },
-      trickster: { scale: 0.92, torso: 14, limb: 8, head: 18 },
-    }
     const body = BODY[f.char.archetype] ?? BODY.prodigy
 
     ctx.save()

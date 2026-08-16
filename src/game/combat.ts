@@ -425,6 +425,7 @@ function applyCommand(m: MatchState, cmd: CoachCommand, voiceEnergy: number, voi
   const calm = voiceEnergy < 0.45 && voiceTone < 1.1
 
   if (cmd === 'cheer') {
+    if (m.t < f.confusedUntil) return // confus : n'écoute plus, pas même les encouragements
     let gain = 6 * hrtScale
     // Sanguin : les cris l'enflamment. Cérébral : hurler ne l'aide pas.
     if (trait === 'sanguin' && shouting) gain *= 1.5
@@ -897,14 +898,17 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
     m.enemy.hp / m.enemy.maxHp < 0.25 &&
     m.enemyHand.some(id => getCard(id).effects.some(e => e.kind === 'heal' || e.kind === 'lowHpHypeFull'))
   ) {
+    // Priorité au soin direct ; à défaut, armer la Dernière Chance adverse
+    // (elle se déclenchera d'elle-même juste plus bas, PV déjà critiques).
     const healId = m.enemyHand.find(id => getCard(id).effects.some(e => e.kind === 'heal'))
-    if (healId) {
+    const clutchId = healId ?? m.enemyHand.find(id => getCard(id).effects.some(e => e.kind === 'lowHpHypeFull'))
+    if (clutchId) {
       m.enemyTimeoutsLeft--
-      m.enemyHand.splice(m.enemyHand.indexOf(healId), 1)
-      m.enemyDiscard.push(healId)
+      m.enemyHand.splice(m.enemyHand.indexOf(clutchId), 1)
+      m.enemyDiscard.push(clutchId)
       m.events.push({ kind: 'timeout', t: m.t, side: 'enemy' })
-      m.events.push({ kind: 'card', t: m.t, name: `${getCard(healId).name} (temps mort adverse)` })
-      applyCardEffects(m, getCard(healId).effects, 'enemy')
+      m.events.push({ kind: 'card', t: m.t, name: `${getCard(clutchId).name} (temps mort adverse)` })
+      applyCardEffects(m, getCard(clutchId).effects, 'enemy')
     }
   }
 
@@ -974,6 +978,11 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
   // --- Actions des combattants ---
   for (const side of ['player', 'enemy'] as const) {
     const f = side === 'player' ? m.player : m.enemy
+    // Un combattant tombé à 0 PV plus tôt DANS CE MÊME TICK (le camp
+    // adverse est résolu juste avant dans cette boucle) ne peut plus
+    // frapper — sinon un round se solde parfois en double-KO où le
+    // départage (ligne plus bas) ignore qui a frappé en premier.
+    if (f.hp <= 0) continue
     if (m.t >= f.nextActionAt) {
       const slow = m.t < f.confusedUntil ? 1.4 : 1
       f.nextActionAt = m.t + attackInterval(f) * slow * (0.85 + Math.random() * 0.3)

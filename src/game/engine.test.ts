@@ -1157,3 +1157,81 @@ describe('Onboarding (onboarding.ts) — dernier module localStorage jamais test
     expect(hasSeenCombatHint()).toBe(false)
   })
 })
+
+describe('Bugs trouvés par audit (code-review, 2026-08-16) — verrouillés par des tests', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("un combattant à 0 PV ne peut plus frapper dans le MÊME tick (pas de double-KO injuste)", () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99) // jamais d'esquive, jamais de crit
+    const m = freshMatch()
+    toFighting(m)
+    m.enemyTimeoutsLeft = 0 // évite toute interférence du temps mort d'urgence adverse
+    m.player.hp = 1
+    m.enemy.hp = 1
+    m.player.nextActionAt = m.t
+    m.enemy.nextActionAt = m.t
+    tick(m, 0.05, quiet)
+    // Le joueur (traité en premier dans la boucle) tue l'adversaire ; l'adversaire,
+    // déjà à 0 PV, ne doit PAS pouvoir riposter dans ce même tick (avant le fix,
+    // il le pouvait, et le départage de double-KO favorisait systématiquement
+    // l'adversaire quel que soit qui avait frappé en premier).
+    expect(m.enemy.hp).toBe(0)
+    expect(m.player.hp).toBe(1)
+    expect(m.phase).toBe('roundEnd')
+  })
+
+  it("le coach ne peut plus 'encourager' un perso confus (comme les autres ordres)", () => {
+    // Un trickle de Hype ambiant (auto-motivation + énergie vocale continue,
+    // voir tick()) s'applique CHAQUE tick indépendamment de toute commande —
+    // donc "la Hype ne bouge pas" n'est pas le bon test. On isole la
+    // contribution PROPRE à 'cheer' en comparant deux runs identiques,
+    // avec et sans la commande, sous la même confusion.
+    const withoutCmd = freshMatch()
+    toFighting(withoutCmd)
+    withoutCmd.player.nextActionAt = withoutCmd.t + 1000
+    withoutCmd.enemy.nextActionAt = withoutCmd.t + 1000
+    withoutCmd.player.confusedUntil = withoutCmd.t + 10
+    tick(withoutCmd, 0.05, { command: null, voiceEnergy: 0.8, faceEnergy: 0 })
+
+    const withCmd = freshMatch()
+    toFighting(withCmd)
+    withCmd.player.nextActionAt = withCmd.t + 1000
+    withCmd.enemy.nextActionAt = withCmd.t + 1000
+    withCmd.player.confusedUntil = withCmd.t + 10
+    tick(withCmd, 0.05, { command: 'cheer', voiceEnergy: 0.8, faceEnergy: 0 })
+
+    expect(withCmd.player.hype).toBe(withoutCmd.player.hype) // confus : 'cheer' n'ajoute rien de plus
+  })
+
+  it("contrôle positif : un perso NON confus reçoit bien un gain SUPPLÉMENTAIRE via 'cheer'", () => {
+    const withoutCmd = freshMatch()
+    toFighting(withoutCmd)
+    withoutCmd.player.nextActionAt = withoutCmd.t + 1000
+    withoutCmd.enemy.nextActionAt = withoutCmd.t + 1000
+    tick(withoutCmd, 0.05, { command: null, voiceEnergy: 0.8, faceEnergy: 0 })
+
+    const withCmd = freshMatch()
+    toFighting(withCmd)
+    withCmd.player.nextActionAt = withCmd.t + 1000
+    withCmd.enemy.nextActionAt = withCmd.t + 1000
+    tick(withCmd, 0.05, { command: 'cheer', voiceEnergy: 0.8, faceEnergy: 0 })
+
+    expect(withCmd.player.hype).toBeGreaterThan(withoutCmd.player.hype)
+  })
+
+  it("le temps mort d'urgence adverse joue aussi une carte lowHpHypeFull, pas seulement heal", () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.enemy.hp = Math.round(m.enemy.maxHp * 0.1) // sous 25% (déclenche) ET sous 15% (seuil de lastChance)
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = ['lastChance'] // AUCUNE carte de soin, seulement lowHpHypeFull
+    const timeoutsBefore = m.enemyTimeoutsLeft
+    tick(m, 0.05, quiet)
+    expect(m.enemyTimeoutsLeft).toBe(timeoutsBefore - 1) // le temps mort a bien été consommé
+    expect(m.enemy.hype).toBe(HYPE_MAX) // armée ET auto-déclenchée dans le même tick (HP déjà sous le seuil)
+    expect(m.events.some(e => e.kind === 'timeout' && e.side === 'enemy')).toBe(true)
+  })
+})
