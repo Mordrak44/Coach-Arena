@@ -53,6 +53,13 @@ export class ArenaRenderer {
   private commentText = ''
   private commentWeight: 1 | 2 | 3 = 1
   private commentUntil = 0
+  /** WCAG 2.3.3 — désactive le shake et le zoom brusque pour les
+   * utilisateurs sujets au mal des transports / troubles vestibulaires.
+   * Le flash d'impact reste (couleur, pas de mouvement). */
+  private reducedMotion =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
   /** Consomme les nouveaux events du match pour déclencher les FX. */
   ingestEvents(m: MatchState, now: number) {
@@ -232,13 +239,13 @@ export class ArenaRenderer {
 
     ctx.save()
     // Screen shake
-    if (now < this.shakeUntil) {
+    if (!this.reducedMotion && now < this.shakeUntil) {
       const k = (this.shakeUntil - now) / 0.25
       ctx.translate((Math.random() - 0.5) * this.shakeMag * k, (Math.random() - 0.5) * this.shakeMag * k)
     }
 
     // Zoom dramatique (spécial) : pousse vite, relâche doucement
-    if (now < this.zoomUntil) {
+    if (!this.reducedMotion && now < this.zoomUntil) {
       const total = this.zoomUntil - this.zoomStart
       const p = (now - this.zoomStart) / total
       const intensity = p < 0.2 ? p / 0.2 : 1 - (p - 0.2) / 0.8

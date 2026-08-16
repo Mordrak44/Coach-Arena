@@ -28,6 +28,7 @@ import { CARD_POOL, SIGNATURE_CARDS, buildStarterDeck, clampEffect, computeCost,
 import { parseConsigne } from './speechTactics'
 import { buildScenePlans, colorWord } from './sceneDirector'
 import { ROSTER, createFromPrompt } from './characters'
+import { ArenaRenderer } from '../render/arenaRenderer'
 import type { CardId, CoachInput, MatchState } from './types'
 
 const quiet: CoachInput = { command: null, voiceEnergy: 0, faceEnergy: 0 }
@@ -1919,5 +1920,29 @@ describe('Persistance de la Forge (cardForge.ts) — saveForgedCard/loadForgedCa
     }
     const r = forgeCard('un cri de guerre puissant')!
     expect(() => saveForgedCard(r.card)).not.toThrow()
+  })
+})
+
+describe('ArenaRenderer — prefers-reduced-motion (WCAG 2.3.3, audit accessibilité)', () => {
+  afterEach(() => {
+    delete (globalThis as any).window
+  })
+
+  it("détecte la préférence de mouvement réduit à la construction", () => {
+    ;(globalThis as any).window = { matchMedia: (_q: string) => ({ matches: true }) }
+    const renderer = new ArenaRenderer()
+    expect((renderer as any).reducedMotion).toBe(true)
+  })
+
+  it('laisse le mouvement actif quand la préférence système ne le demande pas', () => {
+    ;(globalThis as any).window = { matchMedia: (_q: string) => ({ matches: false }) }
+    const renderer = new ArenaRenderer()
+    expect((renderer as any).reducedMotion).toBe(false)
+  })
+
+  it("reste désactivé sans planter quand window ou matchMedia est absent (SSR)", () => {
+    delete (globalThis as any).window
+    expect(() => new ArenaRenderer()).not.toThrow()
+    expect((new ArenaRenderer() as any).reducedMotion).toBe(false)
   })
 })

@@ -806,6 +806,37 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       isolation. 4 nouveaux tests (dont un qui balaie toute la palette du
       roster). engine.test.ts 130 → 134. `tsc --noEmit` + `npm run
       build` verts.
+- [x] `prefers-reduced-motion` (WCAG 2.3.3, « Animation from
+      Interactions ») — 3e dimension d'accessibilité distincte des deux
+      précédentes (ARIA/clavier, puis contraste couleur), jamais adressée :
+      le jeu a un vrai screen shake (7 à 34px selon l'impact) et un zoom
+      dramatique brutal (jusqu'à ×1,32, poussé en 20 % du temps puis
+      relâché) déclenchés sur chaque coup et surtout sur spécial/ulti —
+      exactement le type de mouvement soudain, non essentiel au jeu, que
+      WCAG 2.3.3 demande de pouvoir désactiver (mal des transports,
+      troubles vestibulaires). `grep -rn "prefers-reduced-motion"` sur
+      `src/` confirmait qu'aucune gestion n'existait nulle part. Ajout
+      d'un champ `reducedMotion` sur `ArenaRenderer` (`render/
+      arenaRenderer.ts`), lu une fois à la construction via
+      `window.matchMedia('(prefers-reduced-motion: reduce)').matches`
+      (avec garde `typeof window !== 'undefined'`, cohérent avec le motif
+      `hasStorage` déjà utilisé ailleurs dans le projet) : quand actif, le
+      `ctx.translate` du shake et le `ctx.translate`/`ctx.scale` du zoom
+      dramatique sont simplement sautés dans `draw()`. Le flash d'impact
+      (aplat de couleur, pas un mouvement) et les speed lines de fond
+      (animation continue décorative, pas déclenchée par une interaction —
+      hors du périmètre de 2.3.3) sont volontairement laissés intacts :
+      portée délibérément restreinte aux deux effets qui posent
+      réellement un problème vestibulaire. 3 nouveaux tests unitaires
+      (détection à la construction, `true`/`false`/absence de `window`
+      en SSR ou en environnement de test) — la logique de saut elle-même
+      est une simple garde booléenne d'une ligne, à faible risque, déjà
+      couverte par `tsc`. Vérifié aussi en conditions réelles : Chromium
+      headless avec `page.emulateMedia({ reducedMotion: 'reduce' })` puis
+      `'no-preference'`, confirmant que `window.matchMedia(...).matches`
+      reflète bien l'état émulé dans les deux sens avant de faire
+      confiance à la détection côté renderer. engine.test.ts 134 → 137.
+      `tsc --noEmit` + `npm run build` verts.
 
 ## Vers la version vendable (gap analysis 2026-08-14)
 
@@ -1301,6 +1332,23 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-16 (routine) : 3e dimension d'accessibilité, après ARIA/clavier
+  puis contraste couleur : `prefers-reduced-motion` (WCAG 2.3.3). Le combat
+  a un screen shake (7-34px) et un zoom dramatique brutal (jusqu'à ×1,32)
+  déclenchés sur chaque coup et surtout spécial/ulti — exactement le genre
+  de mouvement soudain, non essentiel, que WCAG demande de pouvoir
+  désactiver. `grep` sur `src/` confirmait qu'aucune gestion n'existait.
+  Ajout d'un champ `reducedMotion` sur `ArenaRenderer`, lu une fois à la
+  construction via `window.matchMedia('(prefers-reduced-motion: reduce)')`
+  (garde `typeof window !== 'undefined'`, même motif que `hasStorage`
+  ailleurs dans le projet) : shake et zoom sautés dans `draw()` quand actif.
+  Flash d'impact et speed lines de fond laissés intacts (pas des mouvements
+  déclenchés par une interaction, hors périmètre de 2.3.3) — portée
+  délibérément restreinte aux deux effets réellement concernés. 3 tests
+  unitaires + vérification Chromium headless via `page.emulateMedia()`
+  confirmant que la préférence émulée atteint bien `window.matchMedia`
+  dans les deux sens. engine.test.ts 134 → 137. `tsc --noEmit` + `npm run
+  build` verts.
 - 2026-08-16 (routine) : Après l'audit ARIA/clavier des deux itérations
   précédentes, une dimension d'accessibilité distincte jamais vérifiée :
   le CONTRASTE des couleurs (WCAG AA). Calculé la luminosité relative +
