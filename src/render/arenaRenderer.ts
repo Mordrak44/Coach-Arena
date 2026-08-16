@@ -62,48 +62,66 @@ export class ArenaRenderer {
     }
   }
 
+  /** Pousse un texte flottant — les champs non fournis retombent sur des
+   *  valeurs neutres (vie 1s, taille 32, blanc, aucun angle/délai). */
+  private pushFloat(
+    text: string,
+    x: number,
+    y: number,
+    now: number,
+    opts: { life?: number; size?: number; color?: string; angle?: number; delay?: number } = {},
+  ) {
+    this.floats.push({
+      text,
+      x,
+      y,
+      t0: now + (opts.delay ?? 0),
+      life: opts.life ?? 1,
+      size: opts.size ?? 32,
+      color: opts.color ?? '#ffffff',
+      angle: opts.angle ?? 0,
+    })
+  }
+
   private onEvent(m: MatchState, ev: CombatEvent, now: number) {
     const fx = (side: 'player' | 'enemy') =>
       (side === 'player' ? m.player.x : m.enemy.x) * CANVAS_W
     switch (ev.kind) {
       case 'hit':
-        this.floats.push({
-          text: ev.onoma,
-          x: fx(ev.target),
-          y: 520 - Math.random() * 80,
-          t0: now,
+        this.pushFloat(ev.onoma, fx(ev.target), 520 - Math.random() * 80, now, {
           life: 0.8,
           size: ev.crit ? 64 : 42,
           color: ev.crit ? '#ffdd00' : '#ffffff',
           angle: (Math.random() - 0.5) * 0.4,
         })
-        this.floats.push({
-          text: `-${ev.dmg}`,
-          x: fx(ev.target) + 30,
-          y: 430,
-          t0: now,
+        this.pushFloat(`-${ev.dmg}`, fx(ev.target) + 30, 430, now, {
           life: 0.9,
           size: 30,
           color: ev.crit ? '#ff3355' : '#ff7788',
-          angle: 0,
         })
         this.shake(now, ev.crit ? 14 : 7)
         if (ev.crit) this.flash(now, '#fff', 0.08)
         break
       case 'blocked':
-        this.floats.push({ text: 'GUARD!', x: fx(ev.target), y: 500, t0: now, life: 0.6, size: 32, color: '#7ec8ff', angle: 0 })
+        this.pushFloat('GUARD!', fx(ev.target), 500, now, { life: 0.6, size: 32, color: '#7ec8ff' })
         break
       case 'dodged':
-        this.floats.push({ text: 'SWOOSH', x: fx(ev.target), y: 500, t0: now, life: 0.6, size: 30, color: '#aaffcc', angle: -0.2 })
+        this.pushFloat('SWOOSH', fx(ev.target), 500, now, { life: 0.6, size: 30, color: '#aaffcc', angle: -0.2 })
         break
       case 'countered':
-        this.floats.push({ text: 'CONTRE !!', x: CANVAS_W / 2, y: 470, t0: now, life: 1, size: 52, color: '#ffaa00', angle: 0.1 })
+        this.pushFloat('CONTRE !!', CANVAS_W / 2, 470, now, { life: 1, size: 52, color: '#ffaa00', angle: 0.1 })
         this.shake(now, 12)
         break
       case 'special':
         this.specialBannerText = ev.name.toUpperCase()
         this.specialBannerUntil = now + 1.6
-        this.floats.push({ text: ev.onoma, x: CANVAS_W / 2, y: 500, t0: now + 0.4, life: 1.1, size: 76, color: '#ffdd00', angle: -0.08 })
+        this.pushFloat(ev.onoma, CANVAS_W / 2, 500, now, {
+          life: 1.1,
+          size: 76,
+          color: '#ffdd00',
+          angle: -0.08,
+          delay: 0.4,
+        })
         this.flash(now, '#fff', 0.16)
         this.shake(now, 22)
         // Zoom dramatique sur celui qui déclenche
@@ -114,8 +132,20 @@ export class ArenaRenderer {
       case 'ulti':
         this.specialBannerText = '★ ' + ev.name.toUpperCase() + ' ★'
         this.specialBannerUntil = now + 2.4
-        this.floats.push({ text: ev.onoma, x: CANVAS_W / 2, y: 500, t0: now + 0.5, life: 1.5, size: 84, color: '#ff3366', angle: -0.06 })
-        this.floats.push({ text: `-${ev.dmg}`, x: CANVAS_W / 2, y: 560, t0: now + 0.9, life: 1.2, size: 44, color: '#ff3366', angle: 0.05 })
+        this.pushFloat(ev.onoma, CANVAS_W / 2, 500, now, {
+          life: 1.5,
+          size: 84,
+          color: '#ff3366',
+          angle: -0.06,
+          delay: 0.5,
+        })
+        this.pushFloat(`-${ev.dmg}`, CANVAS_W / 2, 560, now, {
+          life: 1.2,
+          size: 44,
+          color: '#ff3366',
+          angle: 0.05,
+          delay: 0.9,
+        })
         this.flash(now, '#ff3366', 0.22)
         this.shake(now, 34)
         this.zoomStart = now
@@ -123,22 +153,23 @@ export class ArenaRenderer {
         this.zoomFocusX = (ev.by === 'player' ? m.player.x : m.enemy.x) * CANVAS_W
         break
       case 'ultiReady':
-        this.floats.push({ text: '⚡ ULTI PRÊT ⚡', x: fx(ev.who), y: 360, t0: now, life: 1.4, size: 36, color: '#ff3366', angle: 0 })
+        this.pushFloat('⚡ ULTI PRÊT ⚡', fx(ev.who), 360, now, { life: 1.4, size: 36, color: '#ff3366' })
         break
       case 'card':
-        this.floats.push({ text: `🃏 ${ev.name.toUpperCase()}`, x: CANVAS_W / 2, y: 520, t0: now, life: 1.4, size: 34, color: '#7ec8ff', angle: -0.05 })
+        this.pushFloat(`🃏 ${ev.name.toUpperCase()}`, CANVAS_W / 2, 520, now, {
+          life: 1.4,
+          size: 34,
+          color: '#7ec8ff',
+          angle: -0.05,
+        })
         break
       case 'cardProc':
-        this.floats.push({ text: ev.text, x: CANVAS_W / 2, y: 480, t0: now, life: 1.3, size: 48, color: '#7ec8ff', angle: 0.06 })
+        this.pushFloat(ev.text, CANVAS_W / 2, 480, now, { life: 1.3, size: 48, color: '#7ec8ff', angle: 0.06 })
         this.flash(now, '#7ec8ff', 0.1)
         this.shake(now, 10)
         break
       case 'switch':
-        this.floats.push({
-          text: `🔁 ${ev.name.toUpperCase()} MONTE SUR LE RING !`,
-          x: CANVAS_W / 2,
-          y: 500,
-          t0: now,
+        this.pushFloat(`🔁 ${ev.name.toUpperCase()} MONTE SUR LE RING !`, CANVAS_W / 2, 500, now, {
           life: 1.6,
           size: 36,
           color: ev.side === 'player' ? '#ffdd00' : '#ff7788',
@@ -147,22 +178,22 @@ export class ArenaRenderer {
         this.flash(now, '#ffffff', 0.08)
         break
       case 'trait':
-        this.floats.push({ text: ev.text, x: m.player.x * CANVAS_W, y: 390, t0: now, life: 1.2, size: 26, color: ev.color, angle: -0.04 })
+        this.pushFloat(ev.text, m.player.x * CANVAS_W, 390, now, { life: 1.2, size: 26, color: ev.color, angle: -0.04 })
         break
       case 'confused':
-        this.floats.push({ text: '?? CONFUS ??', x: fx(ev.who), y: 400, t0: now, life: 1.2, size: 30, color: '#cc88ff', angle: 0 })
+        this.pushFloat('?? CONFUS ??', fx(ev.who), 400, now, { life: 1.2, size: 30, color: '#cc88ff' })
         break
       case 'hypeFull':
-        this.floats.push({ text: '★ HYPE MAX ★', x: fx(ev.who), y: 380, t0: now, life: 1.2, size: 34, color: '#ffdd00', angle: 0 })
+        this.pushFloat('★ HYPE MAX ★', fx(ev.who), 380, now, { life: 1.2, size: 34, color: '#ffdd00' })
         break
       case 'roundStart':
-        this.floats.push({ text: `ROUND ${ev.round}`, x: CANVAS_W / 2, y: 440, t0: now, life: 1.6, size: 64, color: '#ffffff', angle: 0 })
+        this.pushFloat(`ROUND ${ev.round}`, CANVAS_W / 2, 440, now, { life: 1.6, size: 64 })
         break
       case 'roundEnd': {
-        this.floats.push({
-          text: ev.winner === 'player' ? 'ROUND GAGNÉ !' : 'ROUND PERDU…',
-          x: CANVAS_W / 2, y: 460, t0: now, life: 2, size: 46,
-          color: ev.winner === 'player' ? '#ffdd00' : '#8899aa', angle: 0,
+        this.pushFloat(ev.winner === 'player' ? 'ROUND GAGNÉ !' : 'ROUND PERDU…', CANVAS_W / 2, 460, now, {
+          life: 2,
+          size: 46,
+          color: ev.winner === 'player' ? '#ffdd00' : '#8899aa',
         })
         // KO (et pas décision aux points) → l'écran se fissure sur le perdant
         const loser = ev.winner === 'player' ? m.enemy : m.player

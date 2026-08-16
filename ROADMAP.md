@@ -348,6 +348,22 @@ portraits du roster qu'après accord explicite de l'utilisateur.
         dédiée plutôt que fait à la hâte ici.
       2 nouveaux tests (engine.test.ts 98 → 100). `tsc --noEmit` +
       `npm run build` + suite complète verts.
+- [x] Nettoyage `arenaRenderer.ts` : les ~20 constructions inline
+      d'objets `FloatingText` dans `onEvent()` (identifiées au round 8,
+      délibérément reportées faute de capture de référence pour vérifier
+      l'absence de régression) extraites en une méthode privée commune
+      `pushFloat(text, x, y, now, opts)` avec des valeurs par défaut
+      neutres (vie 1 s, taille 32, blanc, aucun angle/délai) — chaque
+      site d'appel ne passe plus que ce qui diffère du défaut. Toutes les
+      valeurs (position, couleur, taille, angle, délai `t0`) reproduites
+      à l'identique, site par site, pas de comportement changé. Vérifié
+      en capture Chromium réelle (`?demo=fast`, deux moments de combat
+      capturés) : SWOOSH (esquive) et DOGO!/-5 (coup) rendus identiques
+      à avant le refactor — même position, taille, couleur, angle.
+      `tsc --noEmit` + `npm run build` + 100 tests vitest verts (aucun
+      nouveau test : pur refactor interne, la géométrie/couleur de
+      chaque cas était déjà implicitement verrouillée par la capture
+      visuelle, pas par des tests unitaires sur ce fichier canvas).
 - [x] Carnet du Coach : cartes jouables au coin du ring (3 familles :
       directes, armées, conditionnelles) — voir GAME_DESIGN.md §4 bis
       (v0 : pool de 6 cartes, sélection de 3 avant match, 1 par coin du
@@ -899,6 +915,20 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Nettoyage `arenaRenderer.ts` — reprise de
+  l'item explicitement reporté au round 8 d'audit (la duplication des
+  ~20 constructions de `FloatingText` dans `onEvent()`), cette fois avec
+  la vérification visuelle dédiée qui manquait alors. Extrait en une
+  méthode privée `pushFloat(text, x, y, now, opts)` avec des valeurs par
+  défaut neutres ; chaque site d'appel ne passe plus que ce qui diffère
+  du défaut, reproduisant exactement les valeurs d'avant (position,
+  couleur, taille, angle, délai). Vérifié par deux captures Chromium
+  headless en cours de combat réel (`?demo=fast`) : le texte d'esquive
+  (SWOOSH) et le texte de coup + dégâts (DOGO!/-5) rendus à l'identique
+  de ce qu'ils étaient avant le refactor. Pur nettoyage interne, aucun
+  nouveau test (rien de neuf à verrouiller, juste une déduplication),
+  100 tests vitest inchangés, `tsc --noEmit`/`npm run build` verts.
 
 - 2026-08-16 : Reprise du pilote Kling après confirmation explicite de
   l'utilisateur (« je confirme »), suite à ma question sur l'état du
