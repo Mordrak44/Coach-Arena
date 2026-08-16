@@ -29,7 +29,18 @@ function readJson<T>(key: string, fallback: T): T {
   if (!hasStorage) return fallback
   try {
     const raw = localStorage.getItem(key)
-    return raw ? (JSON.parse(raw) as T) : fallback
+    if (!raw) return fallback
+    const parsed = JSON.parse(raw)
+    // JSON.parse réussit sur du JSON valide mais de mauvaise FORME (ex. la
+    // chaîne "null", "42", '"oops"') sans lever d'exception — les appelants
+    // (getProgress fait `map[charId]`, loadCustoms fait `for...of customs`)
+    // plantaient alors en aval, hors de ce try/catch. La forme attendue se
+    // déduit du `fallback` lui-même (un tableau ici → CUSTOM_KEY, un objet
+    // là → PROG_KEY) : sixième et septième occurrence de cette même
+    // famille de bug trouvée en balayant tous les JSON.parse du dépôt
+    // (stable.ts, deckBuilder.ts, story.ts, onboarding.ts).
+    if (Array.isArray(fallback)) return Array.isArray(parsed) ? (parsed as T) : fallback
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as T) : fallback
   } catch {
     return fallback
   }

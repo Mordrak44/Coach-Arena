@@ -16,7 +16,16 @@ function load(): Seen {
   if (!hasStorage) return {}
   try {
     const raw = localStorage.getItem(KEY)
-    return raw ? (JSON.parse(raw) as Seen) : {}
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    // JSON.parse('null') = null SANS exception — load() le renverrait tel
+    // quel, et l'accès à `.combat`/`.corner` a lieu chez l'APPELANT
+    // (hasSeenCombatHint), hors de ce try/catch : un stockage corrompu par
+    // la chaîne "null" aurait planté le tout premier rendu d'ArenaScreen
+    // (appelé en synchrone dans ses useState/useRef initiaux) — trouvé en
+    // balayant tous les `JSON.parse` du dépôt après le 3e bug de cette
+    // famille en autant de jours (stable.ts, deckBuilder.ts, story.ts).
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Seen) : {}
   } catch {
     return {}
   }

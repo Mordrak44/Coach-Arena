@@ -956,6 +956,40 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       ne plante que pour CERTAINS types primitifs, pas tous. Corrigé en
       validant `Array.isArray(parsed)` avant de construire le Set (même
       patron que le fix deckBuilder.ts). 4 nouveaux tests (112 → 116).
+- [x] Balayage PROACTIF de tous les `JSON.parse` du dépôt (au lieu
+      d'attendre que la coverage ou l'audit en révèle un de plus un par
+      un) — après 3 occurrences de la même famille de bug en 3 jours,
+      vérifié chaque site restant plutôt que de continuer à les découvrir
+      au hasard. 2 vrais bugs supplémentaires trouvés, TOUS DEUX CONFIRMÉS
+      PAR UN TEST QUI ÉCHOUE avant le fix (discipline systématique) :
+      1. **`onboarding.ts`, `load()`** : `JSON.parse('null')` = `null`
+         sans exception — l'accès `.combat`/`.corner` a lieu chez
+         l'APPELANT (`hasSeenCombatHint`), hors du try/catch de `load()`.
+         Un stockage corrompu par la chaîne littérale `"null"` aurait
+         planté le tout premier rendu d'`ArenaScreen` (appelé en
+         SYNCHRONE dans ses `useState`/`useRef` initiaux — pas de
+         deuxième chance, l'écran ne s'affiche jamais). Confirmé par
+         test avant fix : `TypeError: Cannot read properties of null
+         (reading 'combat')`.
+      2. **`progression.ts`, `readJson<T>`** : même défaut générique,
+         touchant DEUX call sites à la fois — `getProgress`/`recordResult`
+         (`map[charId]` plante sur `null`) et `loadCustoms` (`for...of
+         customs` plante sur `null`/nombre — pas itérables — ET sur une
+         chaîne comme `"oops"` : itérable, mais la migration Ulti qui
+         suit tente d'ASSIGNER une propriété à un caractère de string,
+         ce qui lève `TypeError: Cannot create property 'ulti' on
+         string 'o'` en mode strict). Confirmé par 2 tests avant fix.
+      Fix commun aux deux : valider la FORME du JSON parsé (objet pour
+      onboarding.ts/PROG_KEY, tableau pour CUSTOM_KEY — `readJson`
+      déduit laquelle attendre du type runtime de son propre paramètre
+      `fallback`) avant de le renvoyer, plutôt que de compter sur le
+      try/catch existant qui ne couvre que l'ÉTAPE DE PARSING, pas les
+      opérations faites par l'appelant sur le résultat. 4 nouveaux tests
+      (116 → 120, stables sur 5 exécutions), `tsc --noEmit`/`npm run
+      build` verts. Tous les `JSON.parse` du dépôt sont maintenant soit
+      déjà sûrs par construction (cardForge.ts — vérifié : ses opérations
+      internes plantent bien sur TOUTE forme corrompue, y compris les cas
+      qui avaient piégé les autres fichiers), soit corrigés.
 
 ### Tier 2 — Édition Histoire 14,90 € (stores)
 - [x] Mode histoire v0 « Le Grand Hurlement » : 8 chapitres écrits
@@ -1032,6 +1066,39 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Après 3 occurrences de la même famille de bug
+  en 3 jours (stable.ts, deckBuilder.ts, story.ts — un `JSON.parse` non
+  validé en forme), changé de méthode plutôt que d'attendre la
+  prochaine découverte au hasard : `grep -rn "JSON.parse" src/` pour
+  auditer PROACTIVEMENT tous les sites restants d'un coup. 2 fichiers
+  encore vulnérables trouvés, tous deux confirmés par un test qui
+  échoue avant le fix (jamais supposé) :
+  - `onboarding.ts`, `load()` : `JSON.parse('null')` = `null` sans
+    exception ; l'accès `.combat` a lieu chez l'appelant
+    (`hasSeenCombatHint`), hors du try/catch de `load()`. Particulièrement
+    grave celui-ci : `hasSeenCombatHint()` est appelé en SYNCHRONE dans
+    les `useState`/`useRef` initiaux d'`ArenaScreen` — un stockage
+    corrompu par la chaîne `"null"` aurait empêché l'écran d'arène de
+    s'afficher DU TOUT, pas juste une fonctionnalité annexe cassée.
+  - `progression.ts`, `readJson<T>` : le même défaut générique touchait
+    DEUX call sites — `getProgress`/`recordResult` (`map[charId]` plante
+    sur `null`) et `loadCustoms` (`for...of customs` plante sur
+    `null`/nombre, non itérables ; ET sur une chaîne comme `"oops"`,
+    itérable mais dont chaque caractère fait ensuite planter la
+    migration Ulti qui tente de lui ASSIGNER une propriété — `Cannot
+    create property 'ulti' on string 'o'` en mode strict).
+  Fix unique pour les deux : `readJson` déduit la forme attendue
+  (objet ou tableau) du type runtime de son propre `fallback` et
+  valide le JSON parsé contre cette forme avant de le renvoyer, au lieu
+  de compter sur un try/catch qui ne couvre que l'étape de PARSING, pas
+  ce que l'appelant fait ensuite du résultat. 4 nouveaux tests
+  (116 → 120, stables sur 5 exécutions), `tsc --noEmit`/`npm run build`
+  verts. Vérifié que le dernier `JSON.parse` restant (cardForge.ts)
+  était déjà sûr par construction — ses opérations internes plantent
+  bien sur TOUTE forme corrompue, y compris celles qui avaient piégé
+  les 5 autres fichiers — donc tous les `JSON.parse` du dépôt sont
+  maintenant couverts, par correction ou par preuve.
 
 - 2026-08-16 (routine) : Quatrième passe sur le rapport de coverage —
   story.ts (progression du mode Histoire), 64 % → 93 %. Encore un bug

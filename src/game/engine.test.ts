@@ -1232,6 +1232,31 @@ describe('Progression / Lien (progression.ts) — couverture des cas limites', (
     expect(found?.ulti).toBeTruthy()
     expect(found?.ulti.name).toContain('Zénith')
   })
+
+  it("bug potentiel : un stockage JSON valide « null » ne doit pas planter getProgress ni loadCustoms", async () => {
+    // JSON.parse('null') = null SANS exception. getProgress fait
+    // `map[charId]` (planterait sur null) ; loadCustoms fait
+    // `for (const c of customs)` (null n'est pas itérable, plante aussi) —
+    // quatrième et cinquième occurrence de la même famille de bug trouvée
+    // en balayant tous les JSON.parse du dépôt (stable.ts, deckBuilder.ts,
+    // story.ts, onboarding.ts).
+    const { getProgress, loadCustoms } = await import('./progression')
+    localStorage.setItem('coach-arena-progress-v1', 'null')
+    localStorage.setItem('coach-arena-customs-v1', 'null')
+    expect(() => getProgress('kenta')).not.toThrow()
+    expect(getProgress('kenta')).toEqual({ wins: 0, losses: 0 })
+    expect(() => loadCustoms()).not.toThrow()
+    expect(loadCustoms()).toEqual([])
+  })
+
+  it('loadCustoms : un stockage de mauvaise forme (chaîne, nombre, objet — pas un tableau) ne plante jamais', async () => {
+    const { loadCustoms } = await import('./progression')
+    for (const corrupted of ['"oops"', '42', '{}']) {
+      localStorage.setItem('coach-arena-customs-v1', corrupted)
+      expect(() => loadCustoms()).not.toThrow()
+      expect(loadCustoms()).toEqual([])
+    }
+  })
 })
 
 describe('Commentateur (commentator.ts) — jamais testé directement (0 référence)', () => {
@@ -1425,6 +1450,29 @@ describe('Onboarding (onboarding.ts) — dernier module localStorage jamais test
     markCornerHintSeen()
     expect(hasSeenCornerHint()).toBe(true)
     expect(hasSeenCombatHint()).toBe(false)
+  })
+
+  it("bug potentiel : un stockage JSON valide « null » ne doit pas planter hasSeenCombatHint (appelé SYNCHRONE au premier rendu d'ArenaScreen)", async () => {
+    // JSON.parse('null') = null (pas une exception) — accéder à .combat sur
+    // null plante, et cet accès a lieu chez l'APPELANT (hasSeenCombatHint),
+    // hors du try/catch de load() : un stockage corrompu par la chaîne
+    // littérale "null" aurait cassé le tout premier rendu de l'écran
+    // d'arène (ArenaScreen appelle hasSeenCombatHint() en synchrone dans
+    // ses useState/useRef initiaux).
+    const { hasSeenCombatHint, hasSeenCornerHint } = await import('./onboarding')
+    localStorage.setItem('coach-arena-onboarding-v1', 'null')
+    expect(() => hasSeenCombatHint()).not.toThrow()
+    expect(hasSeenCombatHint()).toBe(false)
+    expect(hasSeenCornerHint()).toBe(false)
+  })
+
+  it('stockage corrompu (tableau, nombre) : jamais de crash, retombe sur « pas encore vu »', async () => {
+    const { hasSeenCombatHint, markCombatHintSeen } = await import('./onboarding')
+    for (const corrupted of ['[]', '42', '"oops"']) {
+      localStorage.setItem('coach-arena-onboarding-v1', corrupted)
+      expect(() => hasSeenCombatHint()).not.toThrow()
+      expect(() => markCombatHintSeen()).not.toThrow()
+    }
   })
 })
 
