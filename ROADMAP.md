@@ -838,7 +838,43 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       badge dans les DEUX rendus (DOM live + composite exporté). Restent :
       CGU/CGV formelles au moment du paiement, relecture par un juriste
       avant lancement.
-- [ ] Hébergement + analytics funnel (arrivée → match 1 → match 3 → achat)
+- [~] Hébergement — GitHub Pages, demandé explicitement par l'utilisateur
+      (« github page ? »). `vite.config.ts` : `base: '/Coach-Arena/'` (site
+      de PROJET, pas un domaine dédié — servi sous un sous-chemin). Trois
+      fichiers en dehors du graphe de modules Vite (donc jamais réécrits
+      automatiquement par `base`) corrigés pour rester valides sous un
+      sous-chemin : `public/manifest.webmanifest` (`start_url`/`scope`/
+      icônes passés en chemins RELATIFS `./…`, pas absolus `/…` — sinon un
+      PWA installé chercherait ses icônes à la racine du domaine, pas sous
+      `/Coach-Arena/`) ; `public/sw.js` (les filtres `pathname.startsWith
+      ('/assets/')`/`'/icons/'` ne matchaient plus rien sous un sous-chemin
+      → repli en `.includes(...)` ; le fallback hors-ligne visait `'/'` en
+      dur → `self.registration.scope`) ; `src/main.tsx` (l'enregistrement
+      `register('/sw.js')` codait la racine du domaine en dur →
+      `` `${import.meta.env.BASE_URL}sw.js` ``). `index.html` : `og:image`/
+      `og:url` (Open Graph exige des URLs ABSOLUES, jamais résolues par un
+      crawler) enfin passés du chemin relatif provisoire à la vraie URL
+      GitHub Pages, maintenant connue. Vérifié en conditions RÉELLES, pas
+      supposé : `dist/` copié sous un vrai sous-répertoire `Coach-Arena/`
+      d'un serveur statique local, chargé via Chromium headless — zéro
+      requête en échec, le service worker s'enregistre avec le SCOPE
+      correct (`http://localhost:5199/Coach-Arena/`, pas la racine),
+      capture d'écran confirmant le rendu complet du Titre. `npm run dev`
+      local inchangé dans les faits (redirection 302 automatique de `/`
+      vers `/Coach-Arena/` par le serveur de dev de Vite quand `base` est
+      posé). Workflow GitHub Actions ajouté
+      (`.github/workflows/deploy-pages.yml`, actions officielles
+      `configure-pages`/`upload-pages-artifact`/`deploy-pages`, déclenché
+      sur push vers `claude/coaching-game-voice-arena-yrja2t` — seule
+      branche du dépôt — et `workflow_dispatch` manuel ; `npm test` +
+      `npm run build` tournent DANS le workflow avant tout déploiement).
+      **[~] et pas [x]** : un réglage dépôt hors de portée des outils de
+      cette session reste à faire — Settings → Pages → Build and
+      deployment → Source → « GitHub Actions » (au lieu de « Deploy from
+      a branch », le défaut). Sans ce clic, le workflow tourne mais
+      `deploy-pages` échoue (aucun site Pages configuré pour le recevoir).
+      Une fois fait, l'URL sera `https://mordrak44.github.io/Coach-Arena/`.
+- [ ] Analytics funnel (arrivée → match 1 → match 3 → achat)
 
 ### Tier 2 — Édition Histoire 14,90 € (stores)
 - [x] Mode histoire v0 « Le Grand Hurlement » : 8 chapitres écrits
@@ -915,6 +951,34 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 : Hébergement GitHub Pages mis en place, demandé
+  explicitement par l'utilisateur (« github page ? », après lui avoir
+  proposé le choix entre lancer le jeu en local ou l'héberger). `base:
+  '/Coach-Arena/'` posé dans vite.config.ts (site de PROJET, pas de
+  domaine dédié). En creusant les conséquences d'un sous-chemin plutôt
+  que la racine, trois fichiers HORS du graphe de modules Vite (donc
+  jamais réécrits automatiquement) se sont révélés cassés sous
+  `/Coach-Arena/` : le manifest PWA (icônes/`start_url` en chemins
+  absolus `/…` au lieu de relatifs `./…`), le service worker (filtres
+  `pathname.startsWith('/assets/')` qui ne matchent plus rien sous un
+  sous-chemin, fallback hors-ligne visant `'/'` en dur), et
+  l'enregistrement du service worker dans main.tsx (`/sw.js` en dur).
+  Les trois corrigés. `index.html` : og:image/og:url passés en URLs
+  absolues (obligatoire pour Open Graph), maintenant qu'un vrai domaine
+  d'hébergement existe — clôt une note laissée en suspens depuis
+  l'itération sur l'aperçu de partage. Vérifié en conditions réelles :
+  `dist/` copié sous un vrai sous-répertoire `Coach-Arena/` d'un serveur
+  statique local, chargé en Chromium headless — zéro requête en échec,
+  service worker enregistré avec le bon SCOPE (pas la racine du
+  domaine), capture confirmant le rendu complet. Workflow GitHub Actions
+  ajouté (build + test + déploiement officiel `actions/deploy-pages`,
+  déclenché sur push vers l'unique branche du dépôt + déclenchement
+  manuel). Un seul réglage reste hors de portée des outils disponibles
+  dans cette session : activer « GitHub Actions » comme source Pages
+  dans Settings → Pages du dépôt (case à cocher marquée `[~]`, pas
+  `[x]`, jusqu'à ce que ce soit fait) — communiqué à l'utilisateur avec
+  l'URL finale attendue.
 
 - 2026-08-16 (routine) : Nettoyage `arenaRenderer.ts` — reprise de
   l'item explicitement reporté au round 8 d'audit (la duplication des

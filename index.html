@@ -17,22 +17,24 @@
     />
     <!-- Aperçu de partage (Discord, Slack, iMessage, Twitter/X…) — sans ces
          balises, un lien partagé n'affiche aucune carte. og:image/url en
-         chemins relatifs faute de domaine de prod choisi (voir ROADMAP,
-         item « Hébergement ») ; à rendre absolus une fois hébergé. -->
+         URLs ABSOLUES (obligatoire pour og: — les crawlers ne résolvent pas
+         de chemin relatif) maintenant que le site est hébergé sur GitHub
+         Pages ; voir ROADMAP, item « Hébergement ». -->
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mordrak44.github.io/Coach-Arena/" />
     <meta property="og:title" content="Coach Arena" />
     <meta
       property="og:description"
       content="Le jeu de coaching à la voix : crie tes ordres, ton champion se bat. Clips 9:16 prêts pour TikTok."
     />
-    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image" content="https://mordrak44.github.io/Coach-Arena/og-image.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Coach Arena" />
     <meta
       name="twitter:description"
       content="Le jeu de coaching à la voix : crie tes ordres, ton champion se bat. Clips 9:16 prêts pour TikTok."
     />
-    <meta name="twitter:image" content="/og-image.png" />
+    <meta name="twitter:image" content="https://mordrak44.github.io/Coach-Arena/og-image.png" />
   </head>
   <body>
     <div id="root"></div>

@@ -21,7 +21,9 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url)
   if (e.request.method !== 'GET' || url.origin !== location.origin) return
 
-  if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/')) {
+  // .includes (pas .startsWith) : le site est servi sous un sous-chemin
+  // GitHub Pages (/Coach-Arena/assets/…), pas à la racine du domaine.
+  if (url.pathname.includes('/assets/') || url.pathname.includes('/icons/')) {
     e.respondWith(
       caches.open(CACHE).then(async c => {
         const hit = await c.match(e.request)
@@ -43,6 +45,14 @@ self.addEventListener('fetch', e => {
         }
         return res
       })
-      .catch(async () => (await caches.match(e.request)) ?? (await caches.match('/')) ?? Response.error()),
+      .catch(
+        async () =>
+          // self.registration.scope (pas '/' en dur) : le repli hors-ligne
+          // vise la racine du site tel qu'il est réellement servi
+          // (/Coach-Arena/ sous GitHub Pages), pas la racine du domaine.
+          (await caches.match(e.request)) ??
+          (await caches.match(self.registration.scope)) ??
+          Response.error(),
+      ),
   )
 })
