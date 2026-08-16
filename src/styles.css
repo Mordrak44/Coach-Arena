@@ -10,7 +10,12 @@
   --panel2: #201d38;
   --accent: #ffdd00;
   --accent2: #ff3366;
-  --violet: #8f6bff;
+  /* #8f6bff donnait 4.42:1 sur --panel2 en texte (coûts de carte « ●●● »,
+     16,8 px/900 — sous le seuil « grand texte » WCAG) : sous les 4,5:1
+     requis par la norme AA pour du texte normal. Légèrement éclairci
+     (même teinte) pour repasser au-dessus (4,77:1), trouvé en vérifiant
+     tous les couples texte/fond du thème — jamais fait jusqu'ici. */
+  --violet: #9573ff;
   --text: #f2f0ff;
   --muted: #9a94c2;
 }

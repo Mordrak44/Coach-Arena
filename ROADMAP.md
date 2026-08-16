@@ -769,6 +769,43 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       visuelle pour le flux souris. `tsc --noEmit` + `npm run build` +
       130 tests vitest inchangés (pur ajout de markup, aucune logique
       touchée).
+- [x] Contraste WCAG des couples texte/fond du thème, jamais vérifié
+      jusqu'ici — dimension d'accessibilité distincte des audits
+      ARIA/clavier précédents. Calculé la luminosité relative + le ratio
+      de contraste pour tous les couples couleur-de-texte/fond du thème
+      (`--text`/`--muted`/`--accent`/`--accent2`/`--violet` sur
+      `--bg`/`--panel`/`--panel2`) **et** les 6 couleurs de marque du
+      roster utilisées comme texte (nom du perso dans `CharCard`).
+      2 défauts réels trouvés, tous deux corrigés :
+      1. `--violet` (coûts de carte « ●●● ») à 4,42:1 sur `--panel2` —
+         sous le seuil AA de 4,5:1 pour du texte normal (16,8 px/900,
+         sous le seuil de « grand texte » qui se contenterait de 3:1).
+         Éclairci légèrement dans `styles.css` (même teinte, 4,77:1).
+      2. Rei (`#6c5ce7`, 3,34:1) et Gorō (`#636e72`, 3,09:1) — les noms
+         de perso dans `CharCard` (`.cname`, 16,8 px/900, même seuil de
+         4,5:1) tombaient nettement sous la barre, un vrai problème de
+         LISIBILITÉ pour TOUS les joueurs (pas seulement lecteur
+         d'écran), contrairement aux corrections ARIA précédentes.
+         Corrigé avec `readableTextColor(hex, bgHex, minRatio=4.5)`,
+         nouvelle fonction pure exportée de `characters.ts` : éclaircit
+         une couleur juste assez pour atteindre le ratio requis (mélange
+         progressif vers le blanc, garde la teinte), appliquée
+         UNIQUEMENT au rendu du texte (`char.color` reste inchangé pour
+         le silhouette du perso dans l'arène — `arenaRenderer.ts` n'est
+         pas concerné par des règles de contraste texte). Couvre aussi
+         gratuitement les couleurs arbitraires des persos créés par
+         prompt (`createFromPrompt`), pas seulement les 6 du roster.
+         `ReadyScreen.tsx` (noms au format VS) volontairement NON touché :
+         20,8 px/900 y dépasse le seuil de « grand texte » WCAG (18,66 px
+         gras), donc 3:1 suffit et Rei/Gorō le passent déjà (4,04 et
+         3,74) sans correction.
+      Vérifié en conditions réelles, pas supposé : capture Chromium +
+      lecture directe de `getComputedStyle(...).color` sur les vrais
+      noms rendus, contraste recalculé sur les valeurs RGB effectives
+      (4,60:1 et 4,66:1) — pas seulement sur la sortie de la fonction en
+      isolation. 4 nouveaux tests (dont un qui balaie toute la palette du
+      roster). engine.test.ts 130 → 134. `tsc --noEmit` + `npm run
+      build` verts.
 
 ## Vers la version vendable (gap analysis 2026-08-14)
 
@@ -1263,6 +1300,41 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Après l'audit ARIA/clavier des deux itérations
+  précédentes, une dimension d'accessibilité distincte jamais vérifiée :
+  le CONTRASTE des couleurs (WCAG AA). Calculé la luminosité relative +
+  le ratio de contraste pour tous les couples texte/fond du thème CSS
+  et pour les 6 couleurs de marque du roster utilisées comme texte (le
+  nom du perso dans `CharCard`). 2 défauts réels trouvés :
+  - `--violet` (coûts de carte « ●●● ») à 4,42:1 sur `--panel2`, sous le
+    seuil AA de 4,5:1 pour du texte normal — éclairci légèrement dans
+    `styles.css` (4,77:1, même teinte).
+  - Plus significatif : Rei (`#6c5ce7`, 3,34:1) et Gorō (`#636e72`,
+    3,09:1) — leurs noms dans `CharCard` tombaient nettement sous la
+    barre. Contrairement aux corrections ARIA des deux dernières
+    itérations (qui aident surtout les lecteurs d'écran), celle-ci est
+    un problème de LISIBILITÉ pour TOUS les joueurs — un vrai défaut de
+    design, pas juste un manque de métadonnées. Corrigé avec
+    `readableTextColor(hex, bgHex, minRatio)`, une nouvelle fonction
+    pure dans `characters.ts` qui éclaircit une couleur juste assez pour
+    atteindre le contraste requis (mélange progressif vers le blanc, la
+    teinte reste reconnaissable), appliquée UNIQUEMENT au rendu du texte
+    — `char.color` reste inchangé pour la silhouette du perso dans
+    l'arène, où les règles de contraste texte ne s'appliquent pas.
+    Couvre aussi gratuitement les couleurs arbitraires des persos créés
+    par prompt, pas seulement les 6 du roster. `ReadyScreen.tsx`
+    (mêmes noms, format VS) délibérément NON touché : sa taille de
+    police (20,8 px/900) franchit le seuil WCAG de « grand texte », où
+    3:1 suffit — Rei/Gorō le passent déjà là-bas sans rien changer.
+  Vérifié en conditions réelles, pas en isolation : capture Chromium +
+  lecture directe de `getComputedStyle(...).color` sur les vrais noms
+  rendus dans le navigateur, contraste recalculé sur les valeurs RGB
+  effectives (4,60:1 et 4,66:1), pas seulement sur ce que la fonction
+  renvoie en théorie. 4 nouveaux tests (dont un qui balaie toute la
+  palette du roster pour verrouiller la propriété generalement, pas
+  juste les deux cas trouvés). engine.test.ts 130 → 134, `tsc
+  --noEmit`/`npm run build` verts.
 
 - 2026-08-16 (routine) : Correction de la friction clavier notée hier
   (62 appuis Tab pour atteindre la confirmation du deck) plutôt qu'une

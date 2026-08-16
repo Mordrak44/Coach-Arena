@@ -1800,6 +1800,52 @@ describe('createFromPrompt (characters.ts) — combler les trous de couverture',
   })
 })
 
+describe("readableTextColor (characters.ts) — contraste WCAG des couleurs de marque en texte", () => {
+  // Formule de contraste WCAG dupliquée ici (indépendante de
+  // l'implémentation testée) pour vérifier le RÉSULTAT, pas juste que la
+  // fonction renvoie quelque chose.
+  function contrast(hexA: string, hexB: string): number {
+    const lum = (hex: string) => {
+      const n = parseInt(hex.replace('#', ''), 16)
+      const f = (c: number) => {
+        const s = c / 255
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+      }
+      return 0.2126 * f((n >> 16) & 255) + 0.7152 * f((n >> 8) & 255) + 0.0722 * f(n & 255)
+    }
+    const [hi, lo] = [lum(hexA), lum(hexB)].sort((a, b) => b - a)
+    return (hi + 0.05) / (lo + 0.05)
+  }
+
+  it('laisse inchangée une couleur déjà assez contrastée', async () => {
+    const { readableTextColor } = await import('./characters')
+    expect(readableTextColor('#00cec9', '#201d38')).toBe('#00cec9') // Yuna, largement au-dessus du seuil
+  })
+
+  it("bug d'audit : les couleurs de marque de Rei et Gorō tombaient sous 4,5:1 en texte sur --panel2 — corrigées au rendu", async () => {
+    const { readableTextColor } = await import('./characters')
+    const rei = readableTextColor('#6c5ce7', '#201d38')
+    const goro = readableTextColor('#636e72', '#201d38')
+    expect(contrast('#6c5ce7', '#201d38')).toBeLessThan(4.5) // le défaut, avant correction
+    expect(contrast('#636e72', '#201d38')).toBeLessThan(4.5)
+    expect(contrast(rei, '#201d38')).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(goro, '#201d38')).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('éclaircit une couleur au minimum requis, sans la faire dériver vers le blanc pur', async () => {
+    const { readableTextColor } = await import('./characters')
+    const fixed = readableTextColor('#636e72', '#201d38')
+    expect(fixed).not.toBe('#ffffff') // ne sur-corrige pas au-delà du nécessaire
+  })
+
+  it('toute la palette du roster reste lisible en texte sur --panel2 après correction', async () => {
+    const { readableTextColor } = await import('./characters')
+    for (const c of ROSTER) {
+      expect(contrast(readableTextColor(c.color, '#201d38'), '#201d38'), c.id).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+})
+
 describe('Persistance de la Forge (cardForge.ts) — saveForgedCard/loadForgedCards jamais testés', () => {
   beforeEach(() => {
     ;(globalThis as any).localStorage = fakeLocalStorage()

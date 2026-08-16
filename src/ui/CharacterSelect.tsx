@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react'
 import type { CardId, Character } from '../game/types'
-import { ROSTER, TRAIT_INFO, createFromPrompt } from '../game/characters'
+import { ROSTER, TRAIT_INFO, createFromPrompt, readableTextColor } from '../game/characters'
 import {
   CARD_POOL,
   TIMING_LABEL,
@@ -69,7 +69,12 @@ export function CharCard({
       onClick={onClick}
       aria-pressed={selected}
     >
-      <div className="cname" style={{ color: char.color }}>
+      {/* #201d38 = --panel2 (styles.css), le fond réel de .charCard —
+          readableTextColor éclaircit la couleur de marque du perso si
+          besoin pour rester lisible en texte (16,8 px/900, sous le seuil
+          WCAG de « grand texte » qui se contenterait de 3:1 ; certaines
+          couleurs de marque comme Rei/Gorō tombaient sous 4,5:1). */}
+      <div className="cname" style={{ color: readableTextColor(char.color, '#201d38') }}>
         {char.name}
       </div>
       <div className="ctitle">{char.title}</div>

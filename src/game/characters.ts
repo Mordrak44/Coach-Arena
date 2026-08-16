@@ -198,6 +198,52 @@ function extractName(prompt: string): string {
   )
 }
 
+function srgbToLinear(c: number): number {
+  const s = c / 255
+  return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+}
+
+function relativeLuminance(hex: string): number {
+  const n = parseInt(hex.replace('#', ''), 16)
+  return (
+    0.2126 * srgbToLinear((n >> 16) & 255) +
+    0.7152 * srgbToLinear((n >> 8) & 255) +
+    0.0722 * srgbToLinear(n & 255)
+  )
+}
+
+function contrastRatio(hexA: string, hexB: string): number {
+  const [hi, lo] = [relativeLuminance(hexA), relativeLuminance(hexB)].sort((a, b) => b - a)
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+/**
+ * Couleur de marque d'un perso (`char.color`), éclaircie juste assez pour
+ * rester lisible en TEXTE sur `bgHex` (WCAG AA, 4,5:1 par défaut) — sert
+ * uniquement aux endroits où la couleur est utilisée comme couleur de
+ * texte (ex. `.cname` dans CharacterSelect) ; le rendu du perso dans
+ * l'arène (arenaRenderer.ts) garde `char.color` tel quel, la lisibilité
+ * de texte n'y est pas en jeu. Trouvé en vérifiant systématiquement tous
+ * les couples texte/fond du thème (jamais fait jusqu'ici) : Rei
+ * (#6c5ce7, 3,34:1 sur --panel2) et Gorō (#636e72, 3,09:1) tombaient sous
+ * le seuil requis pour du texte normal (16,8 px/900 gras, sous le seuil
+ * WCAG de « grand texte » qui se contenterait de 3:1).
+ */
+export function readableTextColor(hex: string, bgHex: string, minRatio = 4.5): string {
+  if (contrastRatio(hex, bgHex) >= minRatio) return hex
+  const n = parseInt(hex.replace('#', ''), 16)
+  const r = (n >> 16) & 255
+  const g = (n >> 8) & 255
+  const b = n & 255
+  // Mélange progressif vers le blanc : garde la teinte, augmente la clarté.
+  for (let t = 2; t <= 100; t += 2) {
+    const mix = (c: number) => Math.round(c + (255 - c) * (t / 100))
+    const candidate = `#${[mix(r), mix(g), mix(b)].map(v => v.toString(16).padStart(2, '0')).join('')}`
+    if (contrastRatio(candidate, bgHex) >= minRatio) return candidate
+  }
+  return '#ffffff'
+}
+
 export const TRAIT_INFO: Record<ListenTrait, { label: string; icon: string; hint: string }> = {
   sanguin: { label: 'Sanguin', icon: '🔥', hint: 'Crie fort : ça l’enflamme.' },
   cerebral: { label: 'Cérébral', icon: '🧊', hint: 'Parle calmement — hurler le stresse.' },
