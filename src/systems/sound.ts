@@ -6,7 +6,9 @@ export class SoundSystem {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
   private crowdGain: GainNode | null = null
-  private crowdTarget = 0.04
+  private crowdTarget = 0.04 // niveau de fond visé, suit la Hype en continu
+  private crowdTargetSent = 0.04 // dernière valeur RÉELLEMENT programmée sur le gain
+  private roarUntil = 0 // fin de la clameur ponctuelle en cours (temps ctx.currentTime)
   muted = false
 
   /**
@@ -120,10 +122,16 @@ export class SoundSystem {
   /** hype 0..1 → la foule gronde de plus en plus fort. */
   setCrowdHype(hype: number) {
     if (!this.ctx || !this.crowdGain) return
-    const target = 0.03 + hype * 0.1
-    if (Math.abs(target - this.crowdTarget) > 0.005) {
-      this.crowdTarget = target
-      this.crowdGain.gain.linearRampToValueAtTime(target, this.ctx.currentTime + 0.4)
+    this.crowdTarget = 0.03 + hype * 0.1
+    // Appelé à chaque frame : sans ce garde-fou, sa propre rampe de 0,4 s
+    // ré-écrasait en continu la rampe de décroissance d'une clameur encore
+    // en cours (crowdRoar), qui ne finissait jamais son arc — trouvé en
+    // audit, 2026-08-16. crowdTarget reste à jour pendant ce temps : la
+    // décroissance de la clameur vise donc une cible fraîche à sa fin.
+    if (this.ctx.currentTime < this.roarUntil) return
+    if (Math.abs(this.crowdTarget - this.crowdTargetSent) > 0.005) {
+      this.crowdTargetSent = this.crowdTarget
+      this.crowdGain.gain.linearRampToValueAtTime(this.crowdTarget, this.ctx.currentTime + 0.4)
     }
   }
 
@@ -135,7 +143,10 @@ export class SoundSystem {
     g.cancelScheduledValues(t)
     g.setValueAtTime(g.value, t)
     g.linearRampToValueAtTime(Math.min(0.35, 0.12 + intensity * 0.2), t + 0.08)
-    g.linearRampToValueAtTime(this.crowdTarget, t + 1.2 + intensity)
+    const decay = 1.2 + intensity
+    g.linearRampToValueAtTime(this.crowdTarget, t + decay)
+    this.crowdTargetSent = this.crowdTarget
+    this.roarUntil = t + decay
   }
 
   // -- événements de jeu ----------------------------------------------------

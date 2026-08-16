@@ -88,10 +88,13 @@ export class MatchRecorder {
     })
   }
 
-  /** Stoppe les pistes micro CLONÉES : arrêter l'original ne les arrête pas
-   *  (sinon l'indicateur micro du navigateur reste allumé après le match). */
+  /** Stoppe les pistes micro CLONÉES (arrêter l'original ne les arrête pas,
+   *  sinon l'indicateur micro du navigateur reste allumé après le match)
+   *  ET la piste vidéo de captureStream() — sans ça, le canvas continue
+   *  d'être sollicité à 30 fps sans aucun consommateur après l'arrêt
+   *  (trouvé en audit, 2026-08-16). */
   private releaseTracks() {
-    this.mixStream?.getAudioTracks().forEach(t => t.stop())
+    this.mixStream?.getTracks().forEach(t => t.stop())
     this.mixStream = null
   }
 
@@ -187,9 +190,10 @@ export class HighlightRecorder {
     })
   }
 
-  /** Même exigence que MatchRecorder : les clones micro doivent être stoppés. */
+  /** Même exigence que MatchRecorder : clones micro ET piste vidéo de
+   *  captureStream() doivent être stoppés, pas seulement l'audio. */
   private releaseTracks() {
-    this.stream?.getAudioTracks().forEach(t => t.stop())
+    this.stream?.getTracks().forEach(t => t.stop())
     this.stream = null
   }
 }

@@ -161,6 +161,52 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       d'écurie de Rei remplace bien celui de Kenta ; un équipier qui
       devient principal fait bien passer le texte de « Relève : Rei »
       à « Sans équipiers »), sim/build inchangés.
+- [x] Audit de code round 4 (2026-08-16), ciblé sur systems/ (voice.ts,
+      sound.ts, facecam.ts, recorder.ts — vraies API navigateur, jamais
+      auditées). 4 pistes trouvées, toutes réelles, toutes corrigées :
+      1. **Reconnaissance vocale : un ordre sur deux perdu** :
+         `onresult` ne lisait que `ev.results[ev.resultIndex]`, alors
+         que l'API Web Speech peut regrouper PLUSIEURS résultats
+         fraîchement finalisés dans un même événement (deux ordres
+         courts dits coup sur coup). Corrigé en parcourant tous les
+         résultats de `resultIndex` à la fin — `pendingCommand` reste un
+         pointeur simple vers « le plus récent », pas une file (la
+         dédup anti-spam vit déjà côté jeu, inchangée).
+      2. **Piste vidéo de captureStream() jamais stoppée** :
+         `releaseTracks()` (MatchRecorder ET HighlightRecorder)
+         n'arrêtait que les pistes micro clonées, jamais la piste vidéo
+         du canvas — qui continuait de solliciter le canvas à 30 fps
+         sans aucun consommateur après l'arrêt de l'enregistrement.
+         Pertinent pour le budget batterie mobile (ROADMAP, Tier 1).
+         Corrigé avec `getTracks()` au lieu de `getAudioTracks()`.
+      3. **Rampe de la foule qui ne finit jamais son arc** :
+         `setCrowdHype()`, appelée à CHAQUE frame, reprogrammait sa
+         propre rampe de 0,4 s sans annuler la rampe de décroissance
+         d'une clameur ponctuelle (`crowdRoar`, jusqu'à ~2,8 s pour un
+         Ultime) encore en cours — la clameur se faisait donc
+         interrompre en permanence par le suivi continu de la Hype au
+         lieu de retomber en douceur. Corrigé avec une fenêtre
+         `roarUntil` : `setCrowdHype` garde `crowdTarget` à jour (pour
+         que la décroissance de la clameur vise une cible fraîche) mais
+         ne programme plus sa propre rampe tant qu'une clameur est en
+         cours.
+      4. `FaceCoach.stop()` ne réinitialisait pas `this.prev` (ni
+         `energy`) — un futur `start()` sur la même instance
+         comparerait sa première frame au souvenir de l'ANCIENNE
+         session. Non-atteignable aujourd'hui (ArenaScreen recrée
+         toujours une instance fraîche), corrigé quand même : fix
+         trivial, même contrat start/stop, aucune nouvelle surface.
+      **Aucun test vitest** pour ces 4 fixes — les 4 fichiers dépendent
+      d'API navigateur réelles (SpeechRecognition, WebAudio,
+      MediaRecorder, getUserMedia) indisponibles à la fois dans
+      l'environnement vitest (Node, sans jsdom) et dans ce bac à sable
+      en mode démo (`noMedia`, aucun flux réel) — écrire un test
+      demanderait un mock lourd du Web Audio/MediaRecorder plutôt
+      qu'apporter une vraie garantie. Vérifié par lecture attentive du
+      code + `tsc`/build/capture du funnel standard (le pipeline
+      d'enregistrement/export continue de produire un clip valide,
+      visible sur l'écran de résultats) — pas de faux sentiment de
+      sécurité affiché comme un test qui n'en est pas un.
 - [x] Carnet du Coach : cartes jouables au coin du ring (3 familles :
       directes, armées, conditionnelles) — voir GAME_DESIGN.md §4 bis
       (v0 : pool de 6 cartes, sélection de 3 avant match, 1 par coin du
@@ -698,6 +744,30 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Audit de code round 4, ciblé sur systems/
+  (voice.ts, sound.ts, facecam.ts, recorder.ts) — quatrième passe de la
+  série (moteur → DSL de cartes → UI → API navigateur). Zone
+  délibérément gardée pour la fin : ces fichiers touchent de vraies API
+  du navigateur (reconnaissance vocale, WebAudio, MediaRecorder,
+  getUserMedia), donc aucun des 4 fixes ne peut être verrouillé par un
+  test vitest sans construire un mock lourd de ces API — un choix
+  explicite de ne PAS le faire plutôt que d'écrire un faux sentiment de
+  sécurité. Les 4 bugs sont réels et corrigés quand même, vérifiés par
+  lecture attentive + compilation + capture du funnel : un ordre vocal
+  sur deux pouvait être perdu si le navigateur regroupait plusieurs
+  résultats fraîchement finalisés dans un même événement (`onresult` ne
+  lisait que le premier) ; la piste vidéo de `captureStream()` n'était
+  jamais stoppée à la fin de l'enregistrement (pertinent batterie
+  mobile) ; la rampe audio de la foule qui suit la Hype en continu
+  interrompait sans cesse la clameur ponctuelle d'un beau coup avant
+  qu'elle ait fini de retomber ; et `FaceCoach.stop()` ne réinitialisait
+  pas son état interne (non-atteignable aujourd'hui, corrigé quand même
+  car le fix est trivial). Quatre rounds d'audit consécutifs, quatre
+  fois des bugs réels trouvés — la démarche (lire vraiment le code
+  visé, vérifier chaque piste avant de la corriger ou de la différer,
+  ne jamais prétendre avoir testé ce qui ne l'a pas été) continue de
+  payer plus qu'ajouter des fonctionnalités à ce stade du projet.
 
 - 2026-08-16 (routine) : Audit de code round 3, ciblé sur
   CharacterSelect.tsx (le plus gros fichier UI, 571 lignes, jamais

@@ -125,18 +125,27 @@ export class VoiceCoach {
     rec.continuous = true
     rec.interimResults = true
     rec.onresult = (ev: any) => {
-      const res = ev.results[ev.resultIndex]
-      const text: string = res[0].transcript.trim()
-      if (!text) return
-      this.state.lastHeard = text
-      if (res.isFinal) {
-        this.state.lastFinal = text
-        this.state.finalSeq++
+      // ev.resultIndex n'est que le PREMIER index changé — un même event
+      // peut porter plusieurs résultats fraîchement finalisés (deux
+      // ordres courts dits coup sur coup). Ne lire que resultIndex
+      // perdait silencieusement les suivants ; on les parcourt tous, le
+      // dernier traité l'emporte (pendingCommand reste un simple
+      // pointeur vers « le plus récent », pas une file — trouvé en audit,
+      // 2026-08-16).
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const res = ev.results[i]
+        const text: string = res[0].transcript.trim()
+        if (!text) continue
+        this.state.lastHeard = text
+        if (res.isFinal) {
+          this.state.lastFinal = text
+          this.state.finalSeq++
+        }
+        const cmd = matchCommand(text)
+        // Les résultats finaux ET intermédiaires déclenchent (réactivité) ;
+        // la dédup se fait côté jeu via la fenêtre anti-spam.
+        if (cmd) this.state.pendingCommand = cmd
       }
-      const cmd = matchCommand(text)
-      // Les résultats finaux ET intermédiaires déclenchent (réactivité) ;
-      // la dédup se fait côté jeu via la fenêtre anti-spam.
-      if (cmd) this.state.pendingCommand = cmd
     }
     rec.onend = () => {
       this.state.listening = false

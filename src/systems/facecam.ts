@@ -60,6 +60,13 @@ export class FaceCoach {
   stop() {
     clearInterval(this.timer)
     this.state.active = false
+    this.state.energy = 0
     this.video.srcObject = null
+    // Sans ça, un futur start() sur cette même instance comparerait sa
+    // première frame au dernier souvenir de l'ANCIENNE session, donnant
+    // une énergie de mouvement faussée (trouvé en audit, 2026-08-16 —
+    // non atteignable aujourd'hui, ArenaScreen recrée toujours une
+    // instance fraîche, mais le contrat start/stop doit rester correct).
+    this.prev = null
   }
 }
