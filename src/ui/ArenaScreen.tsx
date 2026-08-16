@@ -35,6 +35,7 @@ import { VoiceCoach } from '../systems/voice'
 import { FaceCoach } from '../systems/facecam'
 import { HighlightRecorder, MatchRecorder } from '../systems/recorder'
 import { SoundSystem } from '../systems/sound'
+import { requestCoachStream } from '../systems/media'
 
 export interface MatchOutcome {
   winner: 'player' | 'enemy'
@@ -201,15 +202,7 @@ export default function ArenaScreen({
       // Flux déjà obtenu au Vestiaire ; sinon on demande ici (accès direct).
       let stream: MediaStream | null = preStream ?? null
       if (!stream && !noMedia) {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-        } catch {
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-          } catch {
-            stream = null
-          }
-        }
+        stream = await requestCoachStream()
       }
       if (disposed) {
         stream?.getTracks().forEach(t => t.stop())

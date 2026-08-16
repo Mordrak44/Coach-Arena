@@ -1411,3 +1411,45 @@ describe('Bugs trouvés par audit (code-review, 2026-08-16) — verrouillés par
     expect(m.events.some(e => e.kind === 'timeout' && e.side === 'enemy')).toBe(true)
   })
 })
+
+describe('requestCoachStream (systems/media.ts) — repli audio+vidéo → audio seul → null', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('audio+vidéo accordés : renvoie ce flux directement, un seul appel', async () => {
+    const calls: any[] = []
+    const fakeStream = { id: 'av' }
+    vi.stubGlobal('navigator', {
+      mediaDevices: { getUserMedia: async (c: any) => (calls.push(c), fakeStream) },
+    })
+    const { requestCoachStream } = await import('../systems/media')
+    expect(await requestCoachStream()).toBe(fakeStream)
+    expect(calls).toEqual([{ audio: true, video: true }])
+  })
+
+  it('vidéo refusée : replie sur audio seul', async () => {
+    const calls: any[] = []
+    const fakeStream = { id: 'audio-only' }
+    vi.stubGlobal('navigator', {
+      mediaDevices: {
+        getUserMedia: async (c: any) => {
+          calls.push(c)
+          if (c.video) throw new Error('cam refusée')
+          return fakeStream
+        },
+      },
+    })
+    const { requestCoachStream } = await import('../systems/media')
+    expect(await requestCoachStream()).toBe(fakeStream)
+    expect(calls).toEqual([{ audio: true, video: true }, { audio: true }])
+  })
+
+  it('audio ET vidéo refusés : renvoie null, jamais de rejet non-géré', async () => {
+    vi.stubGlobal('navigator', {
+      mediaDevices: { getUserMedia: async () => Promise.reject(new Error('tout refusé')) },
+    })
+    const { requestCoachStream } = await import('../systems/media')
+    await expect(requestCoachStream()).resolves.toBeNull()
+  })
+})

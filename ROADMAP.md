@@ -279,6 +279,47 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       `tsc --noEmit` + `npm run build` + suite complète verts. Rien à
       signaler côté deckBuilder.ts, cutLibrary.ts, characters.ts (déjà
       solides).
+- [x] Audit de code round 7 (2026-08-16), ciblé sur les écrans UI restants
+      (ReadyScreen.tsx, ResultsScreen.tsx, StoryScreen.tsx,
+      PrivacyScreen.tsx, TitleScreen.tsx — derniers jamais audités). 2 vrais
+      bugs corrigés, 1 duplication éliminée, 1 micro-nettoyage :
+      1. **ReadyScreen.tsx : icône « Reconnaissance vocale » incohérente
+         avec son propre texte d'avertissement.** Le calcul
+         (`micOk === false || speechSupported ? statusIcon(...) : '✅'`)
+         retombait sur un ✅ CODÉ EN DUR dès que le navigateur n'implémente
+         pas SpeechRecognition (Firefox) ET que le micro n'est pas encore
+         explicitement refusé — la ligne juste à côté affichait pourtant
+         « (indisponible sur ce navigateur — Chrome recommandé) » : coche
+         verte et avertissement d'indisponibilité côte à côte, contradiction
+         visible. Corrigé avec un calcul direct
+         (`speechOk = speechSupported ? micOk : false`) : la reco ne peut
+         jamais être « plus prête » que le micro qui l'alimente, et reste
+         refusée si le navigateur ne l'implémente pas, point. **Vérifié
+         visuellement** : capture Chromium headless réelle avec
+         `SpeechRecognition` supprimé de `window` via un script d'init
+         Playwright (3 scénarios : normal, navigateur sans reco vocale,
+         micro refusé) — icône et texte cohérents dans les 3 cas, plus de
+         ✅ + avertissement simultanés.
+      2. **La demande micro/caméra avec repli (vidéo→audio seul→null)
+         était dupliquée verbatim entre ReadyScreen.tsx et
+         ArenaScreen.tsx** — un risque de divergence silencieuse si l'un
+         des deux évoluait sans l'autre. Extrait en un seul helper partagé,
+         `systems/media.ts::requestCoachStream()`, câblé dans les deux
+         écrans.
+      3. Nettoyage trivial : `TRAIT_INFO[player.trait]` était indexé 3 fois
+         dans ReadyScreen.tsx au lieu d'une seule variable ; `ResultsScreen`
+         appelait `setSceneJobs(queue.jobs())` juste après avoir construit
+         la file, un rendu superflu produisant exactement la même liste que
+         l'initialiseur de `useState` avait déjà posée.
+      3 nouveaux tests dans engine.test.ts (95 → 98), pour
+      `requestCoachStream` (accordé, repli vidéo→audio, tout refusé →
+      null, jamais de rejet non-géré). `tsc --noEmit` + `npm run build` +
+      suite complète verts. StoryScreen.tsx, PrivacyScreen.tsx,
+      TitleScreen.tsx : rien trouvé. **Tous les écrans UI du dépôt sont
+      maintenant passés en revue au moins une fois** (CharacterSelect au
+      round 3, systems/ au round 4, le reste ici) — la série d'audit
+      systématique commencée quand le puits de tâches sûres/gratuites
+      s'épuisait a maintenant couvert l'intégralité du dépôt applicatif.
 - [x] Carnet du Coach : cartes jouables au coin du ring (3 familles :
       directes, armées, conditionnelles) — voir GAME_DESIGN.md §4 bis
       (v0 : pool de 6 cartes, sélection de 3 avant match, 1 par coin du
@@ -816,6 +857,39 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Audit de code round 7, ciblé sur les écrans UI
+  restants (ReadyScreen.tsx, ResultsScreen.tsx, StoryScreen.tsx,
+  PrivacyScreen.tsx, TitleScreen.tsx). Avec ça, tous les écrans UI du
+  dépôt ont maintenant été passés en revue au moins une fois — la série
+  d'audit systématique (lancée quand le puits de tâches sûres/gratuites
+  s'épuisait, round 1 sur combat.ts/arenaRenderer.ts) a couvert
+  l'ensemble du dépôt applicatif en 7 passes.
+  - `ReadyScreen.tsx` : l'icône « Reconnaissance vocale » contredisait
+    son propre texte d'avertissement. Le calcul d'origine retombait sur
+    un ✅ codé en dur dès que `SpeechRecognition` est absent du
+    navigateur (Firefox) ET que le micro n'a pas encore été explicitement
+    refusé — alors que la ligne affichait dans le même temps
+    « indisponible sur ce navigateur ». Fix : `speechOk = speechSupported
+    ? micOk : false`, dérivé directement plutôt qu'un ternaire imbriqué
+    fragile. Vérifié avec une vraie capture Chromium headless (Playwright,
+    `SpeechRecognition` supprimé de `window` via un script d'init) sur 3
+    scénarios : normal, navigateur sans reco vocale, micro refusé —
+    icône/texte cohérents dans les 3.
+  - `ReadyScreen.tsx` et `ArenaScreen.tsx` dupliquaient verbatim le repli
+    de permission média (audio+vidéo → audio seul → null). Extrait en
+    `systems/media.ts::requestCoachStream()`, testé directement en vitest
+    (mock de `navigator.mediaDevices.getUserMedia` via `vi.stubGlobal` —
+    Node 22 expose `globalThis.navigator` en lecture seule, une
+    affectation directe lève `Cannot set property navigator`).
+  - Deux micro-nettoyages triviaux : `TRAIT_INFO[player.trait]` indexé 3
+    fois au lieu d'une variable ; `ResultsScreen` appelait
+    `setSceneJobs(queue.jobs())` juste après construction de la file, un
+    rendu superflu pour une liste identique à celle déjà posée par
+    l'initialiseur de `useState`.
+  - 3 nouveaux tests (engine.test.ts 95 → 98). `tsc --noEmit`, `npm run
+    build` et la suite complète passent. StoryScreen.tsx,
+    PrivacyScreen.tsx, TitleScreen.tsx : rien trouvé.
 
 - 2026-08-16 (routine) : Audit de code round 6, ciblé sur stable.ts,
   speechTactics.ts, progression.ts, deckBuilder.ts, cutLibrary.ts,

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Character } from '../game/types'
 import { TRAIT_INFO } from '../game/characters'
+import { requestCoachStream } from '../systems/media'
 
 // Le Vestiaire : annonce du match façon VS shōnen + onboarding des
 // permissions micro/caméra AVANT l'arène, avec explication et fallback.
@@ -23,16 +24,7 @@ export default function ReadyScreen({
   useEffect(() => {
     let disposed = false
     const ask = async () => {
-      let stream: MediaStream | null = null
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-      } catch {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-        } catch {
-          stream = null
-        }
-      }
+      const stream = await requestCoachStream()
       if (disposed) {
         stream?.getTracks().forEach(t => t.stop())
         return
@@ -53,8 +45,14 @@ export default function ReadyScreen({
   const speechSupported =
     typeof window !== 'undefined' &&
     !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
+  // La reco vocale ne peut jamais marcher mieux que le micro qui l'alimente
+  // (pending tant que micOk l'est, refusée si micOk l'est) — sauf si le
+  // navigateur ne l'implémente pas du tout, auquel cas elle reste refusée
+  // même micro accordé.
+  const speechOk = speechSupported ? micOk : false
 
   const statusIcon = (v: boolean | null) => (v === null ? '⏳' : v ? '✅' : '🚫')
+  const trait = TRAIT_INFO[player.trait]
 
   return (
     <div className="screen" style={{ justifyContent: 'flex-start', gap: 14 }}>
@@ -101,8 +99,8 @@ export default function ReadyScreen({
           width: '100%',
         }}
       >
-        {TRAIT_INFO[player.trait].icon} <b>{player.name} est {TRAIT_INFO[player.trait].label}</b> —{' '}
-        {TRAIT_INFO[player.trait].hint}
+        {trait.icon} <b>{player.name} est {trait.label}</b> —{' '}
+        {trait.hint}
       </div>
 
       {/* État des capteurs du coach */}
@@ -128,8 +126,7 @@ export default function ReadyScreen({
           {camOk === false && <em>(refusé : le match n'aura pas ta facecam)</em>}
         </div>
         <div>
-          {micOk === false || speechSupported ? statusIcon(speechSupported && micOk !== false) : '✅'}{' '}
-          Reconnaissance vocale{' '}
+          {statusIcon(speechOk)} Reconnaissance vocale{' '}
           {!speechSupported && <em>(indisponible sur ce navigateur — Chrome recommandé)</em>}
         </div>
       </div>

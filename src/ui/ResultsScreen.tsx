@@ -42,8 +42,12 @@ export default function ResultsScreen({
     outcome.scenes.map(plan => ({ plan, status: 'pending' as const, clipUrl: null })),
   )
   useEffect(() => {
+    // Pas de setSceneJobs(queue.jobs()) ici : la liste tout-'pending' que
+    // ça produirait est identique à celle déjà posée par l'initialiseur de
+    // useState ci-dessus (même construction depuis outcome.scenes) — un
+    // rendu de plus pour rien avant même que start() ait produit du neuf
+    // (trouvé en audit, 2026-08-16).
     const queue = new SceneJobQueue(outcome.scenes, { onUpdate: setSceneJobs })
-    setSceneJobs(queue.jobs())
     queue.start()
     return () => queue.cancel()
     // eslint-disable-next-line react-hooks/exhaustive-deps
