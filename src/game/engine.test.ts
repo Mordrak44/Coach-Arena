@@ -934,6 +934,42 @@ describe('création par prompt & réalisateur', () => {
     const plans = buildScenePlans(m, ROSTER[0], ROSTER[1], 2)
     expect(plans.some(p => p.id === 'round2-highlight')).toBe(true)
   })
+
+  it('buildScenePlans : un spécial adverse produit un moment fort référençant le bon perso (jamais exercé jusqu’ici)', () => {
+    // 'ulti' et 'hit' (crit) sont couverts par les tests précédents,
+    // mais 'special' et 'countered' — deux des quatre kinds acceptés par
+    // momentPrompt — n'avaient jamais été exercés du tout.
+    const m = freshMatch()
+    m.events.push(
+      { kind: 'special', t: 20, by: 'enemy', name: ROSTER[1].special.name, onoma: 'ZUKYUN!', dmg: 30 },
+      { kind: 'roundEnd', t: 25, winner: 'enemy' },
+      { kind: 'matchEnd', t: 25, winner: 'enemy' },
+    )
+    const plans = buildScenePlans(m, ROSTER[0], ROSTER[1])
+    const highlight = plans.find(p => p.id === 'round1-highlight')
+    expect(highlight?.refChars).toEqual([ROSTER[1].id]) // l'ennemi a lancé le spécial
+    expect(highlight?.prompt).toContain(ROSTER[1].special.name)
+    expect(highlight?.prompt).not.toContain('undefined')
+  })
+
+  it('buildScenePlans : un contre du joueur produit un moment fort référençant le joueur', () => {
+    const m = freshMatch()
+    m.events.push(
+      { kind: 'countered', t: 20, by: 'player', dmg: 25 },
+      { kind: 'roundEnd', t: 25, winner: 'player' },
+      { kind: 'matchEnd', t: 25, winner: 'player' },
+    )
+    m.playerWins = 2
+    const plans = buildScenePlans(m, ROSTER[0], ROSTER[1])
+    const highlight = plans.find(p => p.id === 'round1-highlight')
+    expect(highlight?.refChars).toEqual([ROSTER[0].id]) // le joueur a contré
+    expect(highlight?.prompt).not.toContain('undefined')
+  })
+
+  it('colorWord : branches purple et pink (jamais exercées jusqu’ici)', () => {
+    expect(colorWord('#8000ff')).toBe('purple')
+    expect(colorWord('#ff00cc')).toBe('pink')
+  })
 })
 
 describe('SceneJobQueue (file de génération asynchrone des scènes)', () => {

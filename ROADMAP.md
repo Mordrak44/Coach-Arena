@@ -1004,6 +1004,24 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       résultat normal et sain d'un balayage de couverture, pas tous ne
       révèlent un bug. engine.test.ts 120 → 122, `tsc --noEmit`/`npm run
       build` verts, stable sur 3 exécutions.
+- [x] Sixième cible du rapport de coverage : sceneDirector.ts, 76 % →
+      88 %. `momentPrompt`/le calcul de `by` gèrent 4 `CombatEvent.kind`
+      (ulti/special/countered/hit) mais seuls ulti et hit (crit) étaient
+      exercés — special et countered, jamais. Ce sont exactement les deux
+      kinds qui utilisent la branche `by` générique (`c.e.by === 'enemy'
+      ? enemy : player`) plutôt que la branche spéciale de `hit` corrigée
+      au round 8 d'audit — un bon candidat pour vérifier qu'elles n'ont
+      pas le même genre de défaut. 2 nouveaux tests confirment le bon
+      référencement de perso pour un `special` adverse et un `countered`
+      du joueur (rien de cassé trouvé), plus 1 test pour les branches
+      `purple`/`pink` de `colorWord`, jamais atteintes non plus. Les 2
+      dernières lignes non couvertes (110, 174) sont du code défensif
+      structurellement inatteignable (les branches `default` de
+      `momentPrompt`/du switch `by`, jamais visitées vu que l'appelant ne
+      passe que des events déjà filtrés par `eventScore > 0`) — laissées
+      telles quelles plutôt que forcées artificiellement. engine.test.ts
+      122 → 125, `tsc --noEmit`/`npm run build` verts, stable sur 3
+      exécutions.
 
 ### Tier 2 — Édition Histoire 14,90 € (stores)
 - [x] Mode histoire v0 « Le Grand Hurlement » : 8 chapitres écrits
@@ -1080,6 +1098,24 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Sixième passe sur le rapport de coverage —
+  sceneDirector.ts, 76 % → 88 %. `momentPrompt` et le calcul de l'id de
+  référence (`by`) gèrent 4 types d'événements (ulti/special/countered/
+  hit), mais seuls ulti et hit (crit) avaient un test — special et
+  countered jamais. Choix pas anodin : ce sont exactement les deux kinds
+  qui passent par la branche `by` GÉNÉRIQUE (`c.e.by === 'enemy' ?
+  enemy : player`), par opposition à la branche spéciale de `hit`
+  (`target`) qui avait révélé un vrai bug au round 8 d'audit — un bon
+  candidat pour vérifier qu'elles n'ont pas un défaut analogue. Rien de
+  cassé trouvé cette fois : les deux référencent bien le bon perso. 2
+  nouveaux tests le confirment, plus 1 pour les branches purple/pink de
+  `colorWord` (jamais atteintes). Les 2 dernières lignes non couvertes
+  du fichier sont du code défensif structurellement inatteignable (les
+  branches `default` ne sont jamais visitées vu que l'appelant filtre
+  déjà sur `eventScore > 0`) — laissées telles quelles. engine.test.ts
+  122 → 125, `tsc --noEmit`/`npm run build` verts, stable sur 3
+  exécutions.
 
 - 2026-08-16 (routine) : Cinquième passe sur le rapport de coverage —
   cardForge.ts, 65 % → 94 %, redevenu le plus gros écart après le
