@@ -731,6 +731,29 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       Aucun code changé — vérification pure, comportement confirmé
       conforme à l'intention documentée dans `sw.js` (« network-first
       avec repli cache »).
+- [x] Parcours 100 % clavier vérifié bout-en-bout pour la première fois
+      (Chromium headless, micro/caméra refusés d'emblée pour forcer le
+      vrai repli documenté au README) — jusqu'ici seulement déduit du
+      code (chaque élément cliquable est un vrai `<button>`, confirmé
+      lors de l'audit d'accessibilité), jamais réellement joué au
+      clavier. Titre → Sélection de perso (Tab jusqu'à une `CharCard`,
+      Entrée, `aria-pressed` confirmé) → confirmation du deck → Vestiaire
+      (bouton « gong » atteint et activé au clavier) → Arène (ordres
+      A/D/E/C envoyés en vrai combat, un round entier joué en temps réel
+      jusqu'au Coin du ring) → sélection d'un plan tactique dans l'overlay
+      (Tab jusqu'à une carte, Entrée, `aria-pressed` confirmé). Zéro clic
+      souris du début à la fin, zéro erreur JS. Un vrai piège trouvé en
+      route, mais dans le SCRIPT DE VÉRIFICATION lui-même, pas le jeu :
+      `element.innerText` reflète les transformations CSS
+      (`text-transform: uppercase` sur `.btn`/`h2`), donc chercher
+      `'Coin du ring'` en respectant la casse échouait alors que l'overlay
+      était bel et bien affiché — corrigé en comparant en minuscules.
+      Seule observation notée (pas un bug, pas corrigé) : atteindre le
+      bouton de confirmation du deck prend 62 appuis Tab (le
+      deck-builder a ~20 cartes × 2 boutons −/+ chacune) — un peu long
+      pour un joueur 100 % clavier, mais pas cassé ; à revisiter si un
+      jour l'ergonomie clavier devient une priorité produit. Aucun code
+      changé — vérification pure.
 
 ## Vers la version vendable (gap analysis 2026-08-14)
 
@@ -1225,6 +1248,32 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Suite logique de l'audit d'accessibilité de la
+  veille (qui avait confirmé que chaque élément cliquable est un vrai
+  `<button>` avec gestion clavier native, mais seulement en LISANT le
+  code) : un parcours 100 % clavier vérifié bout-en-bout pour la
+  première fois, joué réellement en Chromium headless plutôt que déduit
+  du code. Micro/caméra refusés d'emblée dans le test pour forcer le
+  vrai chemin de repli documenté au README, pas un chemin qui se
+  contente d'avoir un micro accordé. Parcours complet réussi sans aucun
+  clic souris : Titre → Sélection de perso (Tab jusqu'à une CharCard,
+  Entrée, `aria-pressed` confirmé — l'attribut ajouté hier fonctionne
+  vraiment, pas juste présent dans le DOM) → confirmation du deck →
+  Vestiaire → Arène (un round entier joué en temps réel aux touches
+  A/D/E/C jusqu'au Coin du ring) → sélection d'un plan tactique dans
+  l'overlay (Tab, Entrée, `aria-pressed` confirmé encore). Zéro erreur
+  JS de bout en bout. Un vrai piège trouvé en route, mais dans le SCRIPT
+  DE VÉRIFICATION, pas le jeu : `element.innerText` reflète les
+  transformations CSS (`text-transform: uppercase`), donc chercher
+  `'Coin du ring'` en respectant la casse échouait pendant que l'overlay
+  était pourtant bien affiché à l'écran — corrigé en comparant en
+  minuscules, une bonne leçon sur `innerText` vs `textContent` pour de
+  futurs scripts de vérification. Seule observation notée sans être
+  corrigée : le deck-builder demande 62 appuis Tab pour atteindre la
+  confirmation (~20 cartes × 2 boutons −/+ chacune) — un peu long pour
+  un joueur 100 % clavier, mais fonctionnel, pas cassé. Aucun code
+  changé — pure vérification.
 
 - 2026-08-16 (routine) : Après le balayage `scripts/`, cherché un autre
   angle jamais couvert. Tenté le skill `security-review`, mais il
