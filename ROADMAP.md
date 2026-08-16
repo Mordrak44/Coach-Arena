@@ -929,6 +929,18 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       milliers de matchs joués), pas des unit tests ligne par ligne —
       laissé tel quel plutôt que d'écrire des tests qui dupliqueraient
       artificiellement ce que la simulation couvre déjà en pratique.
+- [x] Troisième cible du rapport de coverage : deckBuilder.ts, 69 % →
+      91 %. **Bug réel trouvé** en écrivant le test de round-trip de
+      `loadTemplate`/`saveTemplate` : un stockage contenant du JSON
+      valide mais de mauvaise FORME (un simple nombre ou une chaîne, ex.
+      `"42"`) ne faisait planter ni `JSON.parse` ni `sanitizeTemplate`
+      (l'accès par index sur un nombre/une chaîne renvoie `undefined` en
+      JS, jamais d'exception) — chaque carte retombait silencieusement à
+      0 copie au lieu du modèle par défaut, un deck vide et invalide
+      sans raison visible. Même classe de bug que stable.ts (round 6
+      d'audit), trouvée cette fois par un test de couverture plutôt que
+      par le skill code-review. Corrigé avec la même validation de forme
+      avant `sanitizeTemplate`. 5 nouveaux tests (110 → 112).
 
 ### Tier 2 — Édition Histoire 14,90 € (stores)
 - [x] Mode histoire v0 « Le Grand Hurlement » : 8 chapitres écrits
@@ -1024,6 +1036,31 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
   test réel est `scripts/sim.ts` (des milliers de matchs simulés), pas
   des tests unitaires ligne par ligne — les dupliquer artificiellement
   n'ajouterait pas de vraie garantie.
+
+- 2026-08-16 (routine) : Troisième cible du rapport de coverage —
+  deckBuilder.ts, 69 % → 91 %. Même piège de `hasStorage` figé au
+  premier import qu'avec cardForge.ts la veille, mais cette fois
+  découvert AVANT d'écrire un seul test (deckBuilder.ts était déjà
+  importé statiquement en tête d'engine.test.ts pour
+  `sanitizeTemplate`/`defaultTemplate`/etc.) : import statique retiré,
+  chaque usage basculé en `import()` dynamique, `beforeEach` (faux
+  localStorage) ajouté à la describe `deck-builder` — la première à
+  toucher le module dans l'ordre du fichier.
+  **Un vrai bug trouvé en écrivant le test de round-trip** :
+  `loadTemplate()` ne retombait sur le modèle par défaut QUE si
+  `JSON.parse` levait une exception ou si `sanitizeTemplate` plantait —
+  mais un stockage contenant du JSON valide de mauvaise FORME (un
+  simple nombre ou une chaîne, ex. `"42"` ou `'"oops"'`) ne fait planter
+  NI `JSON.parse` NI `sanitizeTemplate` (l'accès par index sur un
+  nombre/une chaîne renvoie juste `undefined` en JS, jamais
+  d'exception) — chaque carte retombait silencieusement à 0 copie
+  au lieu du modèle par défaut, donnant un deck vide et invalide sans
+  raison visible pour le joueur. Même classe de bug que le fix de
+  stable.ts au round 6 d'audit, mais cette fois-ci trouvée par un TEST
+  DE COUVERTURE plutôt que par le skill code-review. Corrigé avec la
+  même validation de forme (`typeof === 'object'`, pas un tableau)
+  avant `sanitizeTemplate`. 5 nouveaux tests (110 → 112, stables sur 5
+  exécutions), `tsc --noEmit`/`npm run build` verts.
 
 - 2026-08-16 (routine) : Vérifié le premier run du workflow de
   déploiement Pages (poussé la veille) — échoue exactement comme prévu

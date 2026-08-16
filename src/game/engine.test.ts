@@ -19,7 +19,8 @@ import {
   tick,
 } from './combat'
 import { CARD_POOL, SIGNATURE_CARDS, buildStarterDeck, clampEffect, computeCost, getCard, signatureFor } from './cards'
-import { DECK_MAX, MAX_COPIES, buildDeckFromTemplate, defaultTemplate, sanitizeTemplate, templateSize, templateValid } from './deckBuilder'
+// deckBuilder PAS importé statiquement ici non plus, même raison que
+// cardForge ci-dessous : son hasStorage se fige au tout premier import.
 // cardForge PAS importé statiquement ici, volontairement : son hasStorage
 // interne se fige au tout premier import (comme stable.ts/progression.ts),
 // donc chaque usage plus bas passe par un import() dynamique après avoir
@@ -62,7 +63,15 @@ describe('cartes (DSL)', () => {
 })
 
 describe('deck-builder', () => {
-  it('assainit un modèle trafiqué (copies hors bornes, cartes inconnues)', () => {
+  // Premier point de contact avec deckBuilder.ts dans ce fichier : pose un
+  // faux localStorage AVANT son tout premier import() dynamique, pour que
+  // loadTemplate/saveTemplate (testés plus bas) voient hasStorage=true.
+  beforeEach(() => {
+    ;(globalThis as any).localStorage = fakeLocalStorage()
+  })
+
+  it('assainit un modèle trafiqué (copies hors bornes, cartes inconnues)', async () => {
+    const { MAX_COPIES, sanitizeTemplate } = await import('./deckBuilder')
     const dirty = { secondWind: 99, focus: -3, nimporte: 4 } as never
     const clean = sanitizeTemplate(dirty)
     expect(clean.secondWind).toBe(MAX_COPIES)
@@ -70,17 +79,49 @@ describe('deck-builder', () => {
     expect('nimporte' in clean).toBe(false)
   })
 
-  it('valide les tailles de deck aux bornes', () => {
+  it('valide les tailles de deck aux bornes', async () => {
+    const { DECK_MAX, defaultTemplate, templateSize, templateValid } = await import('./deckBuilder')
     const t = defaultTemplate()
     expect(templateValid(t)).toBe(true)
     expect(templateSize(t)).toBeLessThanOrEqual(DECK_MAX)
     expect(templateValid({})).toBe(false)
   })
 
-  it('compose : modèle + signature + copies gagnées + forgées', () => {
+  it('compose : modèle + signature + copies gagnées + forgées', async () => {
+    const { buildDeckFromTemplate, defaultTemplate, templateSize } = await import('./deckBuilder')
     const t = defaultTemplate()
     const deck = buildDeckFromTemplate(t, 'sigKenta', ['focus'], [])
     expect(deck.length).toBe(templateSize(t) + 2 + 1)
+  })
+
+  it("bug potentiel : loadTemplate/saveTemplate — round-trip, sanitize sur relecture, jamais testés", async () => {
+    const { loadTemplate, saveTemplate, defaultTemplate, sanitizeTemplate } = await import('./deckBuilder')
+    // Rien en stockage : repli propre sur le modèle par défaut.
+    expect(loadTemplate()).toEqual(defaultTemplate())
+
+    saveTemplate({ secondWind: 2, focus: 1 } as never)
+    expect(loadTemplate()).toEqual(sanitizeTemplate({ secondWind: 2, focus: 1 } as never))
+
+    // Stockage corrompu de FORME (JSON valide, pas un objet de template) :
+    // sanitizeTemplate tourne DANS le try/catch de loadTemplate (comme
+    // documenté dans le fichier lui-même comme le bon patron à suivre) —
+    // ne doit jamais planter, doit retomber sur le modèle par défaut.
+    for (const corrupted of ['null', '42', '"oops"']) {
+      localStorage.setItem('coach-arena-deck-v1', corrupted)
+      expect(() => loadTemplate()).not.toThrow()
+      expect(loadTemplate()).toEqual(defaultTemplate())
+    }
+  })
+
+  it('saveTemplate : une écriture qui échoue (quota dépassé) ne plante jamais', async () => {
+    const { saveTemplate, defaultTemplate } = await import('./deckBuilder')
+    ;(globalThis as any).localStorage = {
+      ...fakeLocalStorage(),
+      setItem: () => {
+        throw new Error('QuotaExceededError')
+      },
+    }
+    expect(() => saveTemplate(defaultTemplate())).not.toThrow()
   })
 })
 

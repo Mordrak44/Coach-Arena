@@ -28,8 +28,17 @@ export function loadTemplate(): DeckTemplate {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return defaultTemplate()
-    const t = JSON.parse(raw) as DeckTemplate
-    return sanitizeTemplate(t)
+    const t = JSON.parse(raw)
+    // JSON.parse réussit aussi sur du JSON valide mais de mauvaise FORME
+    // (ex. la chaîne "42" ou '"oops"') — sanitizeTemplate(42) ou
+    // sanitizeTemplate("oops") ne plante pas non plus (l'accès par index
+    // sur un nombre/une chaîne renvoie juste `undefined`, pas d'exception),
+    // donc chaque carte retombait silencieusement à 0 copie au lieu du
+    // modèle par défaut : un deck vide et invalide sans raison visible
+    // (trouvé en écrivant les tests de couverture, 2026-08-16 — même
+    // classe de bug déjà corrigée dans stable.ts).
+    if (!t || typeof t !== 'object' || Array.isArray(t)) return defaultTemplate()
+    return sanitizeTemplate(t as DeckTemplate)
   } catch {
     return defaultTemplate()
   }
