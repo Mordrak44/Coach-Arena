@@ -498,6 +498,55 @@ describe('mode Histoire', () => {
   })
 })
 
+describe('Progression Histoire persistée (story.ts) — loadCleared/markCleared jamais testés', () => {
+  beforeEach(() => {
+    ;(globalThis as any).localStorage = fakeLocalStorage()
+  })
+
+  it('round-trip : markCleared puis loadCleared retrouve le chapitre, storyProgress compte juste', async () => {
+    const { loadCleared, markCleared, storyProgress, STORY_CHAPTERS } = await import('./story')
+    expect(loadCleared().size).toBe(0)
+    markCleared('ch1')
+    markCleared('ch2')
+    const cleared = loadCleared()
+    expect(cleared.has('ch1')).toBe(true)
+    expect(cleared.has('ch2')).toBe(true)
+    expect(storyProgress(cleared)).toEqual({ done: 2, total: STORY_CHAPTERS.length })
+  })
+
+  it("bug potentiel : un stockage JSON valide mais de mauvaise forme (une chaîne, pas un tableau) ne doit pas polluer le Set de caractères isolés", async () => {
+    // JSON.parse('"oops"') = la chaîne "oops", qui EST itérable en JS (une
+    // chaîne s'itère caractère par caractère) — contrairement à un nombre
+    // ou un objet, elle ne fait PAS planter `new Set(...)`. Sans validation
+    // de forme, loadCleared() renverrait silencieusement un Set de
+    // caractères isolés ({'o','p','s'}) au lieu de repartir d'un Set vide,
+    // comme n'importe quel autre stockage corrompu.
+    const { loadCleared } = await import('./story')
+    localStorage.setItem('coach-arena-story-v1', '"oops"')
+    expect(loadCleared().size).toBe(0)
+  })
+
+  it('stockage corrompu (nombre, objet) : loadCleared ne plante jamais et repart vide', async () => {
+    const { loadCleared } = await import('./story')
+    for (const corrupted of ['42', '{}', '{"a":1}']) {
+      localStorage.setItem('coach-arena-story-v1', corrupted)
+      expect(() => loadCleared()).not.toThrow()
+      expect(loadCleared().size).toBe(0)
+    }
+  })
+
+  it('markCleared : une écriture qui échoue (quota dépassé) ne plante jamais', async () => {
+    const { markCleared } = await import('./story')
+    ;(globalThis as any).localStorage = {
+      ...fakeLocalStorage(),
+      setItem: () => {
+        throw new Error('QuotaExceededError')
+      },
+    }
+    expect(() => markCleared('ch1')).not.toThrow()
+  })
+})
+
 describe('séquenceur de cuts (EDL)', () => {
   async function syntheticMatch() {
     const m = freshMatch()

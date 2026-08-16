@@ -941,6 +941,21 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       d'audit), trouvée cette fois par un test de couverture plutôt que
       par le skill code-review. Corrigé avec la même validation de forme
       avant `sanitizeTemplate`. 5 nouveaux tests (110 → 112).
+- [x] Quatrième cible du rapport de coverage : story.ts, 64 % → 93 %.
+      **Encore un bug réel trouvé** dans `loadCleared` (progression du
+      mode Histoire, quels chapitres sont vaincus) : `new Set(JSON.parse
+      (raw))` sans validation de forme — une chaîne stockée (ex.
+      `'"oops"'`) EST itérable en JS (une chaîne s'itère caractère par
+      caractère), donc `new Set("oops")` ne plante PAS comme le ferait
+      `new Set(42)` ou `new Set({})` : ça produisait silencieusement un
+      Set de caractères isolés (`{'o','p','s'}`) au lieu de repartir
+      d'une progression vide. Troisième occurrence de cette même classe
+      de bug (stable.ts au round 6 d'audit, deckBuilder.ts la veille) —
+      chaque fois une valeur JSON PRIMITIVE (nombre, chaîne) qui traverse
+      une opération censée planter sur un mauvais type mais qui, en JS,
+      ne plante que pour CERTAINS types primitifs, pas tous. Corrigé en
+      validant `Array.isArray(parsed)` avant de construire le Set (même
+      patron que le fix deckBuilder.ts). 4 nouveaux tests (112 → 116).
 
 ### Tier 2 — Édition Histoire 14,90 € (stores)
 - [x] Mode histoire v0 « Le Grand Hurlement » : 8 chapitres écrits
@@ -1017,6 +1032,29 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Quatrième passe sur le rapport de coverage —
+  story.ts (progression du mode Histoire), 64 % → 93 %. Encore un bug
+  réel, troisième occurrence de la même famille en 3 jours : `loadCleared`
+  faisait `new Set(JSON.parse(raw))` sans valider que le résultat est
+  bien un tableau. Le piège spécifique ici : une CHAÎNE stockée par
+  erreur (`'"oops"'`) est itérable en JS — `new Set("oops")` ne plante
+  PAS (contrairement à `new Set(42)` ou `new Set({})`, qui lèvent une
+  exception) — donc le garde-fou try/catch existant ne se déclenchait
+  jamais pour ce cas précis, produisant silencieusement un Set de
+  caractères isolés au lieu de repartir d'une progression vide. Écrit
+  le test AVANT le fix (discipline habituelle) : a effectivement échoué
+  (`Set.size` = 3 au lieu de 0), confirmant le bug avant toute
+  correction. Corrigé avec `Array.isArray(parsed)` avant de construire
+  le Set — même patron que le fix deckBuilder.ts de la veille, qui
+  suivait lui-même le fix stable.ts du round 6 d'audit. Le motif qui se
+  dégage sur ces 3 bugs : une opération JS censée « planter sur une
+  mauvaise forme » (accès par index, construction de Set/objet à partir
+  d'un JSON.parse non validé) ne plante en réalité que pour CERTAINS
+  types primitifs, jamais pour tous — null/nombre plantent souvent,
+  mais une chaîne ou un objet vide passent parfois au travers
+  silencieusement. 4 nouveaux tests (112 → 116, stables sur 5
+  exécutions), `tsc --noEmit`/`npm run build` verts.
 
 - 2026-08-16 (routine) : Deuxième passe sur le rapport de coverage
   (après cardForge.ts la veille) — characters.ts, 54 % → 86 %

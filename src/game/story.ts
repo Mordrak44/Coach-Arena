@@ -201,7 +201,15 @@ export function loadCleared(): Set<string> {
   if (!hasStorage) return new Set()
   try {
     const raw = localStorage.getItem(KEY)
-    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+    if (!raw) return new Set()
+    const parsed = JSON.parse(raw)
+    // JSON.parse('"oops"') donne la CHAÎNE "oops" — itérable en JS (une
+    // chaîne s'itère caractère par caractère), donc `new Set(parsed)` ne
+    // plante PAS pour ce cas (contrairement à un nombre ou un objet) : ça
+    // aurait silencieusement pollué le Set de caractères isolés au lieu de
+    // repartir d'une progression vide (trouvé en écrivant les tests de
+    // couverture, 2026-08-16 — même classe de bug que deckBuilder.ts).
+    return new Set(Array.isArray(parsed) ? parsed.filter(x => typeof x === 'string') : [])
   } catch {
     return new Set()
   }
