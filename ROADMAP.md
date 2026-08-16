@@ -874,7 +874,44 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       a branch », le défaut). Sans ce clic, le workflow tourne mais
       `deploy-pages` échoue (aucun site Pages configuré pour le recevoir).
       Une fois fait, l'URL sera `https://mordrak44.github.io/Coach-Arena/`.
+      **Confirmé, pas supposé** : le premier run
+      (https://github.com/Mordrak44/Coach-Arena/actions/runs/31937250358)
+      a échoué exactement comme prévu — `npm test` ✅, `npm run build` ✅,
+      puis `actions/configure-pages@v5` ❌ (site Pages introuvable), le
+      reste `skipped` en cascade. Rien à corriger côté code : c'est
+      précisément le réglage manuel décrit ci-dessus qui manque. Une fois
+      activé, un nouveau push (ou un run manuel via l'onglet Actions)
+      suffira à publier.
 - [ ] Analytics funnel (arrivée → match 1 → match 3 → achat)
+- [x] Couverture de tests par rapport de coverage (`@vitest/coverage-v8`,
+      `npm run coverage`) — angle différent des rounds d'audit
+      code-review précédents (ceux-là cherchent des bugs ; celui-ci
+      cherche du code jamais exercé du tout, correct ou non). Plus gros
+      écart trouvé : `cardForge.ts` (persistance de la Forge,
+      `saveForgedCard`/`loadForgedCards`, jamais testée) à 43 % de
+      couverture — une vraie fonctionnalité joueur (les cartes forgées
+      par prompt survivent aux sessions) sans AUCUN test. Root cause du
+      piège découvert en écrivant les tests : `cardForge.ts` était
+      importé STATIQUEMENT en tête d'engine.test.ts (`import {
+      forgeCard } from './cardForge'`), donc son `hasStorage` interne se
+      figeait à `false` AVANT même le premier `beforeEach` du fichier —
+      même piège que stable.ts/progression.ts (module chargé une seule
+      fois, `hasStorage` calculé à ce moment précis), mais cette fois
+      caché par un import statique préexistant plutôt qu'un import
+      dynamique mal placé. Résolu en retirant l'import statique et en
+      ajoutant un `beforeEach` (faux localStorage) à la describe
+      « création par prompt » — la première à toucher cardForge dans
+      l'ordre du fichier — pour que son tout premier `import()`
+      dynamique voie déjà un stockage disponible. 6 nouveaux tests
+      verrouillent maintenant : le round-trip save→load, l'ordre
+      (plus récent en tête), le plafond MAX_FORGED=8 (les plus
+      anciennes tombent), le re-clamp à la relecture (protège contre un
+      drift de version passée sur une carte déjà sauvegardée), un
+      stockage corrompu (JSON valide, pas un tableau — ne plante pas),
+      et un échec d'écriture (quota dépassé). engine.test.ts 100 → 106.
+      `@vitest/coverage-v8` gardé en devDependency (`coverage/` ajouté
+      au `.gitignore`) pour la prochaine passe de ce genre. `tsc
+      --noEmit` + `npm run build` + suite complète verts.
 
 ### Tier 2 — Édition Histoire 14,90 € (stores)
 - [x] Mode histoire v0 « Le Grand Hurlement » : 8 chapitres écrits
@@ -951,6 +988,32 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Vérifié le premier run du workflow de
+  déploiement Pages (poussé la veille) — échoue exactement comme prévu
+  et documenté : `npm test` ✅, `npm run build` ✅, puis
+  `actions/configure-pages@v5` ❌ (site Pages introuvable, faute du
+  réglage manuel « Source = GitHub Actions » dans Settings → Pages).
+  Rien à corriger côté code, juste confirmé — voir le run
+  https://github.com/Mordrak44/Coach-Arena/actions/runs/31937250358.
+  Puis, avec ce point bloqué sur une action humaine, repris la série de
+  qualité sous un angle neuf : `@vitest/coverage-v8` installé pour
+  trouver du code jamais EXERCÉ (différent des rounds d'audit
+  code-review précédents, qui cherchent des bugs dans du code déjà
+  exercé). Plus gros trou trouvé : la persistance de la Forge
+  (cardForge.ts, `saveForgedCard`/`loadForgedCards`) à 43 % — une vraie
+  fonctionnalité joueur jamais testée. En écrivant les tests, retrouvé
+  exactement le piège de `hasStorage` déjà documenté pour
+  stable.ts/progression.ts, mais sous une forme inédite : cardForge.ts
+  était importé STATIQUEMENT en tête d'engine.test.ts (par les tests
+  forgeCard existants), donc son `hasStorage` se figeait à `false` avant
+  même le premier `beforeEach` du fichier — aucun `vi.resetModules()`
+  n'aurait suffi, il fallait retirer l'import statique et poser le faux
+  localStorage AVANT le tout premier `import()` dynamique du module
+  dans l'ordre d'exécution du fichier. 6 nouveaux tests verrouillent le
+  round-trip, l'ordre, le plafond MAX_FORGED, le re-clamp au
+  rechargement, le stockage corrompu et l'échec d'écriture.
+  engine.test.ts 100 → 106, `tsc --noEmit`/`npm run build` verts.
 
 - 2026-08-16 : Hébergement GitHub Pages mis en place, demandé
   explicitement par l'utilisateur (« github page ? », après lui avoir

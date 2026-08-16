@@ -20,7 +20,10 @@ import {
 } from './combat'
 import { CARD_POOL, SIGNATURE_CARDS, buildStarterDeck, clampEffect, computeCost, getCard, signatureFor } from './cards'
 import { DECK_MAX, MAX_COPIES, buildDeckFromTemplate, defaultTemplate, sanitizeTemplate, templateSize, templateValid } from './deckBuilder'
-import { forgeCard } from './cardForge'
+// cardForge PAS importé statiquement ici, volontairement : son hasStorage
+// interne se fige au tout premier import (comme stable.ts/progression.ts),
+// donc chaque usage plus bas passe par un import() dynamique après avoir
+// posé un faux localStorage — voir la describe « création par prompt ».
 import { parseConsigne } from './speechTactics'
 import { buildScenePlans, colorWord } from './sceneDirector'
 import { ROSTER, createFromPrompt } from './characters'
@@ -686,6 +689,15 @@ describe('bibliothèque de clips (stub — aucun pipeline branché)', () => {
 })
 
 describe('création par prompt & réalisateur', () => {
+  // cardForge.ts calcule hasStorage UNE FOIS au tout premier import (comme
+  // stable.ts/progression.ts) — poser un faux localStorage avant CE
+  // premier import (forcément dynamique, jamais un import statique en
+  // tête de fichier) garantit que la persistance de la Forge, testée plus
+  // bas dans ce fichier, voit hasStorage=true pour le reste du run.
+  beforeEach(() => {
+    ;(globalThis as any).localStorage = fakeLocalStorage()
+  })
+
   it('createFromPrompt produit un perso complet', () => {
     const c = createFromPrompt('un samouraï cérébral de glace nommé Frimas')
     expect(c.name).toBeTruthy()
@@ -693,14 +705,16 @@ describe('création par prompt & réalisateur', () => {
     expect(c.stats.hp).toBeGreaterThan(0)
   })
 
-  it('forgeCard borne les cartes et refuse le vide', () => {
+  it('forgeCard borne les cartes et refuse le vide', async () => {
+    const { forgeCard } = await import('./cardForge')
     const r = forgeCard('une carte qui soigne beaucoup, appelée Regain')
     expect(r?.card.name).toBe('Regain')
     expect(r?.card.cost).toBeGreaterThanOrEqual(1)
     expect(forgeCard('blablabla sans effet')).toBeNull()
   })
 
-  it('forgeCard : les racines courtes ne matchent QUE des mots plats/conjugués, pas des mots sans rapport qui les CONTIENNENT (bug trouvé en audit, 2026-08-16)', () => {
+  it('forgeCard : les racines courtes ne matchent QUE des mots plats/conjugués, pas des mots sans rapport qui les CONTIENNENT (bug trouvé en audit, 2026-08-16)', async () => {
+    const { forgeCard } = await import('./cardForge')
     // Ces mots français courants contiennent une racine de règle en PLEIN
     // MILIEU (pas en préfixe) — avant le fix, ils déclenchaient à tort
     // une carte. "sans rapport" = aucune des 14 règles ne doit matcher.
@@ -1472,5 +1486,81 @@ describe('pickOpponentTeam (characters.ts) — banc adverse du mode Rapide', () 
     const allButOne = ROSTER.slice(1).map(c => c.id)
     const team = pickOpponentTeam(allButOne, 5) // demande 5, il n'en reste qu'1 possible
     expect(team.length).toBe(1)
+  })
+})
+
+describe('Persistance de la Forge (cardForge.ts) — saveForgedCard/loadForgedCards jamais testés', () => {
+  beforeEach(() => {
+    ;(globalThis as any).localStorage = fakeLocalStorage()
+  })
+
+  it('saveForgedCard puis loadForgedCards : la carte revient intacte, jouable via getCard', async () => {
+    const { forgeCard, saveForgedCard, loadForgedCards } = await import('./cardForge')
+    const { getCard } = await import('./cards')
+    const r = forgeCard('une carte qui soigne beaucoup, appelée Regain')!
+    saveForgedCard(r.card)
+    const loaded = loadForgedCards()
+    expect(loaded.map(c => c.id)).toContain(r.card.id)
+    expect(getCard(r.card.id)?.name).toBe('Regain')
+  })
+
+  it('ordre : la plus récente forgée arrive en tête', async () => {
+    const { forgeCard, saveForgedCard, loadForgedCards } = await import('./cardForge')
+    const a = forgeCard('un cri de guerre puissant, appelée Alpha')!
+    const b = forgeCard('un cri de guerre puissant, appelée Beta')!
+    saveForgedCard(a.card)
+    saveForgedCard(b.card)
+    expect(loadForgedCards()[0].name).toBe('Beta')
+  })
+
+  it('plafond MAX_FORGED (8) : les plus anciennes sont abandonnées', async () => {
+    const { forgeCard, saveForgedCard, loadForgedCards } = await import('./cardForge')
+    for (let i = 0; i < 10; i++) {
+      saveForgedCard(forgeCard(`un cri de guerre, appelée Carte${i}`)!.card)
+    }
+    const loaded = loadForgedCards()
+    expect(loaded.length).toBe(8)
+    expect(loaded[0].name).toBe('Carte9') // la plus récente
+    expect(loaded.map(c => c.name)).not.toContain('Carte0') // la plus vieille, hors plafond
+    expect(loaded.map(c => c.name)).not.toContain('Carte1')
+  })
+
+  it('re-clamp à la relecture : un effet hors bornes (drift de version passée) est ramené dans les clous', async () => {
+    const { saveForgedCard, loadForgedCards } = await import('./cardForge')
+    const { computeCost } = await import('./cards')
+    saveForgedCard({
+      id: 'forge-drift-test',
+      name: 'Carte Corrompue',
+      timing: 'pause',
+      cost: 999, // coût jamais recalculé au moment du save : doit être ignoré au load
+      icon: '💊',
+      desc: 'x',
+      effects: [{ kind: 'heal', pct: 5 }], // 5 = 500 % PV, largement hors bornes (max 0.25)
+    } as any)
+    const loaded = loadForgedCards()
+    const c = loaded.find(x => x.id === 'forge-drift-test')!
+    expect((c.effects[0] as any).pct).toBe(0.25) // reclampé au max autorisé
+    expect(c.cost).toBe(computeCost(c.effects)) // recalculé, pas la valeur corrompue de 999
+  })
+
+  it('stockage corrompu (JSON valide, pas un tableau) : loadForgedCards ne plante jamais', async () => {
+    const { loadForgedCards } = await import('./cardForge')
+    for (const corrupted of ['null', '"oops"', '42', '{}']) {
+      localStorage.setItem('coach-arena-forged-cards-v1', corrupted)
+      expect(() => loadForgedCards()).not.toThrow()
+    }
+  })
+
+  it('écriture qui échoue (quota dépassé, navigation privée Safari) : saveForgedCard ne plante jamais', async () => {
+    const { forgeCard, saveForgedCard } = await import('./cardForge')
+    const store = fakeLocalStorage()
+    ;(globalThis as any).localStorage = {
+      ...store,
+      setItem: () => {
+        throw new Error('QuotaExceededError')
+      },
+    }
+    const r = forgeCard('un cri de guerre puissant')!
+    expect(() => saveForgedCard(r.card)).not.toThrow()
   })
 })
