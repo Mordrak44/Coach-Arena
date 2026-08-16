@@ -207,6 +207,40 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       d'enregistrement/export continue de produire un clip valide,
       visible sur l'écran de résultats) — pas de faux sentiment de
       sécurité affiché comme un test qui n'en est pas un.
+- [x] Audit de code round 5 (2026-08-16), ciblé sur le pipeline cinéma
+      (sceneDirector.ts, cutPlanner.ts, liveCutPlayer.ts, sceneQueue.ts —
+      jamais audités). 4 bugs trouvés, tous réels, tous corrigés ET
+      verrouillés par des tests (ce sont des modules de logique pure) :
+      1. **`buildScenePlans` référençait le mauvais perso pour un crit
+         encaissé** : le calcul de l'attaquant supposait un champ `by`
+         présent sur tout événement noté — faux pour `'hit'` (qui n'a
+         que `target`, celui qui encaisse). Un crit subi par le joueur
+         (donc frappé par l'ennemi) partait en génération Kling PAYANTE
+         avec la planche du JOUEUR. Corrigé avec un switch qui dérive
+         l'attaquant depuis `target` pour `'hit'`, depuis `by` sinon.
+      2. **`eventScore` notait `hypeFull` alors que `momentPrompt` n'a
+         aucun cas pour lui** : un round dont le seul événement notable
+         était un hypeFull perdait silencieusement son créneau de moment
+         fort (le prompt généré était `null`, jamais remplacé par le
+         2e-meilleur événement du round). Corrigé en alignant le score
+         de `hypeFull` sur celui de `cutPlanner.ts` (0, non électible).
+      3. **Le garde-fou anti-retard de `LiveCutPlayer` trimmait par
+         NOMBRE de cuts, pas par retard réel** (`MAX_QUEUE=1`) : un seul
+         événement `'hit'` pousse 3 cuts d'un coup (attaque → impact →
+         réaction) et se faisait sabrer à 1 seul cut dès sa création,
+         même sans aucun retard — la grammaire attaque/impact/réaction
+         de `cutPlanner.ts` aurait disparu dès qu'une vraie bibliothèque
+         de clips serait branchée (le pilote Kling en cours y va tout
+         droit). Corrigé avec un budget de DURÉE cumulée
+         (`MAX_QUEUE_LAG_S = 2,5 s`) plutôt qu'un compte d'entrées.
+      4. **`SceneJobQueue` ne pouvait jamais être annulée** : le
+         `setTimeout` de timeout par job n'était jamais nettoyé, et
+         `ResultsScreen.tsx` ne coupait rien à son démontage — chaque job
+         continuait de tourner (et pouvait notifier un composant
+         disparu) jusqu'à expiration. Ajout de `cancel()`, câblé dans le
+         cleanup du `useEffect`.
+      4 nouveaux tests dans engine.test.ts (89 → 93), `tsc --noEmit` +
+      `npm run build` + suite complète verts.
 - [x] Carnet du Coach : cartes jouables au coin du ring (3 familles :
       directes, armées, conditionnelles) — voir GAME_DESIGN.md §4 bis
       (v0 : pool de 6 cartes, sélection de 3 avant match, 1 par coin du
@@ -744,6 +778,63 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Audit de code round 5, ciblé sur le pipeline
+  cinéma (sceneDirector.ts, cutPlanner.ts, liveCutPlayer.ts,
+  sceneQueue.ts, cutLibrary.ts, deckBuilder.ts, stable.ts,
+  speechTactics.ts) — cinquième passe de la série. 4 bugs réels
+  corrigés, tous verrouillés par des tests (contrairement au round 4,
+  ce sont des modules de logique pure, testables en vitest sans mock
+  d'API navigateur) :
+  - **sceneDirector.ts, `buildScenePlans`** : le calcul de « qui a
+    frappé » pour choisir la planche de référence d'un moment fort
+    supposait que tout événement noté a un champ `by` — faux pour
+    `'hit'`, qui n'a que `target` (celui qui ENCAISSE). Un crit encaissé
+    par le joueur (donc frappé par l'ennemi) référençait quand même le
+    joueur : la mauvaise planche de perso serait partie en génération
+    Kling PAYANTE. Trouvé avant tout usage réel en prod (le pipeline
+    scène-par-scène n'est pas encore branché à un vrai submitter), mais
+    aurait cassé le tout premier essai. Fix : bascule sur un switch qui
+    dérive l'attaquant depuis `target` pour `'hit'`, depuis `by` sinon.
+  - **sceneDirector.ts, `eventScore`** : notait `hypeFull` à 1 (donc
+    électible comme meilleur moment d'un round) alors que `momentPrompt`
+    n'a aucun cas pour `hypeFull` et renvoie `null` — un round où le
+    seul événement notable était un hypeFull perdait silencieusement son
+    créneau de moment fort, même si un autre round avait un événement
+    filmable. Fix : `hypeFull` retombe sur le score par défaut (0),
+    aligné sur le choix déjà fait dans `cutPlanner.ts`.
+  - **liveCutPlayer.ts, `LiveCutPlayer.update`** : le garde-fou anti-
+    retard (`MAX_QUEUE=1`) trimmait par NOMBRE d'entrées, pas par retard
+    réel — un seul événement `'hit'` pousse 3 cuts d'un coup
+    (attack-solo + impact-flash + hit-reaction) et se faisait sabrer à 1
+    seul cut (le dernier) dès sa création, même sans aucun retard. Une
+    fois une vraie bibliothèque de clips branchée (le pilote Kling en
+    cours y va), chaque coup aurait sauté direct à la réaction, plus
+    aucun montage attaque→impact→réaction. Fix : le garde-fou trimme
+    maintenant par BUDGET DE DURÉE cumulée (`MAX_QUEUE_LAG_S = 2.5 s`)
+    plutôt que par longueur — une séquence fraîche d'un seul événement
+    passe intacte, un vrai retard accumulé est toujours purgé.
+  - **sceneQueue.ts, `SceneJobQueue.start`** : le `setTimeout` de
+    timeout par job n'était jamais annulé ni annulable — pas de méthode
+    `cancel()`, et `ResultsScreen.tsx` ne nettoyait rien à son
+    démontage. Chaque job continuait de tourner jusqu'à expiration (20 s
+    par défaut) même après que l'écran ait changé, et un submitter réel
+    lent pouvait notifier `onUpdate` sur un composant déjà démonté. Fix :
+    ajout de `cancel()` (annule tous les minuteurs + coupe les
+    notifications futures), câblé dans le cleanup du `useEffect` de
+    ResultsScreen.
+  - Écarté (design, pas un bug) : `eventScore` est dupliqué avec des
+    poids différents dans `sceneDirector.ts` et `cutPlanner.ts` — les
+    deux fichiers ont des critères de « filmable » distincts et déjà
+    cohérents en interne (ex. dodge/block ne comptent dans aucun des
+    deux pour leurs usages respectifs), donc pas une vraie divergence à
+    corriger, juste deux besoins voisins qui se ressemblent.
+  - 4 nouveaux tests dans engine.test.ts (89 → 93) : les deux bugs de
+    sceneDirector, la séquence complète des 3 cuts d'un même événement
+    dans LiveCutPlayer (le test existant encodait l'ancien comportement
+    buggé — réécrit pour vérifier la séquence correcte), et
+    `SceneJobQueue.cancel()` coupant bien les mises à jour tardives.
+    `tsc --noEmit`, `npm run build` et la suite complète passent.
 
 - 2026-08-16 (routine) : Audit de code round 4, ciblé sur systems/
   (voice.ts, sound.ts, facecam.ts, recorder.ts) — quatrième passe de la

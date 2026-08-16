@@ -16,8 +16,15 @@ import { EMPTY_CUT_LIBRARY, type CutClip, type CutClipLibrary } from './cutLibra
 // un <video> par-dessus le canvas dans ArenaScreen est le travail
 // restant, mécanique, le jour où de vrais clips existent.
 
-/** Cuts en attente au-delà de cette taille : les plus vieux sont sautés. */
-export const MAX_QUEUE = 1
+/**
+ * Retard maximum toléré dans la file, en somme des durées des cuts en
+ * attente (secondes) — pas un nombre d'entrées : un seul événement peut
+ * légitimement pousser plusieurs cuts d'un coup (ex. un 'hit' produit
+ * attack-solo + impact-flash + hit-reaction). Trimmer par LONGUEUR
+ * (ancien MAX_QUEUE=1) sabrait ces séquences dès leur naissance, même
+ * sans aucun retard réel (trouvé en audit, 2026-08-16).
+ */
+export const MAX_QUEUE_LAG_S = 2.5
 
 export interface ActiveCut {
   cut: Cut
@@ -60,8 +67,16 @@ export class LiveCutPlayer {
       if (clip) this.queue.push({ cut, clip })
       // Pas de clip prêt : silence — aucune trace, le vectoriel comble l'instant.
     }
-    // Garde-fou : jamais de retard qui s'accumule — on saute les plus vieux.
-    while (this.queue.length > MAX_QUEUE) this.queue.shift()
+    // Garde-fou : jamais de retard qui s'accumule au-delà d'un budget de
+    // DURÉE — on saute les plus vieux jusqu'à repasser sous le budget,
+    // sans jamais sabrer une séquence fraîche d'un seul event (voir
+    // MAX_QUEUE_LAG_S).
+    while (
+      this.queue.length > 1 &&
+      this.queue.reduce((sum, q) => sum + q.cut.duration, 0) > MAX_QUEUE_LAG_S
+    ) {
+      this.queue.shift()
+    }
 
     if (this.active && m.t >= this.active.until) this.active = null
     if (!this.active && this.queue.length > 0) {

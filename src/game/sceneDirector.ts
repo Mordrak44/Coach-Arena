@@ -76,8 +76,11 @@ function eventScore(e: CombatEvent): number {
       return 4
     case 'hit':
       return e.crit ? 3 : 0
-    case 'hypeFull':
-      return 1
+    // hypeFull n'a pas de cas dans momentPrompt (rien de filmable : « la
+    // jauge se remplit » n'est pas un plan) — lui donner un score > 0
+    // le ferait gagner l'élection d'un round sans jamais produire de
+    // prompt, perdant silencieusement ce créneau de moment fort
+    // (trouvé en audit, 2026-08-16). Voir cutPlanner.ts : même choix.
     default:
       return 0
   }
@@ -154,7 +157,23 @@ export function buildScenePlans(
   for (const c of best.slice(0, maxMoments).sort((a, b) => a.round - b.round)) {
     const prompt = momentPrompt(c.e, player, enemy)
     if (prompt) {
-      const by = 'by' in c.e && c.e.by === 'enemy' ? enemy : player
+      // 'hit' n'a pas de champ `by`, seulement `target` (qui ENCAISSE) —
+      // l'attaquant est donc l'AUTRE côté. `'by' in c.e` valait toujours
+      // faux pour un crit et retombait sur `player` même quand c'est
+      // l'ennemi qui avait frappé : la mauvaise planche de référence
+      // partait en génération payante (trouvé en audit, 2026-08-16).
+      const by = ((): Character => {
+        switch (c.e.kind) {
+          case 'hit':
+            return c.e.target === 'player' ? enemy : player
+          case 'ulti':
+          case 'special':
+          case 'countered':
+            return c.e.by === 'enemy' ? enemy : player
+          default:
+            return player
+        }
+      })()
       plans.push({
         id: `round${c.round}-highlight`,
         title: `Moment fort du round ${c.round}`,

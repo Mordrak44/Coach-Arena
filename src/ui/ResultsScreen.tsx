@@ -45,6 +45,7 @@ export default function ResultsScreen({
     const queue = new SceneJobQueue(outcome.scenes, { onUpdate: setSceneJobs })
     setSceneJobs(queue.jobs())
     queue.start()
+    return () => queue.cancel()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   // Le « VICTOIRE ! » d'abord : la vidéo autoplay peut faire défiler l'écran.

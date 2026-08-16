@@ -548,24 +548,35 @@ describe('LiveCutPlayer (lecteur en direct — respecte la règle « instant dé
     expect(player.current()).toBeNull()
   })
 
-  it('avec une bibliothèque garnie : le cut le plus récent joue, puis expire', async () => {
+  it('avec une bibliothèque garnie : les cuts du même événement jouent en séquence, puis expirent', async () => {
+    // Un seul 'hit' produit 3 cuts (attack-solo, impact-flash, hit-reaction) :
+    // ils doivent tous jouer À LA SUITE (garde-fou par budget de durée, pas
+    // par nombre — voir MAX_QUEUE_LAG_S), pas se sabrer au premier qui expire.
     const { LiveCutPlayer } = await import('./liveCutPlayer')
-    const fakeLibrary = { getClip: () => ({ url: 'fake://clip', duration: 999 }) }
+    const fakeLibrary = { getClip: (kind: string) => ({ url: `fake://${kind}`, duration: 999 }) }
     const m = freshMatch()
     const player = new LiveCutPlayer(ROSTER[0], ROSTER[1], fakeLibrary)
     m.events.push({ kind: 'hit', t: 1, target: 'enemy', dmg: 5, crit: false, onoma: 'BAM!' })
     m.t = 1
     player.update(m)
-    const active = player.current()
+    let active = player.current()
     expect(active).not.toBeNull()
-    expect(active!.url).toBe('fake://clip')
+    expect(active!.cut.kind).toBe('attack-solo')
     m.t = active!.until + 0.01
     player.update(m)
-    expect(player.current()).toBeNull() // expiré, rien de neuf à jouer
+    active = player.current()
+    expect(active!.cut.kind).toBe('impact-flash') // le suivant du même événement, pas null
+    m.t = active!.until + 0.01
+    player.update(m)
+    active = player.current()
+    expect(active!.cut.kind).toBe('hit-reaction')
+    m.t = active!.until + 0.01
+    player.update(m)
+    expect(player.current()).toBeNull() // les 3 sont passés, la file est vide
   })
 
-  it('garde-fou : la file ne dépasse jamais MAX_QUEUE, les cuts en retard sont sautés', async () => {
-    const { LiveCutPlayer, MAX_QUEUE } = await import('./liveCutPlayer')
+  it('garde-fou : la file ne dépasse jamais MAX_QUEUE_LAG_S, les cuts en retard sont sautés', async () => {
+    const { LiveCutPlayer } = await import('./liveCutPlayer')
     const seen: string[] = []
     const fakeLibrary = {
       getClip: (kind: string) => {
@@ -588,6 +599,31 @@ describe('LiveCutPlayer (lecteur en direct — respecte la règle « instant dé
     // Le cut affiché doit être parmi les plus récents, pas le tout premier englouti
     // sous une pile de retard — c'est tout l'intérêt du garde-fou.
     expect(active!.until).toBeGreaterThan(m.t) // toujours en cours, pas fini
+  })
+
+  it("bug d'audit : un SEUL événement (3 cuts d'un coup) ne se fait plus sabrer par le garde-fou de file", async () => {
+    // Avant fix (2026-08-16) : MAX_QUEUE=1 trimmait par NOMBRE d'entrées,
+    // donc un seul 'hit' (attack-solo + impact-flash + hit-reaction, 2.4 s
+    // cumulées) perdait ses 2 premiers cuts dès leur création — sans
+    // aucun retard réel. Le fix trimme par budget de DURÉE.
+    const { LiveCutPlayer } = await import('./liveCutPlayer')
+    const kinds: string[] = []
+    const fakeLibrary = {
+      getClip: (kind: string) => {
+        kinds.push(kind)
+        return { url: `fake://${kind}`, duration: 1 }
+      },
+    }
+    const m = freshMatch()
+    const player = new LiveCutPlayer(ROSTER[0], ROSTER[1], fakeLibrary)
+    m.t = 1
+    m.events.push({ kind: 'hit', t: 1, target: 'enemy', dmg: 5, crit: false, onoma: 'BAM!' })
+    player.update(m)
+    // Les 3 cuts du seul événement ont bien été demandés à la bibliothèque…
+    expect(kinds).toEqual(['attack-solo', 'impact-flash', 'hit-reaction'])
+    // …et le tout premier (attack-solo) doit être celui joué en premier,
+    // pas sauté au profit du dernier — rien n'était en retard ici.
+    expect(player.current()?.cut.kind).toBe('attack-solo')
   })
 
   it("comble le SILENCE (file vide, round en cours) avec un idle-loop — pas un événement", async () => {
@@ -710,6 +746,44 @@ describe('création par prompt & réalisateur', () => {
     expect(colorWord('#3742fa')).toBe('blue')
     expect(colorWord('#ffffff')).toBe('white')
   })
+
+  it("bug d'audit : un crit encaissé par le JOUEUR (donc frappé par l'ennemi) référence bien l'ennemi", () => {
+    // Avant fix (2026-08-16) : 'hit' n'a pas de champ `by` (seulement
+    // `target`, qui ENCAISSE), donc `'by' in c.e` était toujours faux et
+    // `by` retombait systématiquement sur `player` — même quand c'est
+    // l'ENNEMI qui avait frappé. La mauvaise planche de perso partait en
+    // génération Kling payante.
+    const m = freshMatch()
+    m.events.push(
+      { kind: 'hit', t: 10, target: 'player', dmg: 40, crit: true, onoma: 'DOKAN!!' },
+      { kind: 'roundEnd', t: 15, winner: 'enemy' },
+      { kind: 'matchEnd', t: 15, winner: 'enemy' },
+    )
+    const plans = buildScenePlans(m, ROSTER[0], ROSTER[1])
+    const highlight = plans.find(p => p.id === 'round1-highlight')
+    expect(highlight?.refChars).toEqual([ROSTER[1].id]) // l'ENNEMI a frappé, pas le joueur
+  })
+
+  it("bug d'audit : un round où le seul événement notable est hypeFull ne perd plus son créneau de moment fort", () => {
+    // Avant fix (2026-08-16) : eventScore('hypeFull') = 1 > 0 le faisait
+    // gagner l'élection du round, mais momentPrompt n'a aucun cas pour
+    // 'hypeFull' → retourne null → AUCUN plan n'était poussé pour ce
+    // round, même si un autre event notable existait. Ici, le crit du
+    // round 2 doit produire son highlight malgré le hypeFull du round 1.
+    const m = freshMatch()
+    m.events.push(
+      { kind: 'roundStart', t: 0, round: 1 },
+      { kind: 'hypeFull', t: 5, who: 'player' },
+      { kind: 'roundEnd', t: 10, winner: 'player' },
+      { kind: 'roundStart', t: 10, round: 2 },
+      { kind: 'hit', t: 20, target: 'enemy', dmg: 30, crit: true, onoma: 'BAM!' },
+      { kind: 'roundEnd', t: 25, winner: 'player' },
+      { kind: 'matchEnd', t: 25, winner: 'player' },
+    )
+    m.playerWins = 2
+    const plans = buildScenePlans(m, ROSTER[0], ROSTER[1], 2)
+    expect(plans.some(p => p.id === 'round2-highlight')).toBe(true)
+  })
 })
 
 describe('SceneJobQueue (file de génération asynchrone des scènes)', () => {
@@ -750,6 +824,28 @@ describe('SceneJobQueue (file de génération asynchrone des scènes)', () => {
     queue.start()
     await new Promise(r => setTimeout(r, 60))
     expect(queue.jobs()[0].status).toBe('failed')
+  })
+
+  it("bug d'audit : cancel() coupe les mises à jour d'un job résolu APRÈS le démontage", async () => {
+    // Avant fix (2026-08-16) : le setTimeout du timeout n'était jamais
+    // annulé, et rien ne pouvait empêcher onUpdate() d'être rappelé après
+    // que l'appelant (ex. ResultsScreen démonté) ait cessé de s'y
+    // intéresser — la file continuait de tourner en arrière-plan sans
+    // aucun moyen de l'arrêter.
+    const { SceneJobQueue } = await import('./sceneQueue')
+    const updates: string[][] = []
+    let resolveSubmit: (url: string | null) => void
+    const pending = new Promise<string | null>(r => (resolveSubmit = r))
+    const queue = new SceneJobQueue([plan('a')], {
+      submitter: { submit: () => pending },
+      onUpdate: jobs => updates.push(jobs.map(j => j.status)),
+    })
+    queue.start()
+    queue.cancel()
+    resolveSubmit!('fake://late')
+    await new Promise(r => setTimeout(r, 10))
+    expect(updates).toEqual([]) // jamais notifié : annulé avant la résolution
+    expect(queue.jobs()[0].status).toBe('pending') // l'état interne n'a pas non plus bougé
   })
 
   it("l'échec d'un job n'affecte pas les autres (indépendants)", async () => {
