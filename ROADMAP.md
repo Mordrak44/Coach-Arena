@@ -1094,6 +1094,43 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       valeurs exactes confirmées, pas seulement leur présence). `tsc
       --noEmit` + `npm run build` + 130 tests vitest inchangés (pur
       ajout d'attributs, aucune logique touchée).
+- [x] Audit de `scripts/` (jamais couvert par les 8 rounds précédents,
+      qui ne ciblaient que `src/`) : `sim.ts`, l'outil d'équilibrage, et
+      `shot.mjs`, le funnel de captures. **Un vrai bug de données trouvé**
+      dans `sim.ts` : la simulation « Coach absent » appelait quand même
+      `chooseTacticPlan(m, 'pressure')` à chaque pause tactique — alors
+      que dans le vrai jeu, un coach absent ne clique jamais de plan
+      (`ArenaScreen` n'appelle cette fonction que sur un clic explicite),
+      laisse `m.plan` à `null`, et `combat.ts` retombe sur `'coldblood'`
+      au timeout (`startNextRound(m, m.plan ?? 'coldblood')`), pas
+      `'pressure'`. Le chiffre « Coach absent » affiché par le script
+      mesurait donc en réalité un coach qui garde la voix silencieuse
+      mais choisit quand même la posture la plus agressive à chaque
+      pause — invalidant en silence toute la comparaison coaché/absent
+      qui est la RAISON D'ÊTRE de cet outil d'équilibrage. Corrigé en
+      gatant l'appel sur `opts.coached`. Effet mesuré, pas supposé :
+      le winrate « Coach absent » chute de ~40-50 % (estimation d'avant
+      fix, jamais un vrai signal) à 20 % après fix — un contraste
+      beaucoup plus net et cohérent avec l'intention du test. Deux
+      nettoyages supplémentaires : le test de la Forge dans `sim.ts`
+      avait la SEULE boucle du fichier sans plafond d'itérations (les
+      deux autres plafonnent et lèvent une erreur claire plutôt que de
+      tourner indéfiniment) — même garde-fou ajouté ; `shot.mjs`
+      fermait le navigateur Chromium seulement sur le chemin de succès
+      (fuite de process si une capture échoue en cours de route) et
+      n'avait aucun listener d'erreur sur le process `vite preview`
+      lancé (un `spawn` qui échoue plantait avec une trace opaque) —
+      les deux corrigés. Vérifié en conditions réelles : `npx tsx
+      scripts/sim.ts` tourne jusqu'au bout sans erreur (« OK — tous les
+      matchs se terminent »), et `node scripts/shot.mjs` régénère les 7
+      captures du funnel standard avec succès — confirme au passage que
+      le récent changement de `base` (hébergement GitHub Pages) n'a
+      RIEN cassé ici : Vite préserve la query string (`?demo=fast`) sur
+      sa redirection 302 de `/` vers `/Coach-Arena/`, donc les URLs
+      codées en dur dans `shot.mjs` fonctionnent toujours sans
+      modification. `tsc --noEmit`/`npm run build`/130 tests vitest
+      inchangés (fichiers `scripts/` hors du périmètre `tsconfig.json`,
+      vérifiés par exécution réelle plutôt que par le compilateur).
 
 ### Tier 2 — Édition Histoire 14,90 € (stores)
 - [x] Mode histoire v0 « Le Grand Hurlement » : 8 chapitres écrits
@@ -1170,6 +1207,34 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Nouveau périmètre jamais audité — `scripts/`
+  (les 8 rounds de code-review précédents ne ciblaient que `src/`).
+  `sim.ts` (l'outil d'équilibrage, la seule source de winrates du
+  projet) et `shot.mjs` (le funnel de captures). Un vrai bug de DONNÉES
+  trouvé : la simulation « Coach absent » de `sim.ts` appelait quand
+  même `chooseTacticPlan(m, 'pressure')` à chaque pause tactique, alors
+  que dans le vrai jeu un coach absent ne clique jamais de plan —
+  `combat.ts` retombe sur `'coldblood'` au timeout, pas `'pressure'`.
+  Le chiffre « Coach absent » du script mesurait donc un coach qui garde
+  la voix silencieuse mais choisit quand même la posture la plus
+  agressive à chaque pause, invalidant en silence la comparaison
+  coaché/absent — la raison d'être même de cet outil. Corrigé en gatant
+  l'appel sur `opts.coached`. Effet mesuré, pas supposé : le winrate
+  « Coach absent » tombe à 20 % après fix, un contraste bien plus net
+  et cohérent avec l'intention du test. Deux nettoyages de robustesse en
+  plus : une boucle sans plafond d'itérations dans `sim.ts` (le seul
+  endroit du fichier qui pouvait tourner indéfiniment sans erreur si la
+  machine à états se bloquait un jour) ; `shot.mjs` qui fermait Chromium
+  seulement sur le succès (fuite de process sur échec) et n'écoutait pas
+  les erreurs de spawn du serveur `vite preview`. Vérifié en conditions
+  réelles (ces fichiers sont hors du périmètre `tsconfig.json`, donc
+  hors de portée de `tsc`) : `npx tsx scripts/sim.ts` tourne jusqu'au
+  bout sans erreur, `node scripts/shot.mjs` régénère les 7 captures du
+  funnel standard avec succès — confirmant au passage que le récent
+  changement de `base` (GitHub Pages) n'a rien cassé ici : Vite préserve
+  la query string sur sa redirection 302, donc les URLs codées en dur
+  du script marchent toujours sans modification.
 
 - 2026-08-16 (routine) : Avec les séries d'audit code-review (8 rounds)
   et de coverage (7 passes) toutes deux épuisées, changé d'angle plutôt

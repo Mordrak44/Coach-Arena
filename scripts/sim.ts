@@ -56,7 +56,15 @@ function runMatch(opts: SimOptions): { winner: 'player' | 'enemy'; cardProcs: nu
     prevPhase = m.phase
     if (m.phase === 'fighting' && m.t - roundStart > ROUND_TIME_LIMIT) forceRoundTimeout(m)
     if (m.phase === 'tactics') {
-      if (m.plan === null) chooseTacticPlan(m, 'pressure')
+      // opts.coached seulement : un coach ABSENT ne clique jamais de plan
+      // dans le vrai jeu (ArenaScreen n'appelle chooseTacticPlan que sur un
+      // clic explicite) — m.plan reste null et combat.ts retombe sur
+      // 'coldblood' au timeout (startNextRound(m, m.plan ?? 'coldblood')),
+      // pas 'pressure'. Sans ce garde-fou, la simulation « Coach absent »
+      // mesurait en réalité un coach qui garde la voix silencieuse mais
+      // choisit quand même Pression à chaque pause — une comparaison
+      // coaché/absent invalidée en silence (trouvé en audit, 2026-08-16).
+      if (opts.coached && m.plan === null) chooseTacticPlan(m, 'pressure')
       // Joue tant que le Souffle le permet (première carte abordable de la main).
       let played = true
       while (played) {
@@ -371,7 +379,12 @@ function makeFightingMatch(playerIdx: number): MatchState {
   let lastCmdAt = -10
   let roundStart = 0
   let prevPhase: string = m.phase
-  while (m.phase !== 'tactics' && m.phase !== 'matchEnd') {
+  // Même borne que runMatch/le test Commentator : sans elle, un futur
+  // blocage de la machine à états (phase qui ne transitionne jamais vers
+  // 'tactics'/'matchEnd') fait tourner `npx tsx scripts/sim.ts` indéfiniment
+  // sans aucune sortie, au lieu d'échouer bruyamment comme le reste du
+  // fichier (trouvé en audit, 2026-08-16).
+  for (let i = 0; i < 60 * 60 * 10 && m.phase !== 'tactics' && m.phase !== 'matchEnd'; i++) {
     let command: any = null
     if (m.phase === 'fighting' && m.t - lastCmdAt > 4) {
       command = 'attack'
@@ -382,6 +395,8 @@ function makeFightingMatch(playerIdx: number): MatchState {
     prevPhase = m.phase
     if (m.phase === 'fighting' && m.t - roundStart > ROUND_TIME_LIMIT) forceRoundTimeout(m)
   }
+  if (m.phase !== 'tactics' && m.phase !== 'matchEnd')
+    throw new Error(`forge : phase tactique jamais atteinte (phase=${m.phase} t=${m.t.toFixed(1)})`)
   if (m.phase === 'tactics') {
     // Depuis la guerre des coins, l'adversaire peut avoir armé un blocage
     // (Silence du Coin est dans son deck) : on mesure l'EFFET de la carte,

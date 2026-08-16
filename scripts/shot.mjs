@@ -10,10 +10,18 @@ const PORT = 4173
 const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], {
   stdio: 'ignore',
 })
+// Sans ce listener, un spawn qui échoue (npx introuvable) lève une exception
+// Node non gérée avec une trace opaque au lieu d'un message diagnosticable
+// (trouvé en audit, 2026-08-16).
+server.on('error', err => {
+  console.error('serveur vite preview : échec du lancement —', err.message)
+  process.exit(1)
+})
 await new Promise(r => setTimeout(r, 2500))
 
+let browser
 try {
-  const browser = await chromium.launch({
+  browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium',
     args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'],
   })
@@ -49,8 +57,12 @@ try {
   await page.waitForSelector('text=Revanche', { timeout: 180000 })
   await page.waitForTimeout(1200)
   await page.screenshot({ path: `${outDir}/results.png` })
-  await browser.close()
   console.log(`captures écrites dans ${outDir}/`)
 } finally {
+  // browser.close() ici (pas seulement sur le chemin de succès) : sinon
+  // une exception entre le lancement et la fin (un sélecteur qui timeout,
+  // par ex.) laissait le process chromium tourner indéfiniment en arrière-
+  // plan, s'accumulant au fil des runs CI (trouvé en audit, 2026-08-16).
+  await browser?.close()
   server.kill()
 }
