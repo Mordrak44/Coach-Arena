@@ -74,6 +74,53 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       inchangée (78/10/76 avant, 74/11/80 après — dans la variance
       normale, pas de dérive d'équilibrage), build inchangé, vérifié en
       capture (funnel standard identique).
+- [x] Audit de code round 2 (2026-08-16), ciblé cette fois sur cards.ts/
+      cardForge.ts/deckBuilder.ts (le DSL de cartes, jamais audité). 5
+      pistes trouvées, chacune revérifiée manuellement — 2 corrigées, 3
+      délibérément différées avec leur raison notée (voir ci-dessous) :
+      1. **Regex de la Forge trop permissives** : les mots-clés de
+         reconnaissance (`RULES` dans cardForge.ts) matchaient en PLEIN
+         MILIEU de mots français courants sans rapport — "soin" dans
+         « besoin », "garde" dans « regarde », "cri" dans « décrit »,
+         "contre" dans « rencontre », "rage" dans « courage »/« orage ».
+         En vérifiant, le trou s'est révélé plus large que les 3
+         exemples cités par l'audit initial. Corrigé avec un lookbehind
+         Unicode `(?<!\p{L})` (pas un simple `\b` : JS ne traite pas les
+         lettres accentuées comme des caractères de mot, donc « décrit »
+         — é juste avant "cri" — passait quand même à travers un `\b`
+         classique, trouvé en écrivant le test). Limite assumée,
+         documentée dans le code : un mot qui commence VRAIMENT par la
+         racine (« critique » commence par "cri") reste indissociable
+         d'une vraie forme conjuguée par une simple regex.
+      2. **Coût des cartes ignorant `hits`** : `primitivePower` pour
+         `hitsTakenHype` ne regardait que `amount`, jamais `hits` —
+         pourtant `clampEffect` traite `hits` comme un paramètre
+         réglable (2 à 5). Une carte à 2 coups (facile à déclencher)
+         coûtait donc le même prix qu'une carte à 5 coups (difficile),
+         un trou latent puisqu'aujourd'hui TOUTES les cartes existantes
+         (pool + forge) codent `hits: 3` en dur. Corrigé avec une
+         formule référencée sur 3 coups (`(amount/20) * (3/hits)`) :
+         zéro cartes existantes repricées (vérifié par le test
+         exhaustif déjà en place), mais un futur `hits` différent de 3
+         sera enfin tarifé correctement.
+      Différés, avec raison : (3) `clampEffect` dupliqué 4× dans le
+      code (characters.ts, deckBuilder.ts, CharacterSelect.tsx) —
+      cosmétique/DRY, zéro impact fonctionnel ; (4) `getCard()` peut
+      renvoyer `undefined` malgré son typage — vérifié non-atteignable
+      aujourd'hui (toute source d'id de carte est fraîchement rechargée
+      avant usage), un vrai filet à poser plus tard si le DSL change ;
+      (5) `deriveTiming()` étiquette « Instant · voix » une carte à 2
+      effets dont un seul est réellement voix-déclenché — cosmétique
+      pur (`timing` n'affecte QUE l'affichage, jamais la résolution
+      réelle des effets, vérifié en lisant combat.ts), cas rare (2
+      règles précises sur 14 doivent matcher ensemble).
+      3 tests vitest de régression (89 au total, exécutés 5× de suite),
+      sim dans la variance normale (65-83% sur plusieurs runs, cible
+      historique cohérente), build/capture inchangés.
+      **Bonus** : en le faisant tourner davantage, un test flaky (~1
+      échec sur 15-30) a été trouvé et corrigé dans le lot de bugs
+      PRÉCÉDENT (« le temps mort d'urgence adverse ») — détails dans le
+      Journal.
 - [x] Carnet du Coach : cartes jouables au coin du ring (3 familles :
       directes, armées, conditionnelles) — voir GAME_DESIGN.md §4 bis
       (v0 : pool de 6 cartes, sélection de 3 avant match, 1 par coin du
@@ -611,6 +658,46 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Audit de code round 2, ciblé sur le DSL de
+  cartes (cards.ts/cardForge.ts/deckBuilder.ts) — la même démarche que
+  l'audit du moteur juste avant, appliquée à la zone la plus risquée
+  suivante (parsing de texte libre + calcul de prix, jamais auditée).
+  Le vrai travail n'était pas le skill lui-même mais la VÉRIFICATION :
+  sur les 5 pistes trouvées, une (les regex de la Forge) s'est révélée
+  PLUS large que les 3 exemples cités en la testant moi-même — "besoin"
+  contient "soin", "regarde" contient "garde" — puis la première
+  tentative de fix (`\b` classique) a elle-même échoué sur "décrit"
+  (accents non traités comme lettres par `\b` en JS), découvert
+  seulement en écrivant le test de régression, pas en la relisant. Deux
+  autres pistes (`clampEffect` dupliqué, `deriveTiming` cosmétique) ont
+  été délibérément écartées après vérification — pas ignorées, jugées :
+  la première est un nettoyage sans risque ni bénéfice mesurable, la
+  seconde n'affecte qu'un libellé d'UI pour un cas à deux règles
+  précises sur 14. Une quatrième (`getCard()` non-null assertion
+  dangereuse) vérifiée non-atteignable aujourd'hui par un vrai chemin de
+  jeu, donc pas corrigée — corriger du code mort n'est pas un audit
+  utile. 3 tests vitest (89 au total, 5× de suite), sim dans la variance
+  normale, build/capture inchangés.
+
+  **En bonus**, un test flaky trouvé et corrigé — pas dans ce lot, mais
+  dans celui d'AVANT (« le temps mort d'urgence adverse joue aussi une
+  carte lowHpHypeFull », ajouté à l'itération précédente). En le
+  relançant 30× d'affilée (au lieu des 5× habituelles, réflexe pris pour
+  vérifier CE lot-ci) il échouait ~1 fois sur 15-30 : `expected 9 to be
+  100`. Diagnostiqué avec un script de reproduction dédié plutôt que
+  deviné : la Dernière Chance adverse met bien la Hype à fond DANS le
+  tick testé, mais `enemyCoachAI` peut, dans ce même tick, tirer
+  instantanément le spécial adverse dès que la Hype est pleine
+  (probabilité ~6 %/tick, `Math.random()` non mocké dans ce test) — ce
+  qui la reconsomme aussitôt. Le test vérifiait un état FINAL
+  légitimement perturbable par une autre mécanique du jeu, parfaitement
+  correcte de son côté — ce n'était pas un bug de bug #3, c'était un test
+  mal conçu. Corrigé en vérifiant les ÉVÉNEMENTS produits (la preuve que
+  le déclenchement a eu lieu) plutôt que la valeur finale de la Hype,
+  qu'aucune mécanique ultérieure du même tick ne peut plus faire
+  échouer. 40 exécutions isolées + 20 suites complètes après fix,
+  stable.
 
 - 2026-08-16 (routine) : Audit de code du moteur (skill code-review) —
   avec le puits des tâches sûres/gratuites qui s'épuisait (dit

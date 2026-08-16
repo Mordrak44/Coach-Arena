@@ -14,87 +14,103 @@ interface ForgeRule {
   namePool: string[]
 }
 
+// Chaque mot-clé n'est protégé qu'en DÉBUT de match (jamais en fin) :
+// délibéré, ça laisse "cri" reconnaître "crie"/"crié"/"criant" par
+// préfixe. Sans garde-fou, ces racines courtes matchaient aussi en
+// PLEIN MILIEU de mots français courants sans rapport : "soin" dans
+// "besoin", "garde" dans "regarde", "cri" dans "décrit", "contre" dans
+// "rencontre", "rage" dans "courage"/"orage" — trouvé en vérifiant
+// chaque règle après un audit de code (2026-08-16). `\b` seul ne
+// suffit PAS : JS ne traite pas les lettres accentuées comme des
+// caractères de mot, donc "décrit" (é juste avant "cri") passait quand
+// même au travers d'un \b classique. `(?<!\p{L})` (lookbehind Unicode,
+// nécessite le flag u) exige qu'aucune lettre — accentuée ou non — ne
+// précède immédiatement le mot-clé. Limite assumée et non résolue : un
+// mot qui commence VRAIMENT par la racine ("critique" commence par
+// "cri") reste indissociable d'une vraie forme conjuguée ("crie") par
+// une simple regex — seule une whitelist de mots ou un LLM (v1) réglerait
+// ce cas résiduel.
 const RULES: ForgeRule[] = [
   {
-    re: /soigne|soin|répare|régénère|récupère|guérit/i,
+    re: /(?<!\p{L})(?:soigne|soin|répare|régénère|récupère|guérit)/iu,
     make: () => ({ kind: 'heal', pct: 0.12 }),
     icon: '💊',
     namePool: ['Regain', 'Souffle Neuf', 'Pansement Miracle'],
   },
   {
-    re: /motive|inspire|galvanise|discours|exalte/i,
+    re: /(?<!\p{L})(?:motive|inspire|galvanise|discours|exalte)/iu,
     make: () => ({ kind: 'hype', amount: 20 }),
     icon: '🔥',
     namePool: ['Étincelle', 'Harangue', 'Feu Sacré'],
   },
   {
-    re: /sabote|gèle|refroidit|déstabilise|casse le moral|démoralise/i,
+    re: /(?<!\p{L})(?:sabote|gèle|refroidit|déstabilise|casse le moral|démoralise)/iu,
     make: () => ({ kind: 'enemyHype', amount: -25 }),
     icon: '🧊',
     namePool: ['Coup au Moral', 'Vent Glacial', 'Doute'],
   },
   {
-    re: /bouclier|garde|armure|protège|carapace|blinde/i,
+    re: /(?<!\p{L})(?:bouclier|garde|armure|protège|carapace|blinde)/iu,
     make: () => ({ kind: 'damageReduction', mul: 0.7 }),
     icon: '🛡️',
     namePool: ['Carapace', 'Rempart', 'Peau de Fer'],
   },
   {
-    re: /esquive|fantôme|fumée|insaisissable|glisse/i,
+    re: /(?<!\p{L})(?:esquive|fantôme|fumée|insaisissable|glisse)/iu,
     make: () => ({ kind: 'dodgeBonus', add: 0.12 }),
     icon: '💨',
     namePool: ['Brume', 'Pas Fantôme', 'Silhouette'],
   },
   {
-    re: /zen|concentr|sérénité|calme absolu|imperturbable/i,
+    re: /(?<!\p{L})(?:zen|concentr|sérénité|calme absolu|imperturbable)/iu,
     make: () => ({ kind: 'immuneConfusion' }),
     icon: '🎯',
     namePool: ['Zénitude', 'Esprit Clair', 'Roc Mental'],
   },
   {
-    re: /contre|riposte|renvoie/i,
+    re: /(?<!\p{L})(?:contre|riposte|renvoie)/iu,
     make: () => ({ kind: 'armCounterMul', mul: 1.8 }),
     icon: '⚡',
     namePool: ['Riposte Éclair', 'Miroir', 'Punition'],
   },
   {
-    re: /cri|hurle|rugis|clameur/i,
+    re: /(?<!\p{L})(?:cri|hurle|rugis|clameur)/iu,
     make: () => ({ kind: 'armCheerHype', amount: 30 }),
     icon: '📣',
     namePool: ['Clameur', 'Voix du Coin', 'Tonnerre'],
   },
   {
-    re: /rage|frénésie|déchaîne|furie|berserk/i,
+    re: /(?<!\p{L})(?:rage|frénésie|déchaîne|furie|berserk)/iu,
     make: () => ({ kind: 'armAttackFrenzy', mul: 1.4, duration: 5 }),
     icon: '🩸',
     namePool: ['Furie', 'Sang Chaud', 'Déchaînement'],
   },
   {
-    re: /désespoir|dernier|acculé|dos au mur|survie/i,
+    re: /(?<!\p{L})(?:désespoir|dernier|acculé|dos au mur|survie)/iu,
     make: () => ({ kind: 'lowHpHypeFull', threshold: 0.18 }),
     icon: '🕯️',
     namePool: ['Dos au Mur', 'Ultime Lueur', 'Instinct de Survie'],
   },
   {
-    re: /provoque|insulte|nargue|chauffe/i,
+    re: /(?<!\p{L})(?:provoque|insulte|nargue|chauffe)/iu,
     make: () => ({ kind: 'provoke', duration: 8 }),
     icon: '😤',
     namePool: ['Pique', 'Bras d’Honneur', 'Chiffon Rouge'],
   },
   {
-    re: /humilie|leçon|orgueil/i,
+    re: /(?<!\p{L})(?:humilie|leçon|orgueil)/iu,
     make: () => ({ kind: 'counterHype', amount: 35 }),
     icon: '🌑',
     namePool: ['Humiliation', 'Leçon', 'Revers Cinglant'],
   },
   {
-    re: /encaisse|douleur|souffre|masochiste|endur/i,
+    re: /(?<!\p{L})(?:encaisse|douleur|souffre|masochiste|endur)/iu,
     make: () => ({ kind: 'hitsTakenHype', hits: 3, amount: 30 }),
     icon: '❤️‍🔥',
     namePool: ['Peau Dure', 'Nourri de Coups', 'Cuir Tanné'],
   },
   {
-    re: /anticipe|lit le jeu|prévoit|voit venir/i,
+    re: /(?<!\p{L})(?:anticipe|lit le jeu|prévoit|voit venir)/iu,
     make: () => ({ kind: 'halveEnemySpecial' }),
     icon: '👁️',
     namePool: ['Lecture Parfaite', 'Sixième Sens', 'Déjà-Vu'],

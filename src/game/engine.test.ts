@@ -646,6 +646,44 @@ describe('création par prompt & réalisateur', () => {
     expect(forgeCard('blablabla sans effet')).toBeNull()
   })
 
+  it('forgeCard : les racines courtes ne matchent QUE des mots plats/conjugués, pas des mots sans rapport qui les CONTIENNENT (bug trouvé en audit, 2026-08-16)', () => {
+    // Ces mots français courants contiennent une racine de règle en PLEIN
+    // MILIEU (pas en préfixe) — avant le fix, ils déclenchaient à tort
+    // une carte. "sans rapport" = aucune des 14 règles ne doit matcher.
+    expect(forgeCard('il a besoin de repos avant le match')).toBeNull() // "soin" dans "besoin"
+    expect(forgeCard("elle rencontre son adversaire demain")).toBeNull() // "contre" dans "rencontre"
+    expect(forgeCard('le commentateur décrit le combat')).toBeNull() // "cri" dans "décrit" (é juste avant : \b seul ne suffisait pas)
+    expect(forgeCard('il a du courage face au danger')).toBeNull() // "rage" dans "courage"
+    expect(forgeCard('le combat continue sous l’orage')).toBeNull() // "rage" dans "orage"
+    expect(forgeCard('il regarde attentivement son adversaire')).toBeNull() // "garde" dans "regarde"
+    // Contrôle positif : les vrais mots-clés (et leurs formes conjuguées
+    // en PRÉFIXE, le comportement voulu) matchent toujours.
+    expect(forgeCard('une potion qui soigne bien')?.card).toBeTruthy()
+    expect(forgeCard('un geste qui contre son attaque')?.card).toBeTruthy()
+    expect(forgeCard('un cri de guerre puissant')?.card).toBeTruthy()
+    expect(forgeCard('il crie très fort sur le ring')?.card).toBeTruthy() // "crie" via le préfixe "cri"
+    expect(forgeCard('rempli de rage et de fureur')?.card).toBeTruthy()
+    // Limite CONNUE et non résolue (documentée dans cardForge.ts) : un mot
+    // qui commence VRAIMENT par la racine ("critique" commence par "cri")
+    // reste indissociable d'une vraie forme conjuguée par une simple regex.
+    expect(forgeCard('il critique la stratégie adverse')?.card).toBeTruthy()
+  })
+
+  it('primitivePower(hitsTakenHype) tient compte de `hits` : moins de coups requis coûte plus cher', () => {
+    // Les coûts des cartes DU JEU ACTUEL (hits: 3 partout, CARD_POOL +
+    // SIGNATURE_CARDS) restent inchangés par construction — déjà vérifié
+    // par le test « le coût budgétisé reproduit le coût déclaré » juste
+    // au-dessus, qui couvre les deux collections exhaustivement. Ici, la
+    // propriété NOUVELLE qu'introduit le fix : à `amount` égal, moins de
+    // coups requis (plus facile à déclencher) doit coûter plus cher —
+    // avant le fix, `hits` était totalement ignoré du calcul.
+    const cheap = computeCost([{ kind: 'hitsTakenHype', hits: 5, amount: 30 }]) // dur à déclencher
+    const mid = computeCost([{ kind: 'hitsTakenHype', hits: 3, amount: 30 }]) // référence actuelle
+    const pricey = computeCost([{ kind: 'hitsTakenHype', hits: 2, amount: 30 }]) // facile à déclencher
+    expect(pricey).toBeGreaterThanOrEqual(mid)
+    expect(mid).toBeGreaterThanOrEqual(cheap)
+  })
+
   it('buildScenePlans : entrée, moments forts, finale — prompts propres', () => {
     const m = freshMatch()
     m.events.push(
@@ -1231,7 +1269,17 @@ describe('Bugs trouvés par audit (code-review, 2026-08-16) — verrouillés par
     const timeoutsBefore = m.enemyTimeoutsLeft
     tick(m, 0.05, quiet)
     expect(m.enemyTimeoutsLeft).toBe(timeoutsBefore - 1) // le temps mort a bien été consommé
-    expect(m.enemy.hype).toBe(HYPE_MAX) // armée ET auto-déclenchée dans le même tick (HP déjà sous le seuil)
+    expect(m.enemyMods.lowHpThreshold).toBe(0) // armée ET consommée : la Dernière Chance a bien tranché
+    // PAS d'assertion sur la valeur finale de m.enemy.hype : dans ce même
+    // tick, enemyCoachAI peut (probabilité ~6 %/tick, Math.random() non
+    // mocké ici) déclencher instantanément le spécial adverse dès que sa
+    // Hype est pleine — ce qui la reconsomme aussitôt. Un test flaky
+    // trouvé en le faisant échouer ~1 fois sur 15-30 : la bonne assertion
+    // porte sur les ÉVÉNEMENTS produits (la preuve que ça s'est bien
+    // déclenché), pas sur un état final que d'autres mécaniques légitimes
+    // peuvent perturber dans le même tick.
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('DERNIÈRE CHANCE'))).toBe(true)
+    expect(m.events.some(e => e.kind === 'hypeFull' && e.who === 'enemy')).toBe(true)
     expect(m.events.some(e => e.kind === 'timeout' && e.side === 'enemy')).toBe(true)
   })
 })

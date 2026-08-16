@@ -33,7 +33,13 @@ export function primitivePower(e: EffectPrimitive): number {
     case 'counterHype':
       return e.amount / 25
     case 'hitsTakenHype':
-      return e.amount / 20
+      // Moins de coups requis = plus facile à déclencher = plus cher.
+      // Référence à 3 coups (le seul cas produit aujourd'hui, pool +
+      // forge) pour ne rien changer aux coûts déjà en jeu ; seul un
+      // futur `hits` différent de 3 changera le prix — jusqu'ici le
+      // paramètre était borné (2..5, voir clampEffect) mais totalement
+      // ignoré du calcul de coût, un trou trouvé en audit (2026-08-16).
+      return (e.amount / 20) * (3 / e.hits)
     case 'halveEnemySpecial':
       return 2
     case 'blockEnemyCard':
