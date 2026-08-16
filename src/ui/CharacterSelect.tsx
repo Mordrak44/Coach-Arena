@@ -45,7 +45,9 @@ function StatBar({ label, value, color }: { label: string; value: number; color:
   return (
     <div className="statRow">
       <span style={{ width: 28 }}>{label}</span>
-      <div className="bar">
+      {/* la valeur numérique n'existe qu'en largeur de barre visuelle
+          ailleurs — aria-label la rend accessible sans changer le rendu */}
+      <div className="bar" aria-label={`${label} ${value} sur 12`}>
         <i style={{ width: `${(value / 12) * 100}%`, background: color }} />
       </div>
     </div>
@@ -62,7 +64,11 @@ export function CharCard({
   onClick: () => void
 }) {
   return (
-    <button className={`charCard${selected ? ' selected' : ''}`} onClick={onClick}>
+    <button
+      className={`charCard${selected ? ' selected' : ''}`}
+      onClick={onClick}
+      aria-pressed={selected}
+    >
       <div className="cname" style={{ color: char.color }}>
         {char.name}
       </div>
@@ -299,6 +305,7 @@ export default function CharacterSelect({
             className="promptBox"
             style={{ minHeight: 0, padding: '9px 12px' }}
             placeholder="Son nom (optionnel — sinon on l'invente)"
+            aria-label="Nom du personnage (optionnel)"
             value={gName}
             maxLength={14}
             onChange={e => setGName(e.target.value)}
@@ -316,6 +323,7 @@ export default function CharacterSelect({
           <textarea
             className="promptBox"
             placeholder="Décris-le librement : « un vieux maître cyborg ultra rapide mais fragile, appelé Zenko »"
+            aria-label="Décris ton personnage"
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
           />
@@ -475,11 +483,17 @@ export default function CharacterSelect({
             className="promptBox"
             style={{ minHeight: 0, padding: '9px 12px', flex: 1 }}
             placeholder="« une carte qui soigne et motive, appelée Regain »"
+            aria-label="Décris la carte à forger"
             value={forgePrompt}
             maxLength={120}
             onChange={e => setForgePrompt(e.target.value)}
           />
-          <button className="btn secondary" onClick={onForgeCard} disabled={forgePrompt.trim().length < 4}>
+          <button
+            className="btn secondary"
+            onClick={onForgeCard}
+            disabled={forgePrompt.trim().length < 4}
+            aria-label="Forger cette carte"
+          >
             ⚒
           </button>
         </div>
@@ -547,7 +561,12 @@ export default function CharacterSelect({
               <div className="ctitle">{TIMING_LABEL[c.timing]}</div>
               <div style={{ fontSize: '0.7rem', marginTop: 4, color: 'var(--muted)' }}>{c.desc}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                <button style={chip(false)} onClick={() => setCopies(c.id, -1)} disabled={n === 0}>
+                <button
+                  style={chip(false)}
+                  onClick={() => setCopies(c.id, -1)}
+                  disabled={n === 0}
+                  aria-label={`Retirer une copie de ${c.name}`}
+                >
                   −
                 </button>
                 <b style={{ fontSize: '0.8rem' }}>×{n}</b>
@@ -555,6 +574,7 @@ export default function CharacterSelect({
                   style={chip(false)}
                   onClick={() => setCopies(c.id, +1)}
                   disabled={n >= MAX_COPIES}
+                  aria-label={`Ajouter une copie de ${c.name}`}
                 >
                   +
                 </button>

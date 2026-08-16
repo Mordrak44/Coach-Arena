@@ -1047,6 +1047,53 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       délibérément laissé de côté car son test réel est `scripts/sim.ts`
       (des milliers de matchs simulés), pas des tests unitaires ligne
       par ligne.
+- [x] Premier audit d'accessibilité du dépôt (jamais fait jusqu'ici,
+      angle différent des rounds de code-review et des passes de
+      coverage — pas des bugs de logique ni des lignes non testées, mais
+      « qui peut jouer à ce jeu »). Délégué à un agent Explore en lecture
+      seule sur les 7 fichiers `src/ui/` : chaque élément cliquable
+      s'est révélé être un vrai `<button>` avec gestion clavier native
+      (zéro `div onClick` factice) — le vrai manque était les NOMS
+      accessibles et les ÉTATS. 8 points trouvés, 7 corrigés (le 8e,
+      un flux `aria-live` complet PV-par-PV pour le canvas de combat,
+      volontairement laissé pour un chantier séparé plutôt que fait à la
+      hâte — voir juste en dessous) :
+      - `CharCard` (sélection de perso) et les cartes de plan tactique
+        (coin du ring) : état sélectionné signalé seulement par une
+        bordure colorée, invisible en lecteur d'écran → `aria-pressed`
+        ajouté aux deux.
+      - `StatBar` (ATK/DEF/SPD/❤ dans les fiches perso) : la valeur
+        numérique n'existait qu'en largeur de barre visuelle → `aria-
+        label` avec la vraie valeur sur 12.
+      - Les boutons −/+ de copies dans le deck-builder (un par carte du
+        pool) : glyphes seuls, aucune indication de QUELLE carte chacun
+        affecte → `aria-label` dynamique par carte.
+      - Le bouton de soumission de la Forge (icône ⚒ seule) et les 3
+        champs texte (nom guidé, description libre, prompt de forge de
+        carte) qui ne s'appuyaient que sur `placeholder` (jamais fiable
+        comme nom accessible, disparaît à la saisie) → `aria-label` sur
+        les quatre.
+      - La tuile du coach adverse (`ArenaScreen`) : l'humeur passe
+        souvent par un emoji seul sans bulle de texte (spécial déclenché,
+        round gagné/perdu…) — un signal de jeu réel totalement invisible
+        en lecteur d'écran. Table de traduction courte emoji→phrase FR
+        ajoutée, appliquée en `aria-label` sans toucher à la logique de
+        jeu existante.
+      - Le canvas de combat lui-même (PV, Hype, Ulti, chrono) n'avait
+        NI rôle NI nom — un lecteur d'écran l'ignore complètement,
+        comme s'il n'existait pas. `role="img"` + `aria-label` descriptif
+        ajoutés : un filet minimal (le lecteur sait au moins que
+        quelque chose s'y affiche et quoi), pas la solution complète —
+        un vrai flux `aria-live` valeur par valeur reste un chantier à
+        part (throttling nécessaire pour ne pas spammer les annonces à
+        chaque frame), noté mais pas fait ici plutôt que bâclé.
+      Vérifié en conditions réelles, pas supposé : capture Chromium
+      headless (aucune régression visuelle, les deux écrans rendus à
+      l'identique) + lecture directe des attributs ARIA via Playwright
+      (`aria-pressed`, `aria-label` sur chaque élément listé ci-dessus,
+      valeurs exactes confirmées, pas seulement leur présence). `tsc
+      --noEmit` + `npm run build` + 130 tests vitest inchangés (pur
+      ajout d'attributs, aucune logique touchée).
 
 ### Tier 2 — Édition Histoire 14,90 € (stores)
 - [x] Mode histoire v0 « Le Grand Hurlement » : 8 chapitres écrits
@@ -1123,6 +1170,41 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Avec les séries d'audit code-review (8 rounds)
+  et de coverage (7 passes) toutes deux épuisées, changé d'angle plutôt
+  que de continuer à gratter les mêmes fichiers : premier audit
+  d'ACCESSIBILITÉ du dépôt, jamais fait jusqu'ici. Délégué à un agent
+  Explore en lecture seule sur les 7 fichiers `src/ui/` — bonne nouvelle
+  d'abord : chaque élément cliquable du jeu est un vrai `<button>` avec
+  gestion clavier native, zéro `div onClick` factice nulle part. Le
+  vrai manque, partout, ce sont les NOMS accessibles (glyphes/emojis
+  seuls sans `aria-label`) et les ÉTATS (sélection signalée seulement
+  par une bordure colorée). 8 points trouvés, 7 corrigés directement :
+  `aria-pressed` sur `CharCard` et les cartes de plan tactique ;
+  `aria-label` avec la vraie valeur sur `StatBar` (la barre ne portait
+  que la largeur visuelle, pas le chiffre) ; `aria-label` dynamique par
+  carte sur les boutons −/+ du deck-builder (un par carte du pool, sinon
+  un lecteur d'écran énumère une longue liste de boutons « moins »/
+  « plus » indiscernables) ; `aria-label` sur le bouton de forge (icône
+  seule) et les 3 champs texte qui ne s'appuyaient que sur `placeholder`
+  (jamais fiable comme nom accessible — disparaît dès que l'utilisateur
+  tape) ; et une table emoji→phrase FR pour la tuile du coach adverse,
+  dont l'humeur passe souvent par un emoji seul sans bulle de texte —
+  un signal de jeu réel (spécial déclenché, round gagné/perdu) qui
+  était totalement invisible en lecteur d'écran. Le 8e point — le
+  canvas de combat (PV/Hype/Ulti/chrono) n'avait ni rôle ni nom, donc un
+  lecteur d'écran l'ignorait comme s'il n'existait pas — traité en
+  filet minimal (`role="img"` + `aria-label` descriptif) plutôt qu'en
+  solution complète : un vrai flux `aria-live` valeur par valeur
+  demanderait un throttling dédié pour ne pas spammer les annonces à
+  chaque frame, noté comme chantier séparé plutôt que bâclé ici.
+  Vérifié en conditions réelles : capture Chromium headless (zéro
+  régression visuelle sur les deux écrans) ET lecture directe des
+  attributs ARIA via Playwright (valeurs exactes confirmées, pas
+  seulement leur présence). `tsc --noEmit`/`npm run build`/130 tests
+  vitest inchangés (pur ajout d'attributs, aucune logique de jeu
+  touchée).
 
 - 2026-08-16 (routine) : Septième et dernière passe sur le rapport de
   coverage — nettoyage des écarts épars restants plutôt qu'un gros

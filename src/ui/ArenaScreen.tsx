@@ -47,6 +47,20 @@ export interface MatchOutcome {
   scenes: ScenePlan[]
 }
 
+// L'humeur du coach adverse passe SOUVENT par un emoji seul (bubble null,
+// voir setMood) — un utilisateur de lecteur d'écran ne voit aucun signal.
+// Traduction courte pour aria-label, sans toucher à la logique de jeu.
+const MOOD_LABEL: Record<string, string> = {
+  '🧐': 'neutre',
+  '😤': 'énervé',
+  '⚡': 'électrisé',
+  '🔁': 'fait une relève',
+  '🔥': 'déclenche son spécial',
+  '😰': 'inquiet',
+  '😏': 'content, il vient de gagner le round',
+  '😱': 'choqué, il vient de perdre le round',
+}
+
 const PLANS: Array<{ id: TacticPlan; name: string; desc: string }> = [
   { id: 'pressure', name: 'Pression', desc: 'Agressif dès le gong. On le finit.' },
   { id: 'concrete', name: 'Béton', desc: 'Garde haute, on encaisse, on use.' },
@@ -628,7 +642,17 @@ export default function ArenaScreen({
 
   return (
     <div className="arenaWrap">
-      <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} />
+      {/* PV/Hype/Ulti/timer ne sont dessinés que dans le canvas — pas de
+          miroir texte complet ici (un vrai flux aria-live PV-par-PV est un
+          chantier à part, voir ROADMAP). role="img" + aria-label évitent au
+          moins qu'un lecteur d'écran l'ignore comme un graphique sans nom. */}
+      <canvas
+        ref={canvasRef}
+        width={CANVAS_W}
+        height={CANVAS_H}
+        role="img"
+        aria-label="Rendu visuel du combat : PV, Hype et jauge d'Ulti des deux combattants, chronomètre du round"
+      />
 
       {/* Combat en cuts : un clip vidéo par-dessus le vectoriel, uniquement
           quand le lecteur en a un (jamais aujourd'hui — bibliothèque vide).
@@ -683,7 +707,9 @@ export default function ArenaScreen({
       {/* Le coach adverse — en PvP, la cam du joueur d'en face prendra cette place. */}
       <div className="coachTile">
         {enemyMood.bubble && <div className="coachBubble">{enemyMood.bubble}</div>}
-        <div className="coachFace">{enemyMood.emoji}</div>
+        <div className="coachFace" aria-label={`Coach adverse : ${MOOD_LABEL[enemyMood.emoji] ?? enemyMood.emoji}`}>
+          {enemyMood.emoji}
+        </div>
       </div>
       <span className="coachName">Coach adverse</span>
 
@@ -764,6 +790,7 @@ export default function ArenaScreen({
                 key={p.id}
                 className={`planCard${plan === p.id ? ' selected' : ''}`}
                 onClick={() => pickPlan(p.id)}
+                aria-pressed={plan === p.id}
               >
                 <b>{p.name}</b>
                 <span>{p.desc}</span>
