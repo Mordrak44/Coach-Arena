@@ -1489,6 +1489,49 @@ describe('pickOpponentTeam (characters.ts) — banc adverse du mode Rapide', () 
   })
 })
 
+describe('pickOpponent (characters.ts) — adversaire du mode Rapide, jamais testé directement', () => {
+  it("n'est jamais le perso du joueur, sur de nombreux tirages", async () => {
+    const { pickOpponent } = await import('./characters')
+    for (let i = 0; i < 200; i++) {
+      expect(pickOpponent(ROSTER[0].id).id).not.toBe(ROSTER[0].id)
+    }
+  })
+})
+
+describe('createFromPrompt (characters.ts) — combler les trous de couverture', () => {
+  it('rééquilibre la somme des stats vers 26 quand plusieurs règles cumulent trop de bonus', async () => {
+    // Jamais exercé jusqu'ici : tous les prompts testés jusque-là restaient
+    // sous le plafond. "fort" + "tank" + "vieux" + "gentil" cumulent assez
+    // de bonus pour dépasser 26 et déclencher le rééquilibrage.
+    const { createFromPrompt } = await import('./characters')
+    const c = createFromPrompt('un fort colosse blindé, vieux sensei au grand cœur, appelé Titan')
+    const sum = c.stats.atk + c.stats.def + c.stats.spd + c.stats.hrt
+    expect(sum).toBeLessThanOrEqual(27) // proche de la cible 26 (arrondis)
+    expect(c.stats.atk).toBeGreaterThanOrEqual(2) // jamais sous le plancher malgré le scale
+    expect(c.stats.def).toBeGreaterThanOrEqual(2)
+  })
+
+  it('deriveTrait retombe sur le trait par défaut de l’archétype quand aucun mot-clé de trait ne matche', async () => {
+    // "ninja" déclenche l'archétype trickster (via la règle "rapide") sans
+    // qu'aucun mot-clé de TRAIT_RULES n'apparaisse dans le prompt : le
+    // fallback ARCHETYPE_TRAIT['trickster'] doit s'appliquer.
+    const { createFromPrompt } = await import('./characters')
+    const c = createFromPrompt('un ninja véloce, appelé Kage')
+    expect(c.archetype).toBe('trickster')
+    expect(c.trait).toBe('tetu') // ARCHETYPE_TRAIT.trickster
+  })
+
+  it('extractName : sans motif « appelé/nommé X », génère un nom depuis les syllabes', async () => {
+    const { createFromPrompt } = await import('./characters')
+    const c = createFromPrompt('un guerrier sauvage et féroce') // aucun "appelé"/"nommé"
+    // Forme exacte attendue : une syllabe + une terminaison des pools
+    // internes d'extractName (dupliqués ici faute d'export), pas le prompt
+    // recopié tel quel.
+    const NAME_RE = /^(Ka|Ryu|Zen|Aki|Tetsu|Hana|Kai|Shiro|Rin|Dai)(ro|ka|to|mi|n|shi|ji)$/
+    expect(c.name).toMatch(NAME_RE)
+  })
+})
+
 describe('Persistance de la Forge (cardForge.ts) — saveForgedCard/loadForgedCards jamais testés', () => {
   beforeEach(() => {
     ;(globalThis as any).localStorage = fakeLocalStorage()

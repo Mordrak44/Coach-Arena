@@ -912,6 +912,23 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       `@vitest/coverage-v8` gardé en devDependency (`coverage/` ajouté
       au `.gitignore`) pour la prochaine passe de ce genre. `tsc
       --noEmit` + `npm run build` + suite complète verts.
+      2026-08-16 (suite) : deuxième cible du même rapport, characters.ts
+      (54 % → 86 %, branches 57 % → 100 %). 4 chemins jamais exercés :
+      `pickOpponent` (jamais testé directement, contrairement à
+      `pickOpponentTeam` du round 8) ; le RÉÉQUILIBRAGE des stats vers
+      26 quand plusieurs règles de `createFromPrompt` cumulent trop de
+      bonus (garde-fou d'équilibrage central, jamais déclenché par
+      aucun prompt de test jusqu'ici) ; le repli `ARCHETYPE_TRAIT` de
+      `deriveTrait` quand aucun mot-clé de trait n'apparaît dans le
+      prompt (seul l'archétype le détermine alors) ; et la génération de
+      nom par syllabes d'`extractName` quand le prompt ne contient pas
+      « appelé/nommé X ». 4 nouveaux tests (106 → 110, stables sur 5
+      exécutions malgré le hasard des tirages), `tsc --noEmit` + `npm
+      run build` verts. combat.ts (72 %) reste le plus gros écart
+      restant mais son test réel est le sim `scripts/sim.ts` (des
+      milliers de matchs joués), pas des unit tests ligne par ligne —
+      laissé tel quel plutôt que d'écrire des tests qui dupliqueraient
+      artificiellement ce que la simulation couvre déjà en pratique.
 
 ### Tier 2 — Édition Histoire 14,90 € (stores)
 - [x] Mode histoire v0 « Le Grand Hurlement » : 8 chapitres écrits
@@ -988,6 +1005,25 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Deuxième passe sur le rapport de coverage
+  (après cardForge.ts la veille) — characters.ts, 54 % → 86 %
+  (branches 57 % → 100 %). 4 chemins jamais exercés par aucun test
+  jusqu'ici : `pickOpponent` (jamais testé directement — seule sa
+  cousine `pickOpponentTeam` l'avait été, au round 8 d'audit) ; le
+  rééquilibrage des stats de `createFromPrompt` vers la somme cible 26
+  quand plusieurs règles cumulent trop de bonus (le garde-fou
+  d'équilibrage le plus important du fichier, jamais déclenché par
+  aucun prompt de test) ; le repli `ARCHETYPE_TRAIT` de `deriveTrait`
+  quand le prompt ne contient aucun mot-clé de trait ; et la génération
+  de nom par syllabes d'`extractName` en l'absence de « appelé/nommé
+  X ». 4 nouveaux tests, stables sur 5 exécutions consécutives malgré
+  le tirage aléatoire impliqué dans plusieurs de ces chemins.
+  engine.test.ts 106 → 110, `tsc --noEmit`/`npm run build` verts.
+  combat.ts (72 %, le plus gros écart restant) laissé tel quel : son
+  test réel est `scripts/sim.ts` (des milliers de matchs simulés), pas
+  des tests unitaires ligne par ligne — les dupliquer artificiellement
+  n'ajouterait pas de vraie garantie.
 
 - 2026-08-16 (routine) : Vérifié le premier run du workflow de
   déploiement Pages (poussé la veille) — échoue exactement comme prévu
