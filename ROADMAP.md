@@ -241,6 +241,44 @@ portraits du roster qu'après accord explicite de l'utilisateur.
          cleanup du `useEffect`.
       4 nouveaux tests dans engine.test.ts (89 → 93), `tsc --noEmit` +
       `npm run build` + suite complète verts.
+- [x] Audit de code round 6 (2026-08-16), ciblé sur stable.ts,
+      speechTactics.ts, progression.ts, deckBuilder.ts, cutLibrary.ts,
+      characters.ts — dernière tranche de modules de logique pure jamais
+      audités. 3 vrais bugs + 1 nettoyage, tous corrigés et verrouillés :
+      1. **`stable.ts`, `readAll()` plantait sur un stockage JSON valide
+         mais de mauvaise forme** : `JSON.parse` réussit sur `"null"`,
+         `"5"`, `"true"` (posé par une extension navigateur ou un bug de
+         migration passé) — le `catch` ne l'attrape pas, et
+         `charId in all` plante ensuite en aval, SYNCHRONE dans le rendu
+         de `CharacterSelect.tsx` (écran cassé). Corrigé en validant la
+         forme (`typeof === 'object'`, pas un tableau) après le parse,
+         même garde-fou que `deckBuilder.ts` avait déjà pour son propre
+         stockage.
+      2. **`speechTactics.ts` : « dernier souffle » déclenchait AUSSI la
+         récupération** : la règle générique `souffle` (→ heal 5%)
+         matchait la sous-chaîne « souffle » à l'intérieur de « dernier
+         souffle », en plus de la règle dédiée « baroud d'honneur » — un
+         discours de dernier recours se voyait accorder un soin gratuit
+         à contresens. Corrigé avec un lookbehind négatif
+         `(?<!dernier )souffle`, la règle générique reste valide hors de
+         ce contexte.
+      3. **`combat.ts`, `applyConsigne` dupliquait la limite d'effets en
+         dur** (`effects.slice(0, 2)`) au lieu d'importer
+         `MAX_CONSIGNE_EFFECTS` de `speechTactics.ts` — un futur
+         changement de cette constante aurait affiché un label promettant
+         un effet jamais appliqué. Corrigé par import de la constante
+         partagée.
+      4. Écarté comme bug mais corrigé quand même (trivial, zéro
+         risque) : `progression.ts`, `claimReward` relisait et
+         re-parsait `PROG_KEY` en double via `pendingReward(charId)` au
+         lieu de réutiliser la map déjà en main — aucun effet observable,
+         juste du travail en trop à chaque clic de récompense.
+      2 nouveaux tests dans engine.test.ts (93 → 95) : le stockage
+      corrompu de stable.ts (4 valeurs JSON malformées testées dans une
+      boucle) et le chevauchement « dernier souffle » de speechTactics.ts.
+      `tsc --noEmit` + `npm run build` + suite complète verts. Rien à
+      signaler côté deckBuilder.ts, cutLibrary.ts, characters.ts (déjà
+      solides).
 - [x] Carnet du Coach : cartes jouables au coin du ring (3 familles :
       directes, armées, conditionnelles) — voir GAME_DESIGN.md §4 bis
       (v0 : pool de 6 cartes, sélection de 3 avant match, 1 par coin du
@@ -778,6 +816,45 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Audit de code round 6, ciblé sur stable.ts,
+  speechTactics.ts, progression.ts, deckBuilder.ts, cutLibrary.ts,
+  characters.ts — sixième et dernière tranche de la série sur les
+  modules de logique pure (le reste du dépôt hors UI/systems browser-API
+  a maintenant été passé au crible). 3 vrais bugs corrigés + 1
+  nettoyage trivial :
+  - `stable.ts` : `readAll()` ne validait que l'absence d'erreur de
+    syntaxe JSON, pas la FORME du résultat — un stockage contenant du
+    JSON valide mais non-objet (`"null"`, `"5"`, `"true"`, posé par une
+    extension navigateur ou un bug de migration passé) faisait planter
+    `charId in all` en aval, dans le rendu synchrone de
+    CharacterSelect.tsx. Fix : validation de forme après le parse
+    (`typeof === 'object'`, pas un tableau), même garde-fou que
+    deckBuilder.ts avait déjà pour son propre stockage.
+  - `speechTactics.ts` : la règle générique `souffle` (→ récupération
+    5 %) matchait la sous-chaîne « souffle » À L'INTÉRIEUR de « dernier
+    souffle », qui a sa PROPRE règle dédiée (« baroud d'honneur »,
+    `lowHpHypeFull`) — un discours de dernier recours se voyait donc
+    accorder un soin gratuit à contresens en plus de l'effet voulu.
+    Fix : lookbehind négatif `(?<!dernier )souffle` — même classe de
+    bug que le fix des regex de cardForge.ts au round 2 (chevauchement
+    de sous-chaîne entre deux règles), mais ici entre deux RÈGLES
+    distinctes plutôt qu'un faux positif isolé.
+  - `combat.ts`, `applyConsigne` : la limite d'effets par consigne était
+    dupliquée en dur (`effects.slice(0, 2)`) au lieu d'importer
+    `MAX_CONSIGNE_EFFECTS` de speechTactics.ts — un piège à dérive
+    future (le label affiché et les effets réellement appliqués
+    auraient pu diverger si la constante changeait un jour sans que ce
+    slice suive). Fix : import de la constante partagée.
+  - Nettoyage trivial (pas un bug, mais gratuit à corriger) :
+    `progression.ts`, `claimReward` relisait et re-parsait `PROG_KEY` en
+    double via `pendingReward(charId)` au lieu de réutiliser la map déjà
+    en main dans la fonction.
+  - deckBuilder.ts, cutLibrary.ts, characters.ts : rien trouvé, déjà
+    solides (deckBuilder.ts en particulier avait déjà le bon réflexe de
+    validation de forme que stable.ts vient d'adopter).
+  - 2 nouveaux tests dans engine.test.ts (93 → 95). `tsc --noEmit`,
+    `npm run build` et la suite complète passent.
 
 - 2026-08-16 (routine) : Audit de code round 5, ciblé sur le pipeline
   cinéma (sceneDirector.ts, cutPlanner.ts, liveCutPlayer.ts,

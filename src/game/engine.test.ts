@@ -335,6 +335,20 @@ describe('consignes parlées', () => {
     expect(c?.effects.map(e => e.kind)).toContain('halveEnemySpecial')
   })
 
+  it("bug d'audit : « dernier souffle » ne déclenche plus AUSSI la récupération (souffle en substring)", () => {
+    // Avant fix (2026-08-16) : la règle générique "souffle" (→ heal 5%)
+    // matchait la sous-chaîne "souffle" À L'INTÉRIEUR de "dernier souffle",
+    // en plus de la règle "baroud d'honneur" dédiée à cette phrase — un
+    // discours de dernier recours se voyait accorder un soin gratuit à
+    // contresens.
+    const c = parseConsigne('tout ou rien, on part sur son dernier souffle !')
+    expect(c?.effects.map(e => e.kind)).toContain('lowHpHypeFull')
+    expect(c?.effects.map(e => e.kind)).not.toContain('heal')
+    // La règle générique "souffle" reste valide seule, hors de ce contexte.
+    const c2 = parseConsigne('respire un bon coup, reprends ton souffle')
+    expect(c2?.effects.map(e => e.kind)).toContain('heal')
+  })
+
   it('ignore le bruit et limite à une consigne par pause', () => {
     expect(parseConsigne('il fait beau ce soir non ?')).toBeNull()
     const m = freshMatch()
@@ -980,6 +994,20 @@ describe("Vie d'Écurie (stable.ts) — jamais testée jusqu'ici (0 référence)
     expect(moodStartHype(10)).toBe(0)
     expect(moodIgnoresFirstOrder(10)).toBe(true)
     expect(moodIgnoresFirstOrder(50)).toBe(false)
+  })
+
+  it("bug d'audit : un stockage JSON valide mais de mauvaise forme (pas un objet) ne fait plus planter getStable", async () => {
+    // Avant fix (2026-08-16) : JSON.parse('null'/'5'/'true') réussit (donc
+    // le catch ne l'attrape pas), et `charId in all` plantait ensuite sur
+    // une valeur non-objet — synchrone dans le rendu de CharacterSelect.
+    for (const corrupted of ['null', '5', 'true', '"oops"']) {
+      ;(globalThis as any).localStorage = fakeLocalStorage()
+      localStorage.setItem('coach-arena-stable-v1', corrupted)
+      const { getStable } = await import('./stable')
+      expect(() => getStable('kenta', 'sanguin', DAY1)).not.toThrow()
+      const s = getStable('kenta', 'sanguin', DAY1)
+      expect(s.mood).toBe(50) // repart d'un état neuf, comme si le stockage était vide
+    }
   })
 })
 

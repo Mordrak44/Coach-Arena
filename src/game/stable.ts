@@ -32,7 +32,13 @@ const hasStorage = typeof localStorage !== 'undefined'
 function readAll(): Record<string, StableState> {
   if (!hasStorage) return {}
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? '{}')
+    const parsed = JSON.parse(localStorage.getItem(KEY) ?? '{}')
+    // JSON.parse réussit aussi sur un JSON valide mais de mauvaise FORME
+    // (ex. la chaîne "null", "5" écrite par une extension ou un bug de
+    // migration passé) — le catch ne l'attrape pas, et `charId in all`
+    // planterait alors en aval, synchrone dans le rendu de CharacterSelect
+    // (trouvé en audit, 2026-08-16).
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
   } catch {
     return {}
   }

@@ -43,7 +43,12 @@ const RULES: Rule[] = [
     effect: { kind: 'provoke', duration: 6 },
   },
   {
-    re: /souffle|respire|r[ée]cup[èe]re|repose/i,
+    // (?<!dernier ) : « dernier souffle » est du baroud d'honneur (règle
+    // ci-dessous), pas une consigne de récupération — sans ce garde-fou,
+    // les deux réglaient sur la même phrase et « dernier souffle » se
+    // voyait accorder un soin gratuit à contresens (trouvé en audit,
+    // 2026-08-16).
+    re: /(?<!dernier )souffle|respire|r[ée]cup[èe]re|repose/i,
     label: 'récupération',
     effect: { kind: 'heal', pct: 0.05 },
   },

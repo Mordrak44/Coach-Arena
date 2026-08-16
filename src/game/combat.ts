@@ -12,6 +12,7 @@ import type {
   TacticPlan,
 } from './types'
 import { buildStarterDeck, clampEffect, getCard, shuffle, signatureFor } from './cards'
+import { MAX_CONSIGNE_EFFECTS } from './speechTactics'
 
 // ---------------------------------------------------------------------------
 // Constantes d'équilibrage
@@ -397,7 +398,7 @@ export function applyConsigne(m: MatchState, effects: EffectPrimitive[], label: 
   if ((m.phase !== 'tactics' && m.phase !== 'timeout') || m.consigneUsed || effects.length === 0)
     return false
   m.consigneUsed = true
-  applyCardEffects(m, effects.slice(0, 2).map(clampEffect), 'player')
+  applyCardEffects(m, effects.slice(0, MAX_CONSIGNE_EFFECTS).map(clampEffect), 'player')
   m.events.push({ kind: 'card', t: m.t, name: `🎤 ${label}` })
   return true
 }

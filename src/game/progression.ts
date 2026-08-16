@@ -143,10 +143,18 @@ export function claimReward(charId: string, cardId: CardId): boolean {
   const map = readJson<ProgressMap>(PROG_KEY, {})
   const p = map[charId] ?? { wins: 0, losses: 0 }
   const claimed = p.lastRewardLevel ?? 0
-  const reward = pendingReward(charId)
-  if (!reward || !reward.options.includes(cardId)) return false
+  // Palier + options recalculés depuis `p` (déjà en main) plutôt que via
+  // pendingReward(charId), qui relirait et re-parserait PROG_KEY en double
+  // (trouvé en audit, 2026-08-16 — sans effet observable, juste du travail
+  // en trop à chaque clic de récompense).
+  const care = Math.floor(getDesiresFulfilled(charId) / 3)
+  const level = bondLevel(p.wins + care)
+  if (level <= claimed) return false
+  const next = claimed + 1
+  const options = rewardOptionsFor(charId, next)
+  if (!options.includes(cardId)) return false
   p.extraCopies = [...(p.extraCopies ?? []), cardId]
-  p.lastRewardLevel = claimed + 1
+  p.lastRewardLevel = next
   map[charId] = p
   writeJson(PROG_KEY, map)
   return true
