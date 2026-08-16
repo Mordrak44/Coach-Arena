@@ -1022,6 +1022,31 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       telles quelles plutôt que forcées artificiellement. engine.test.ts
       122 → 125, `tsc --noEmit`/`npm run build` verts, stable sur 3
       exécutions.
+- [x] Septième et dernière passe : nettoyage des petits écarts épars
+      restants sur tout le dépôt plutôt qu'un gros fichier isolé —
+      `characters.ts` (100 %, 6 dernières règles de `RULES` jamais
+      exercées : fragile/feu/ombre/lumière/cyborg/bête), `cards.ts`
+      (100 %, `getCustomCards()` jamais testé directement + branche
+      `drainSouffle` de `clampEffect`), `sceneQueue.ts` (97 %, le chemin
+      `.catch()` d'un submitter qui REJETTE une vraie exception — jamais
+      exercé, tous les tests précédents ne couvraient que l'échec
+      « propre » `resolve(null)` ou le timeout), `stable.ts` (98 %,
+      `desireText()` jamais appelée alors qu'elle est utilisée en
+      production dans `CharacterSelect.tsx`, + une vraie erreur de
+      SYNTAXE JSON distincte du cas « mauvaise forme » déjà couvert).
+      Rien de cassé trouvé cette fois. Couverture globale du dépôt :
+      84 % → 86 % (lignes : 87,6 %). engine.test.ts 125 → 130, `tsc
+      --noEmit`/`npm run build` verts, stable sur 4 exécutions. Piège
+      débusqué en écrivant le test `desireText` : appeler `getStable`
+      avec un trait DIFFÉRENT de celui du perso testé désynchronise le
+      pool d'envies tiré de celui que `desireText` relit ensuite via
+      `char.trait` — corrigé en passant `ROSTER[0].trait` explicitement
+      plutôt qu'un trait choisi au hasard.
+      **Avec cette passe, la série de coverage systématique touche à sa
+      fin** : le seul écart notable qui reste est `combat.ts` (72 %),
+      délibérément laissé de côté car son test réel est `scripts/sim.ts`
+      (des milliers de matchs simulés), pas des tests unitaires ligne
+      par ligne.
 
 ### Tier 2 — Édition Histoire 14,90 € (stores)
 - [x] Mode histoire v0 « Le Grand Hurlement » : 8 chapitres écrits
@@ -1098,6 +1123,33 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Septième et dernière passe sur le rapport de
+  coverage — nettoyage des écarts épars restants plutôt qu'un gros
+  fichier isolé (les précédentes cibles avaient toutes >20 points à
+  gagner ; il ne restait plus que quelques lignes par-ci par-là).
+  characters.ts (100 %, les 6 dernières règles de `RULES` jamais
+  exercées) ; cards.ts (100 %, `getCustomCards()` jamais testé
+  directement + la branche `drainSouffle` de `clampEffect`) ;
+  sceneQueue.ts (97 %, le chemin `.catch()` d'un submitter qui REJETTE
+  une vraie exception — tous les tests précédents ne couvraient que
+  l'échec « propre » via `resolve(null)` ou le timeout, jamais un vrai
+  rejet de Promise) ; stable.ts (98 %, `desireText()` jamais appelée
+  alors qu'elle est utilisée en production dans `CharacterSelect.tsx`,
+  plus une vraie erreur de SYNTAXE JSON distincte du cas « mauvaise
+  forme » déjà couvert par le fix du round 6 d'audit). Rien de cassé
+  trouvé cette fois, mais un piège découvert en écrivant le test
+  `desireText` lui-même : appeler `getStable` avec un trait différent
+  de celui du perso testé désynchronise le pool d'envies tiré de celui
+  que `desireText` relit ensuite via `char.trait` — pas un bug du code
+  de prod, juste un piège de test à connaître, corrigé en passant
+  `ROSTER[0].trait` explicitement. Couverture globale du dépôt :
+  84 % → 86 % (lignes : 87,6 %). engine.test.ts 125 → 130, `tsc
+  --noEmit`/`npm run build` verts, stable sur 4 exécutions.
+  Avec cette passe, la série de coverage systématique touche à sa fin :
+  le seul écart notable qui reste est combat.ts (72 %), délibérément
+  laissé de côté car son test réel est `scripts/sim.ts` (des milliers
+  de matchs simulés), pas des tests unitaires ligne par ligne.
 
 - 2026-08-16 (routine) : Sixième passe sur le rapport de coverage —
   sceneDirector.ts, 76 % → 88 %. `momentPrompt` et le calcul de l'id de

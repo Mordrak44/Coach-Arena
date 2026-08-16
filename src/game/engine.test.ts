@@ -51,6 +51,26 @@ describe('cartes (DSL)', () => {
     expect(clampEffect({ kind: 'heal', pct: 5 })).toEqual({ kind: 'heal', pct: 0.25 })
     expect(clampEffect({ kind: 'hype', amount: 999 })).toEqual({ kind: 'hype', amount: 40 })
     expect(clampEffect({ kind: 'armCounterMul', mul: 99 })).toEqual({ kind: 'armCounterMul', mul: 2.5 })
+    // drainSouffle : jamais exercé jusqu'ici.
+    expect(clampEffect({ kind: 'drainSouffle', amount: 99.7 })).toEqual({ kind: 'drainSouffle', amount: 3 })
+  })
+
+  it('getCustomCards (jamais testé) : reflète le registre après registerCustomCard', async () => {
+    const { registerCustomCard, getCustomCards, getCard } = await import('./cards')
+    const before = getCustomCards().length
+    const custom = {
+      id: `test-custom-${Math.random().toString(36).slice(2, 8)}` as CardId,
+      name: 'Carte de Test',
+      timing: 'pause' as const,
+      cost: 3,
+      icon: '🧪',
+      desc: 'x',
+      effects: [],
+    }
+    registerCustomCard(custom)
+    expect(getCustomCards().length).toBe(before + 1)
+    expect(getCustomCards().map(c => c.id)).toContain(custom.id)
+    expect(getCard(custom.id)).toEqual(custom)
   })
 
   it('chaque perso du roster a sa carte signature', () => {
@@ -1045,6 +1065,19 @@ describe('SceneJobQueue (file de génération asynchrone des scènes)', () => {
     expect(jobs.find(j => j.plan.id === 'ok')?.status).toBe('ready')
     expect(jobs.find(j => j.plan.id === 'ko')?.status).toBe('failed')
   })
+
+  it("un submitter qui REJETTE (pas juste resolve(null)) passe aussi le job à 'failed' (jamais exercé jusqu'ici)", async () => {
+    // Tous les autres tests couvrent l'échec « propre » (resolve(null)) ou
+    // le timeout — jamais une vraie exception/rejet (erreur réseau réelle
+    // d'un futur submitter serveur), le chemin .catch() de start().
+    const { SceneJobQueue } = await import('./sceneQueue')
+    const queue = new SceneJobQueue([plan('boom')], {
+      submitter: { submit: async () => Promise.reject(new Error('network error')) },
+    })
+    queue.start()
+    await new Promise(r => setTimeout(r, 10))
+    expect(queue.jobs()[0].status).toBe('failed')
+  })
 })
 
 // L'environnement de test (Node, pas jsdom) n'a pas de localStorage — les
@@ -1180,6 +1213,25 @@ describe("Vie d'Écurie (stable.ts) — jamais testée jusqu'ici (0 référence)
       const s = getStable('kenta', 'sanguin', DAY1)
       expect(s.mood).toBe(50) // repart d'un état neuf, comme si le stockage était vide
     }
+  })
+
+  it('desireText (jamais testé) : le texte suit le trait, null si aucune envie active', async () => {
+    const { desireText, getStable } = await import('./stable')
+    // ROSTER[0] (Kenta) a le trait 'fusionnel' dans le roster réel — passer
+    // le MÊME trait à getStable pour que l'envie tirée vienne bien du pool
+    // que desireText va relire via char.trait (sinon les deux se
+    // désynchronisent et le filtre ne retrouve jamais l'envie).
+    const s = getStable('kenta', ROSTER[0].trait, DAY1)
+    const text = desireText(ROSTER[0], s)
+    expect(text).toContain(ROSTER[0].name)
+    expect(desireText(ROSTER[0], { ...s, desire: null })).toBeNull()
+  })
+
+  it("readAll : une VRAIE erreur de syntaxe JSON (pas juste une mauvaise forme) retombe aussi sur un état neuf", async () => {
+    const { getStable } = await import('./stable')
+    localStorage.setItem('coach-arena-stable-v1', '{ceci nest pas du json')
+    expect(() => getStable('kenta', 'sanguin', DAY1)).not.toThrow()
+    expect(getStable('kenta', 'sanguin', DAY1).mood).toBe(50)
   })
 })
 
@@ -1735,6 +1787,16 @@ describe('createFromPrompt (characters.ts) — combler les trous de couverture',
     // recopié tel quel.
     const NAME_RE = /^(Ka|Ryu|Zen|Aki|Tetsu|Hana|Kai|Shiro|Rin|Dai)(ro|ka|to|mi|n|shi|ji)$/
     expect(c.name).toMatch(NAME_RE)
+  })
+
+  it('les 6 dernières règles de RULES jamais exercées (fragile/feu/ombre/lumière/cyborg/bête)', async () => {
+    const { createFromPrompt } = await import('./characters')
+    expect(createFromPrompt('un combattant fragile et vulnérable, appelé Verre').stats.hp).toBeLessThan(100)
+    expect(createFromPrompt('un combattant de feu ardent, appelé Braise').color).toBe('#ff5a36')
+    expect(createFromPrompt('un combattant des ombres, appelé Nuit').archetype).toBe('rival')
+    expect(createFromPrompt('un ange de lumière, appelé Halo').stats.hrt).toBeGreaterThan(6)
+    expect(createFromPrompt('un cyborg mécanique, appelé Unité').color).toBe('#00cec9')
+    expect(createFromPrompt('une bête sauvage et animale, appelé Croc').archetype).toBe('beast')
   })
 })
 
