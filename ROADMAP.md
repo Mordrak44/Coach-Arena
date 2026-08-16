@@ -320,6 +320,34 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       round 3, systems/ au round 4, le reste ici) — la série d'audit
       systématique commencée quand le puits de tâches sûres/gratuites
       s'épuisait a maintenant couvert l'intégralité du dépôt applicatif.
+- [x] Audit de code round 8 (2026-08-16), ciblé sur App.tsx et
+      render/arenaRenderer.ts — les deux plus gros fichiers jamais
+      passés au crible en entier (App.tsx jamais ciblé ; arenaRenderer.ts
+      seulement effleuré au round 1 pour un hoist de perf). 1 vrai bug de
+      gameplay corrigé :
+      - **`App.tsx`, mode Rapide avec équipiers : le banc adverse pouvait
+        aligner le perso du JOUEUR ou l'un de ses ÉQUIPIERS.** Le calcul
+        du banc adverse (`pool = ROSTER.filter(r => r.id !== opponent.id)`)
+        n'excluait que l'adversaire principal — pas le perso du joueur, ni
+        ses équipiers. Un joueur sur Kenta avec Rei en équipière pouvait
+        ainsi se retrouver face à un banc adverse qui aligne… Kenta ou
+        Rei, contredisant le commentaire du code lui-même (« sans
+        doublons »). Fix : la logique de sélection du banc, auparavant en
+        ligne dans App.tsx, extraite en fonction pure et exportée
+        `pickOpponentTeam(excludeIds, size)` dans characters.ts (aux
+        côtés de `pickOpponent`, même famille), appelée avec la liste
+        complète à exclure (perso + équipe + adversaire). Verrouillé par
+        un test à 200 tirages (jamais un id exclu) + un test de bord
+        (moins de candidats que la taille demandée).
+      - Écarté (design, pas un bug) : `arenaRenderer.ts` construit ~20
+        objets `FloatingText` quasi identiques inline dans `onEvent()` au
+        lieu d'un helper commun — coût de maintenance réel mais risque de
+        régression visuelle non négligeable pour un refactor sur un
+        fichier canvas de 1000+ lignes sans capture de référence dédiée ;
+        laissé pour une itération future avec vérification visuelle
+        dédiée plutôt que fait à la hâte ici.
+      2 nouveaux tests (engine.test.ts 98 → 100). `tsc --noEmit` +
+      `npm run build` + suite complète verts.
 - [x] Carnet du Coach : cartes jouables au coin du ring (3 familles :
       directes, armées, conditionnelles) — voir GAME_DESIGN.md §4 bis
       (v0 : pool de 6 cartes, sélection de 3 avant match, 1 par coin du
@@ -631,6 +659,20 @@ entre les phases de coaching. Le mode arcade actuel reste le fallback.
       pas d'erreur de câblage) — seule la LECTURE réelle du fichier
       n'est pas vérifiable d'ici. Les liens ont été partagés en
       conversation ; ils expirent 24h après génération.
+      2026-08-16 : l'utilisateur a confirmé ("je confirme") vouloir
+      reprendre le lot manquant. Les 2 portraits de référence Kenta/Rei
+      de la veille ayant expiré (24h), ils ont été régénérés (2 crédits,
+      mêmes prompts que les portraits dérivés qui avaient servi aux 8
+      clips déjà faits) — URLs fraîches obtenues et confirmées prêtes.
+      Le lot a été interrompu par l'utilisateur une TROISIÈME fois juste
+      avant le premier envoi vidéo du lot restant (victory-pose Rei) :
+      aucun crédit vidéo dépensé cette fois, seulement les 2 portraits
+      (~212 crédits consommés au total sur 2978). Conformément à la
+      règle « jamais de crédits sans confirmation », pas de nouvelle
+      tentative sans un nouveau feu vert explicite — les URLs des 2
+      portraits fraîchement générés n'ont pas été conservées ici
+      (expirent aussi en 24h) ; une reprise future devra les régénérer à
+      nouveau si plus de 24h se sont écoulées.
 - [ ] Montage final du match (concat des clips + habillage) exportable 9:16
 - [ ] Génération de perso via API Claude (stats + lore + nom du spécial)
 - [x] Le discours du coin du ring COMPRIS — v0 locale : parseur de
@@ -857,6 +899,44 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 : Reprise du pilote Kling après confirmation explicite de
+  l'utilisateur (« je confirme »), suite à ma question sur l'état du
+  lot en attente. Les 2 portraits de référence Kenta/Rei de la veille
+  avaient expiré (24h) — régénérés avec les mêmes prompts que les
+  portraits dérivés ayant servi aux 8 clips déjà générés (2 crédits,
+  URLs fraîches confirmées prêtes via query_tasks). Le lot a été
+  interrompu par l'utilisateur une troisième fois juste avant le premier
+  envoi vidéo du reste (victory-pose Rei) — aucun crédit vidéo dépensé
+  cette fois. Conformément à la règle « jamais de crédits sans
+  confirmation », pas de nouvelle tentative sans feu vert explicite.
+  ~212 crédits consommés au total sur 2978. Voir la case à cocher
+  correspondante plus haut pour le détail.
+
+- 2026-08-16 (routine) : Audit de code round 8, ciblé sur App.tsx et
+  render/arenaRenderer.ts — les deux plus gros fichiers jamais passés en
+  revue en entier. Après le round 7 qui couvrait tous les écrans UI,
+  restait le composant racine (App.tsx, jamais spécifiquement audité) et
+  le renderer canvas (arenaRenderer.ts, seulement effleuré au round 1
+  pour un hoist de performance, jamais une passe de correction complète).
+  1 vrai bug de gameplay trouvé : en mode Rapide avec équipiers, le banc
+  adverse pouvait aligner le perso du JOUEUR lui-même ou l'un de ses
+  ÉQUIPIERS — `App.tsx` ne filtrait le pool du banc adverse que sur
+  l'adversaire principal (`r.id !== opponent.id`), oubliant le perso du
+  joueur et son équipe, contredisant le propre commentaire du code
+  (« sans doublons »). Corrigé en extrayant la sélection du banc adverse
+  en fonction pure exportée, `pickOpponentTeam(excludeIds, size)` dans
+  characters.ts (aux côtés de `pickOpponent`), appelée avec la liste
+  complète à exclure — testable indépendamment de React, contrairement à
+  la logique qui vivait avant en ligne dans le composant. Verrouillé par
+  un test statistique (200 tirages, jamais un id exclu) + un test de
+  bord (pool plus petit que la taille demandée). Écarté comme non-bug
+  mais documenté : la duplication de ~20 objets `FloatingText` dans
+  arenaRenderer.ts (mérite un helper commun) laissée pour une itération
+  dédiée avec vérification visuelle, plutôt que refactorée à la hâte sur
+  un fichier canvas de 1000+ lignes sans capture de référence. 2
+  nouveaux tests (98 → 100), `tsc --noEmit` + `npm run build` + suite
+  complète verts.
 
 - 2026-08-16 (routine) : Audit de code round 7, ciblé sur les écrans UI
   restants (ReadyScreen.tsx, ResultsScreen.tsx, StoryScreen.tsx,

@@ -1453,3 +1453,24 @@ describe('requestCoachStream (systems/media.ts) — repli audio+vidéo → audio
     await expect(requestCoachStream()).resolves.toBeNull()
   })
 })
+
+describe('pickOpponentTeam (characters.ts) — banc adverse du mode Rapide', () => {
+  it("bug d'audit : le banc adverse n'aligne plus jamais le perso du joueur ni ses équipiers", async () => {
+    // Avant fix (2026-08-16) : App.tsx filtrait le pool adverse seulement
+    // sur l'id de l'adversaire principal — le perso du joueur ou l'un de
+    // ses équipiers pouvait se retrouver sur le banc EN FACE de lui-même.
+    const { pickOpponentTeam } = await import('./characters')
+    const excluded = [ROSTER[0].id, ROSTER[1].id, ROSTER[2].id]
+    for (let i = 0; i < 200; i++) {
+      const team = pickOpponentTeam(excluded, 3)
+      expect(team.some(c => excluded.includes(c.id))).toBe(false)
+    }
+  })
+
+  it('ne renvoie jamais plus que ce que le reste du roster permet', async () => {
+    const { pickOpponentTeam } = await import('./characters')
+    const allButOne = ROSTER.slice(1).map(c => c.id)
+    const team = pickOpponentTeam(allButOne, 5) // demande 5, il n'en reste qu'1 possible
+    expect(team.length).toBe(1)
+  })
+})

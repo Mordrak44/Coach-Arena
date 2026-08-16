@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CardId, Character } from './game/types'
-import { ROSTER, pickOpponent } from './game/characters'
+import { ROSTER, pickOpponent, pickOpponentTeam } from './game/characters'
 import { buildStarterDeck } from './game/cards'
 import { applyBond, recordResult } from './game/progression'
 import {
@@ -76,10 +76,9 @@ export default function App() {
     const teamFighters = team.map(t => applyBond(t))
     const story = storyRef.current
     const opponent = story ? chapterOpponent(story) : pickOpponent(char.id)
-    const pool = ROSTER.filter(r => r.id !== opponent.id)
     const enemyTeam = story
       ? chapterOpponentTeam(story)
-      : [...pool].sort(() => Math.random() - 0.5).slice(0, teamFighters.length)
+      : pickOpponentTeam([char.id, opponent.id, ...team.map(t => t.id)], teamFighters.length)
     matchOptsRef.current = {
       startHype: moodStartHype(stable.mood),
       sulky: moodIgnoresFirstOrder(stable.mood),

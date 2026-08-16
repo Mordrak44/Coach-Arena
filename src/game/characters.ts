@@ -210,3 +210,16 @@ export function pickOpponent(playerId: string): Character {
   const pool = ROSTER.filter(c => c.id !== playerId)
   return pool[Math.floor(Math.random() * pool.length)]
 }
+
+/**
+ * Banc adverse (mode Rapide) : tiré du reste du roster, EXCLUANT tous les
+ * ids passés — pas seulement l'adversaire principal. Sans exclure aussi le
+ * perso du joueur et ses propres équipiers, le banc adverse pouvait aligner
+ * une copie du perso même du joueur ou d'un de ses équipiers, face à
+ * lui-même (trouvé en audit, 2026-08-16).
+ */
+export function pickOpponentTeam(excludeIds: string[], size: number): Character[] {
+  const excluded = new Set(excludeIds)
+  const pool = ROSTER.filter(c => !excluded.has(c.id))
+  return [...pool].sort(() => Math.random() - 0.5).slice(0, size)
+}
