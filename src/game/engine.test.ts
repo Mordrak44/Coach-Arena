@@ -827,6 +827,38 @@ describe('création par prompt & réalisateur', () => {
     expect(forgeCard('il critique la stratégie adverse')?.card).toBeTruthy()
   })
 
+  it('forgeCard : les 9 règles jamais exercées jusqu’ici produisent le bon kind ET la bonne description', async () => {
+    // Seules 5 des 14 règles de cardForge.ts étaient exercées par les
+    // tests existants (soigne/contre/cri/rage + les contrôles négatifs) —
+    // les 9 autres, et les cas de describe() qu'elles déclenchent
+    // (jamais vérifiés eux non plus), restaient un angle mort complet.
+    const { forgeCard } = await import('./cardForge')
+    const cases: Array<[string, string, RegExp]> = [
+      ['un discours qui motive les troupes', 'hype', /Hype/],
+      ['une attaque qui démoralise l’adversaire', 'enemyHype', /l'adversaire perd/],
+      ['une carapace protectrice', 'damageReduction', /dégâts reçus/],
+      ['un mouvement fantôme insaisissable', 'dodgeBonus', /esquive/],
+      ['une sérénité totale et imperturbable', 'immuneConfusion', /immunisé à la confusion/],
+      ['en position acculé, dos au mur', 'lowHpHypeFull', /Hype pleine/],
+      ['un geste qui nargue l’adversaire', 'provoke', /démarre agressif/],
+      ['une leçon d’humilité cinglante', 'counterHype', /contre réussi/],
+      ['une résistance qui encaisse tout', 'hitsTakenHype', /encaisser \d+ coups/],
+      ['un coach qui anticipe chaque attaque', 'halveEnemySpecial', /spécial adverse est réduit/],
+    ]
+    for (const [prompt, kind, descRe] of cases) {
+      const r = forgeCard(prompt)
+      expect(r, prompt).toBeTruthy()
+      expect(r!.card.effects.map(e => e.kind), prompt).toContain(kind)
+      expect(r!.card.desc, prompt).toMatch(descRe)
+    }
+  })
+
+  it('deriveTiming : condition pour les effets conditionnels (jamais exercé jusqu’ici)', async () => {
+    const { forgeCard } = await import('./cardForge')
+    const r = forgeCard('en position acculé, dos au mur')!
+    expect(r.card.timing).toBe('condition')
+  })
+
   it('primitivePower(hitsTakenHype) tient compte de `hits` : moins de coups requis coûte plus cher', () => {
     // Les coûts des cartes DU JEU ACTUEL (hits: 3 partout, CARD_POOL +
     // SIGNATURE_CARDS) restent inchangés par construction — déjà vérifié

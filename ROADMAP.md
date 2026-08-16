@@ -990,6 +990,20 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       déjà sûrs par construction (cardForge.ts — vérifié : ses opérations
       internes plantent bien sur TOUTE forme corrompue, y compris les cas
       qui avaient piégé les autres fichiers), soit corrigés.
+- [x] Cinquième cible du rapport de coverage : cardForge.ts, 65 % → 94 %.
+      Seules 5 des 14 règles de la Forge (soigne/contre/cri/rage +
+      contrôles négatifs) étaient exercées par les tests existants — les
+      9 autres, et les cas de `describe()` (le texte affiché au joueur)
+      qu'elles déclenchent, restaient un angle mort complet : aucune
+      garantie que « une carapace protectrice » produise bien une carte
+      de réduction de dégâts avec le bon texte, par exemple. 2 nouveaux
+      tests couvrent maintenant les 9 règles manquantes (kind ET texte de
+      description vérifiés pour chacune) et la branche `condition` de
+      `deriveTiming` (jamais atteinte non plus, faute d'avoir déclenché
+      un des 5 effets conditionnels). Rien de cassé trouvé cette fois — un
+      résultat normal et sain d'un balayage de couverture, pas tous ne
+      révèlent un bug. engine.test.ts 120 → 122, `tsc --noEmit`/`npm run
+      build` verts, stable sur 3 exécutions.
 
 ### Tier 2 — Édition Histoire 14,90 € (stores)
 - [x] Mode histoire v0 « Le Grand Hurlement » : 8 chapitres écrits
@@ -1066,6 +1080,20 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 - [ ] Classements, saisons, événements
 
 ## Journal
+
+- 2026-08-16 (routine) : Cinquième passe sur le rapport de coverage —
+  cardForge.ts, 65 % → 94 %, redevenu le plus gros écart après le
+  balayage JSON.parse. Seules 5 des 14 règles de la Forge de cartes
+  étaient exercées par les tests existants ; les 9 autres — et les cas
+  correspondants de `describe()`, le texte de la carte affiché au
+  joueur — n'avaient jamais été vérifiés. 2 nouveaux tests couvrent les
+  9 règles manquantes (kind ET texte de description pour chacune,
+  prompts choisis pour isoler une seule règle à la fois) plus la
+  branche `condition` de `deriveTiming`. Rien de cassé cette fois —
+  contrairement aux 4 dernières cibles de coverage, qui avaient chacune
+  révélé un bug réel : un résultat sain, pas un échec de la méthode.
+  engine.test.ts 120 → 122, `tsc --noEmit`/`npm run build` verts,
+  stable sur 3 exécutions.
 
 - 2026-08-16 (routine) : Après 3 occurrences de la même famille de bug
   en 3 jours (stable.ts, deckBuilder.ts, story.ts — un `JSON.parse` non
