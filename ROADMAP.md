@@ -792,6 +792,26 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       Aucun bug trouvé — le fichier était déjà correct — mais couvert
       pour de bon maintenant. engine.test.ts 210 → 214. Couverture
       `facecam.ts` 0 % → 96,9 %. `tsc --noEmit` + `npm run build` verts.
+- [x] `systems/sound.ts` (`SoundSystem`, bande-son 100 % synthétisée
+      WebAudio) — 0 % de couverture, écarté la fois précédente comme
+      « effort de mock élevé pour un risque de bug faible ». Reconsidéré :
+      TOUTES ses méthodes sont déjà protégées par `if (!this.ctx...)
+      return`, ce qui rend le chemin « AudioContext absent » testable
+      SANS AUCUN mock — l'environnement Node de vitest n'a justement pas
+      `AudioContext` du tout, exactement comme un navigateur qui la
+      refuserait. 1er test : tous les événements de jeu (hit/block/dodge/
+      counter/special/ulti/gong/ko/hypeFull/cardPlay/confused) + setCrowd
+      Hype/resume/setMuted/stop appelés à la chaîne sans jamais planter,
+      alors que `ctx` est resté `null`. 2e test : `muted` reste cohérent
+      indépendamment de l'audio. 3e test, plus généreux : un faux
+      `AudioContext` minimal (nœuds chaînables `.connect()`, `AudioParam`
+      avec les 4 méthodes de rampe utilisées) pour vérifier que le VRAI
+      graphe audio (oscillateurs, filtres, bruit blanc, foule) se
+      construit sans planter quand le contexte existe réellement — pas
+      seulement le chemin de repli. Aucun bug trouvé. 3 nouveaux tests.
+      engine.test.ts 214 → 217. Couverture `sound.ts` 0 % → 94,5 %.
+      Couverture globale de `systems/` 0 % il y a quelques itérations →
+      84,8 % maintenant. `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1712,6 +1732,18 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Reconsidéré `systems/sound.ts` (WebAudio,
+  laissé de côté à l'itération précédente comme « effort de mock élevé »)
+  — en fait bon marché : toutes ses méthodes sont déjà gardées par
+  `if (!this.ctx...) return`, et Node n'a justement pas d'`AudioContext`
+  du tout, donc le chemin « absent » se teste sans aucun mock. 1er test :
+  tous les événements de jeu enchaînés sans jamais planter avec `ctx`
+  resté null. 2e : `muted` cohérent. 3e, plus généreux : un faux
+  `AudioContext` minimal pour vérifier que le VRAI graphe audio
+  (oscillateurs, filtres, bruit, foule) se construit sans planter aussi.
+  Aucun bug trouvé. 3 tests. engine.test.ts 214 → 217. Couverture
+  sound.ts 0 % → 94,5 % ; systems/ globalement 84,8 % maintenant (0 % il
+  y a quelques itérations). `tsc --noEmit` + `npm run build` verts.
 - 2026-08-17 (routine) : Deux choses cette itération. D'abord un incident
   CI transitoire diagnostiqué avant de toucher au code : le déploiement
   Pages a échoué pour la 1re fois depuis sa mise en ligne — logs vérifiés,

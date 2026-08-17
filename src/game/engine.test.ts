@@ -31,6 +31,7 @@ import { ROSTER, createFromPrompt } from './characters'
 import { ArenaRenderer } from '../render/arenaRenderer'
 import { matchCommand } from '../systems/voice'
 import { MatchRecorder, fileExt, pickMimeType, shareOrDownload } from '../systems/recorder'
+import { SoundSystem } from '../systems/sound'
 import type { CardId, CoachInput, MatchState } from './types'
 
 const quiet: CoachInput = { command: null, voiceEnergy: 0, faceEnergy: 0 }
@@ -2739,5 +2740,132 @@ describe('FaceCoach (systems/facecam.ts) — énergie de mouvement par diff d\'i
     setFrame(new Uint8ClampedArray(FRAME_LEN).fill(255))
     ;(fc as any).sample()
     expect(fc.state.energy).toBe(0) // 1re frame de la nouvelle session : juste une initialisation
+  })
+})
+
+describe('SoundSystem (systems/sound.ts) — bande-son synthétisée, jamais testée', () => {
+  afterEach(() => {
+    delete (globalThis as any).AudioContext
+  })
+
+  it("sans AudioContext (absent de ce sandbox Node, comme un navigateur qui le refuserait) : tous les événements de jeu restent des no-op sûrs", () => {
+    const ss = new SoundSystem()
+    ss.start() // échoue proprement, ctx reste null
+    expect(() => {
+      ss.hit(true)
+      ss.hit(false)
+      ss.block()
+      ss.dodge()
+      ss.counter()
+      ss.special()
+      ss.ulti()
+      ss.gong()
+      ss.ko()
+      ss.hypeFull()
+      ss.cardPlay()
+      ss.confused()
+      ss.setCrowdHype(0.5)
+      ss.resume()
+      ss.setMuted(true)
+      ss.stop()
+    }).not.toThrow()
+  })
+
+  it('setMuted/muted restent cohérents même sans contexte audio', () => {
+    const ss = new SoundSystem()
+    expect(ss.muted).toBe(false)
+    ss.setMuted(true)
+    expect(ss.muted).toBe(true)
+    ss.setMuted(false)
+    expect(ss.muted).toBe(false)
+  })
+
+  it('avec un AudioContext disponible, tous les événements construisent leur graphe audio sans planter', () => {
+    class FakeParam {
+      value = 0
+      setValueAtTime() {
+        return this
+      }
+      exponentialRampToValueAtTime() {
+        return this
+      }
+      linearRampToValueAtTime() {
+        return this
+      }
+      cancelScheduledValues() {
+        return this
+      }
+    }
+    class FakeNode {
+      connect() {
+        return this
+      }
+    }
+    class FakeGainNode extends FakeNode {
+      gain = new FakeParam()
+    }
+    class FakeOscillatorNode extends FakeNode {
+      type = 'sine'
+      frequency = new FakeParam()
+      start() {}
+      stop() {}
+    }
+    class FakeBiquadFilterNode extends FakeNode {
+      type = 'lowpass'
+      frequency = new FakeParam()
+      Q = new FakeParam()
+    }
+    class FakeBufferSourceNode extends FakeNode {
+      buffer: unknown = null
+      loop = false
+      start() {}
+    }
+    class FakeAudioContext {
+      currentTime = 0
+      sampleRate = 44100
+      state = 'running'
+      destination = new FakeNode()
+      createGain() {
+        return new FakeGainNode()
+      }
+      createOscillator() {
+        return new FakeOscillatorNode()
+      }
+      createBiquadFilter() {
+        return new FakeBiquadFilterNode()
+      }
+      createBufferSource() {
+        return new FakeBufferSourceNode()
+      }
+      createBuffer(_channels: number, length: number) {
+        return { getChannelData: () => new Float32Array(length) }
+      }
+      resume() {
+        return Promise.resolve()
+      }
+      close() {
+        return Promise.resolve()
+      }
+    }
+    ;(globalThis as any).AudioContext = FakeAudioContext
+    const ss = new SoundSystem()
+    ss.start()
+    expect(() => {
+      ss.hit(true)
+      ss.hit(false)
+      ss.block()
+      ss.dodge()
+      ss.counter()
+      ss.special()
+      ss.ulti()
+      ss.gong()
+      ss.ko()
+      ss.hypeFull()
+      ss.cardPlay()
+      ss.confused()
+      ss.setCrowdHype(0.9) // au-dessus du seuil de variation → programme une vraie rampe
+      ss.resume()
+      ss.stop()
+    }).not.toThrow()
   })
 })
