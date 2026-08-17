@@ -493,6 +493,32 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       aujourd'hui. 4 nouveaux tests, engine.test.ts 149 → 153. Couverture
       `combat.ts` 80,6 % → 84,94 % (stmts), 71,22 % → 72,42 % (branch).
       `tsc --noEmit` + `npm run build` verts.
+- [x] Error Boundary React — après 3 passes de coverage sur `combat.ts`
+      (rendements décroissants sur ce fichier, temps de pivoter), un vrai
+      trou de résilience jamais adressé : `grep -rln "ErrorBoundary"` sur
+      `src/` confirmait qu'AUCUN filet n'existait nulle part. Sans lui,
+      une exception non attrapée pendant un match coaché (canvas, reco
+      vocale, un deck forgé corrompu…) fait tomber tout React à un écran
+      BLANC, en plein direct — le pire scénario possible pour un jeu conçu
+      pour être filmé/streamé en 9:16. Nouveau `src/ui/ErrorBoundary.tsx`
+      (class component — seule forme capable d'intercepter côté React,
+      pas d'équivalent en hooks), enveloppe `<App/>` dans `main.tsx` :
+      écran de repli réutilisant les classes existantes (`.screen`/
+      `.tagline`/`.btn`, zéro CSS ajouté), rassure explicitement que deck
+      forgé/Vie d'Écurie/progression survivent (ils vivent dans
+      localStorage, pas l'état React), bouton de rechargement. Vérifié en
+      conditions réelles, pas supposé : déclencheur de crash TEMPORAIRE
+      ajouté à `App.tsx` (même motif que le `?demo` déjà existant),
+      Chromium headless confirmant (1) le chargement normal est inchangé
+      et (2) `?crashtest=1` affiche bien le fallback « K.O. TECHNIQUE » +
+      bouton de relance au lieu d'un écran blanc — puis le déclencheur
+      retiré avant tout commit (`git status` vérifié : seuls `main.tsx` et
+      le nouveau fichier restent modifiés, `App.tsx` revenu à l'identique).
+      153 tests inchangés (pas de test unitaire ajouté — pas de
+      testing-library dans ce projet, cohérent avec le choix déjà fait
+      partout ailleurs de vérifier le comportement UI via Chromium réel
+      plutôt que d'ajouter cette dépendance). `tsc --noEmit` + `npm run
+      build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1411,6 +1437,22 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Après 3 passes de coverage sur `combat.ts`
+  (rendements décroissants), pivot vers un vrai trou de résilience jamais
+  adressé : aucun Error Boundary React n'existait nulle part (`grep`
+  confirmé). Une exception non attrapée pendant un match coaché faisait
+  tomber tout React à un écran BLANC en plein direct — le pire scénario
+  pour un jeu pensé pour être filmé/streamé. Nouveau `src/ui/
+  ErrorBoundary.tsx` (class component, seule forme capable d'intercepter
+  côté React), enveloppe `<App/>` dans `main.tsx`. Écran de repli
+  réutilisant les classes CSS existantes, rassure que deck forgé/Vie
+  d'Écurie/progression survivent (localStorage, pas l'état React), bouton
+  de rechargement. Vérifié en conditions réelles : déclencheur de crash
+  TEMPORAIRE (même motif que `?demo`), Chromium headless confirmant le
+  chargement normal inchangé ET `?crashtest=1` affichant le fallback au
+  lieu d'un écran blanc — déclencheur retiré avant le commit (`git status`
+  vérifié, `App.tsx` revenu à l'identique). `tsc --noEmit` + `npm run
+  build` verts, 153 tests inchangés.
 - 2026-08-17 (routine) : 3e passe du coverage-driven bug hunt sur
   `combat.ts`, ciblée sur `resolveAttack`/`fireSpecial` : les branches à
   ISSUE RARE qu'aucune simulation de match ordinaire ne déclenche
