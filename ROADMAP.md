@@ -546,6 +546,29 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       montrait déjà 6 copies quasi identiques avant ce fix). 6 nouveaux
       tests (un par module touché), engine.test.ts 153 → 159. `tsc
       --noEmit` + `npm run build` verts.
+- [x] 3e maillon de la passe résilience : `VoiceCoach.startRecognition()`
+      (`systems/voice.ts`) posait `state.supported = true` AVANT même
+      d'appeler `new Ctor()` (le constructeur `SpeechRecognition`/
+      `webkitSpeechRecognition`), et ce constructeur n'était PAS protégé
+      par try/catch — seul `rec.start()` plus bas l'était. Sur certains
+      WebView/navigateurs verrouillés où le constructeur EXISTE sur
+      `window` mais échoue quand même faute de pont natif de reco vocale
+      disponible, `state.supported` restait figé à `true` alors que la
+      reco n'avait jamais démarré : un FAUX POSITIF pire qu'une absence
+      honnête, puisque l'UI (ReadyScreen) affiche cet état au joueur. Pire
+      encore : `start()` est appelé sans `await` ni `.catch()` depuis
+      `ArenaScreen.tsx` (`sys.voice.start(stream)`) — l'exception
+      synchrone du constructeur, dans une méthode `async`, devenait donc
+      une PROMESSE REJETÉE NON GÉRÉE, invisible en dehors de la console.
+      Confirmé réel avant fix (discipline habituelle) : un test avec un
+      constructeur `SpeechRecognition` factice qui jette a fait échouer
+      l'assertion AVANT le correctif (`git stash` du fichier source,
+      relancé le test, remis en place), confirmant que ce n'est pas un
+      test vacueusement vert. Fix : `new Ctor()` déplacé dans son propre
+      try/catch, `state.supported = true` déplacé APRÈS la construction
+      réussie. 2 nouveaux tests (constructeur qui jette → `supported`
+      correctement `false`, constructeur qui réussit → `true`),
+      engine.test.ts 159 → 161. `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1464,6 +1487,21 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : 3e maillon de la passe résilience, trouvé en
+  suivant les autres accès à des API navigateur potentiellement
+  jetables : `VoiceCoach.startRecognition()` posait `state.supported =
+  true` AVANT même d'appeler `new Ctor()` (le constructeur
+  `SpeechRecognition`), non protégé par try/catch (seul `rec.start()`
+  l'était). Sur un WebView/navigateur où le constructeur existe mais
+  échoue sans pont natif, `supported` restait figé à `true` — un faux
+  positif affiché au joueur (ReadyScreen), pire qu'une absence honnête.
+  Pire : `sys.voice.start(stream)` est appelé sans `await`/`.catch()`
+  depuis ArenaScreen.tsx, donc l'exception synchrone du constructeur (dans
+  une méthode async) devenait une promesse rejetée non gérée, invisible.
+  Confirmé réel avant fix : `git stash` du fichier source, le test échoue
+  bien AVANT le correctif, pas vacueusement vert. Fix : constructeur dans
+  son propre try/catch, `supported = true` déplacé après. 2 tests,
+  engine.test.ts 159 → 161. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-17 (routine) : Suite de la passe résilience, un cran plus
   profond que l'Error Boundary : le motif `const hasStorage = typeof
   localStorage !== 'undefined'`, dupliqué dans 6 modules (cardForge,

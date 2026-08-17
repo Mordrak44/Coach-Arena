@@ -2236,3 +2236,43 @@ describe("Résilience : l'accès à `localStorage` LUI-MÊME bloqué (pas juste 
     })
   }
 })
+
+describe('VoiceCoach — le constructeur SpeechRecognition peut exister mais planter quand même', () => {
+  afterEach(() => {
+    delete (globalThis as any).window
+  })
+
+  it("bug d'audit : `supported` restait figé à `true` si le constructeur jetait (WebView sans pont natif)", async () => {
+    class ThrowingRecognition {
+      constructor() {
+        throw new Error('NotSupportedError: no native speech bridge')
+      }
+    }
+    ;(globalThis as any).window = { SpeechRecognition: ThrowingRecognition }
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    // start() est async ; sans le fix, l'exception synchrone du constructeur
+    // se traduisait par une promesse REJETÉE (jamais attendue côté
+    // ArenaScreen.tsx : `sys.voice.start(stream)` n'est ni awaited ni
+    // catché) — ici on vérifie surtout l'état, pas juste l'absence de rejet.
+    await expect(vc.start({} as any)).resolves.toBeUndefined()
+    expect(vc.state.supported).toBe(false)
+  })
+
+  it('un constructeur qui réussit passe bien `supported` à true', async () => {
+    class WorkingRecognition {
+      lang = ''
+      continuous = false
+      interimResults = false
+      onresult: unknown = null
+      onend: unknown = null
+      onerror: unknown = null
+      start() {}
+    }
+    ;(globalThis as any).window = { SpeechRecognition: WorkingRecognition }
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    expect(vc.state.supported).toBe(true)
+  })
+})

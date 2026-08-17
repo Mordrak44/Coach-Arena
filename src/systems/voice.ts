@@ -118,8 +118,19 @@ export class VoiceCoach {
       this.state.supported = false
       return
     }
+    let rec: any
+    try {
+      rec = new Ctor()
+    } catch {
+      // Le constructeur existe (Ctor truthy) mais échoue quand même — vu
+      // sur certains WebView/navigateurs verrouillés sans pont natif de
+      // reco vocale disponible. Sans ce catch, `supported` restait figé à
+      // `true` (posé juste avant, plus bas) alors que la reco n'a jamais
+      // démarré : un faux positif pire qu'une absence honnête.
+      this.state.supported = false
+      return
+    }
     this.state.supported = true
-    const rec = new Ctor()
     this.recognition = rec
     rec.lang = 'fr-FR'
     rec.continuous = true
