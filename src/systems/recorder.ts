@@ -173,21 +173,29 @@ export class HighlightRecorder {
 
   private rotate() {
     const rec = this.current
-    if (!rec || rec.state === 'inactive') return
-    const chunks = this.currentChunks
-    rec.onstop = () => {
-      this.prevBlob = chunks.length ? new Blob(chunks, { type: rec.mimeType || 'video/webm' }) : null
+    // Le garde-fou (recorder actif) ne protège QUE l'arrêt du segment en
+    // cours — il ne doit pas empêcher la TENTATIVE de démarrer le
+    // suivant. Avant ce fix, si `startSegment()` avait déjà échoué à une
+    // rotation précédente, `this.current` restait inactif pour de bon :
+    // ce garde-fou renvoyait tout de suite à CHAQUE rotation suivante,
+    // sans jamais retenter — un vrai bug d'auto-guérison qui ne guérissait
+    // rien (trouvé en vérifiant le commentaire du fix précédent, qui
+    // affirmait le contraire sans que ce soit vrai).
+    if (rec && rec.state !== 'inactive') {
+      const chunks = this.currentChunks
+      rec.onstop = () => {
+        this.prevBlob = chunks.length ? new Blob(chunks, { type: rec.mimeType || 'video/webm' }) : null
+      }
+      rec.stop()
     }
-    rec.stop()
     try {
       this.startSegment()
     } catch {
-      // Contrairement à start() (protégé par son propre try/catch), cet
-      // appel tournait NU dans le callback du setInterval — une panne
-      // transitoire du prochain MediaRecorder (rare mais réelle) plantait
-      // silencieusement hors de toute pile surveillée. Sans dégâts pour
-      // autant : le prochain rotate() (14 s plus tard) retentera, et
-      // stop() retombe déjà sur prevBlob si `current` reste invalide.
+      // Panne transitoire du prochain MediaRecorder (rare, mais réelle) —
+      // cet appel tourne nu dans le callback du setInterval, sans filet
+      // par défaut. Sans dégâts : la prochaine rotation (14 s plus tard)
+      // retente réellement maintenant, et stop() retombe sur prevBlob si
+      // `current` reste invalide entre-temps.
     }
   }
 

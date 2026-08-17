@@ -2316,6 +2316,41 @@ describe("HighlightRecorder — une panne transitoire du MediaRecorder à la rot
     expect(() => (hr as any).rotate()).not.toThrow() // le 2e (dans rotate) échoue, ne doit pas remonter
     await expect(hr.stop()).resolves.not.toBeUndefined() // pas de throw non plus au stop()
   })
+
+  it("bug d'audit : après une rotation ratée, la SUIVANTE devait réellement retenter (le commentaire du 1er fix affirmait ça sans que ce soit vrai)", async () => {
+    let constructCount = 0
+    class FlakyRecorder {
+      static isTypeSupported(): boolean {
+        return false
+      }
+      state = 'recording'
+      mimeType = 'video/webm'
+      ondataavailable: ((e: { data: { size: number } }) => void) | null = null
+      onstop: (() => void) | null = null
+      constructor() {
+        constructCount++
+        if (constructCount === 2) throw new Error('panne transitoire, une seule fois')
+      }
+      start() {}
+      stop() {
+        this.state = 'inactive'
+        this.onstop?.()
+      }
+    }
+    ;(globalThis as any).MediaRecorder = FlakyRecorder
+    ;(globalThis as any).window = { setInterval: () => 0, clearInterval: () => {} }
+    const { HighlightRecorder } = await import('../systems/recorder')
+    const hr = new HighlightRecorder()
+    const fakeCanvas = {
+      captureStream: () => ({ getTracks: () => [], getAudioTracks: () => [], addTrack: () => {} }),
+    } as unknown as HTMLCanvasElement
+    hr.start(fakeCanvas, null) // 1er MediaRecorder (construction #1)
+    ;(hr as any).rotate() // construction #2 échoue, `current` reste sur le 1er (inactif)
+    expect((hr as any).current.state).toBe('inactive')
+    ;(hr as any).rotate() // DOIT retenter malgré `current` inactif — construction #3
+    expect(constructCount).toBe(3) // la 3e construction a bien été tentée
+    expect((hr as any).current.state).toBe('recording') // et a réussi : un vrai segment tourne à nouveau
+  })
 })
 
 describe('matchCommand (voice.ts) — reconnaissance des consignes parlées, jamais testée jusqu\'ici', () => {

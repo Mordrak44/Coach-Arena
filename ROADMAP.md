@@ -719,6 +719,30 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       tests (un par classe, avec un faux flux/piste micro qui trace
       précisément quelles pistes sont arrêtées). engine.test.ts 202 → 204.
       `tsc --noEmit` + `npm run build` verts.
+- [x] Second bug RÉEL, trouvé en vérifiant mon PROPRE commentaire du fix
+      précédent : `HighlightRecorder.rotate()` affirmait (dans le
+      commentaire ajouté avec le fix « fuite de flux » d'il y a deux
+      itérations) que « le prochain rotate() (14 s plus tard) retentera »
+      après une panne transitoire du MediaRecorder — vérifié avec un
+      script `tsx` autonome AVANT de faire confiance à ma propre
+      affirmation, et c'était FAUX. Le garde-fou en tête de `rotate()`
+      (`if (!rec || rec.state === 'inactive') return`) protégeait
+      légitimement l'appel `.stop()` sur un recorder déjà mort, mais son
+      `return` précoce empêchait AUSSI toute tentative de
+      `startSegment()` — donc une fois `this.current` coincé sur un
+      recorder inactif après un échec, TOUTES les rotations suivantes du
+      reste du match devenaient des no-op silencieux, sans jamais
+      retenter. Pas catastrophique (`stop()` retombe sur `prevBlob`, le
+      dernier segment complet), mais une vraie régression de l'auto-
+      guérison promise. Fix : séparé la garde qui protège `.stop()` de la
+      tentative de `startSegment()`, qui s'exécute maintenant
+      INCONDITIONNELLEMENT à chaque rotation. Confirmé réel avant fix
+      (script `tsx`, puis `git stash` du fichier source — le nouveau test
+      échoue bien sans le correctif, `constructCount` bloqué à 2 au lieu
+      de 3). 1 nouveau test simulant 2 rotations consécutives (échec puis
+      succès), vérifiant que la 3e construction est bien tentée ET
+      réussit. engine.test.ts 204 → 205. `tsc --noEmit` + `npm run build`
+      verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1639,6 +1663,19 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Second bug réel, trouvé en vérifiant mon PROPRE
+  commentaire du fix précédent avant de lui faire confiance : j'avais
+  écrit que « le prochain rotate() (14 s plus tard) retentera » après une
+  panne transitoire — un script `tsx` autonome a montré que c'était faux.
+  Le garde-fou en tête de `rotate()` protégeait légitimement l'appel
+  `.stop()`, mais son `return` précoce empêchait AUSSI toute tentative de
+  redémarrer un segment — une fois coincé sur un recorder inactif, TOUTES
+  les rotations suivantes du reste du match devenaient des no-op
+  silencieux. Fix : séparé la garde de `.stop()` de la tentative de
+  `startSegment()`, qui s'exécute maintenant inconditionnellement à
+  chaque rotation. Confirmé avant et après fix (`git stash`). 1 test
+  simulant échec puis succès sur 2 rotations. engine.test.ts 204 → 205.
+  `tsc --noEmit` + `npm run build` verts.
 - 2026-08-17 (routine) : BUG RÉEL trouvé en creusant `MatchRecorder`/
   `HighlightRecorder` juste après les avoir couverts. `start()` construit
   le flux composite (canvas + piste micro clonée) AVANT le
