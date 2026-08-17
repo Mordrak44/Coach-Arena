@@ -2869,3 +2869,87 @@ describe('SoundSystem (systems/sound.ts) — bande-son synthétisée, jamais tes
     }).not.toThrow()
   })
 })
+
+describe('recorder.ts — chemins de succès de stop(), jamais exercés (seuls les chemins d\'échec l\'étaient)', () => {
+  afterEach(() => {
+    delete (globalThis as any).MediaRecorder
+    delete (globalThis as any).window
+  })
+
+  class WorkingRecorder {
+    static isTypeSupported() {
+      return true
+    }
+    state = 'recording'
+    mimeType = 'video/webm'
+    ondataavailable: ((e: { data: { size: number } }) => void) | null = null
+    onstop: (() => void) | null = null
+    start() {}
+    stop() {
+      // Comme un vrai MediaRecorder : un dernier chunk arrive juste avant onstop.
+      this.ondataavailable?.({ data: { size: 42 } })
+      this.state = 'inactive'
+      this.onstop?.()
+    }
+  }
+
+  function fakeCanvasAndMic() {
+    const tracks: unknown[] = []
+    const fakeStream = {
+      addTrack: (t: unknown) => tracks.push(t),
+      getTracks: () => tracks,
+      getAudioTracks: () => [],
+    }
+    const fakeCanvas = { captureStream: () => fakeStream } as unknown as HTMLCanvasElement
+    return { fakeCanvas }
+  }
+
+  it('MatchRecorder.stop() résout avec un Blob contenant les chunks accumulés, et relâche les pistes', async () => {
+    ;(globalThis as any).MediaRecorder = WorkingRecorder
+    const { fakeCanvas } = fakeCanvasAndMic()
+    const mr = new MatchRecorder()
+    expect(mr.start(fakeCanvas, null)).toBe(true)
+    const rec = (mr as any).recorder
+    rec.ondataavailable({ data: { size: 100 } }) // un chunk arrive en cours d'enregistrement
+    const blob = await mr.stop()
+    expect(blob).not.toBeNull()
+    expect(blob!.type).toBe('video/webm')
+    expect(mr.recording).toBe(false)
+    expect((mr as any).mixStream).toBeNull() // pistes relâchées
+  })
+
+  it("MatchRecorder.stop() résout avec null si aucun recorder actif (jamais démarré, ou déjà arrêté)", async () => {
+    const mr = new MatchRecorder()
+    await expect(mr.stop()).resolves.toBeNull()
+  })
+
+  it('HighlightRecorder.stop() résout avec le segment courant quand il est assez long', async () => {
+    ;(globalThis as any).MediaRecorder = WorkingRecorder
+    ;(globalThis as any).window = { setInterval: () => 0, clearInterval: () => {} }
+    const { HighlightRecorder } = await import('../systems/recorder')
+    const hr = new HighlightRecorder()
+    const { fakeCanvas } = fakeCanvasAndMic()
+    expect(hr.start(fakeCanvas, null)).toBe(true)
+    // Segment démarré il y a « longtemps » (> 6 s, le seuil de bascule vers prevBlob) :
+    // simulé en reculant artificiellement currentStartedAt plutôt qu'en attendant pour de vrai.
+    ;(hr as any).currentStartedAt = performance.now() - 7000
+    const current = (hr as any).current
+    current.ondataavailable({ data: { size: 100 } })
+    const blob = await hr.stop()
+    expect(blob).not.toBeNull()
+    expect(blob!.type).toBe('video/webm')
+  })
+
+  it('HighlightRecorder.stop() : un segment courant TROP COURT (< 6 s) retombe sur le segment précédent complet', async () => {
+    ;(globalThis as any).MediaRecorder = WorkingRecorder
+    ;(globalThis as any).window = { setInterval: () => 0, clearInterval: () => {} }
+    const { HighlightRecorder } = await import('../systems/recorder')
+    const hr = new HighlightRecorder()
+    const { fakeCanvas } = fakeCanvasAndMic()
+    expect(hr.start(fakeCanvas, null)).toBe(true)
+    ;(hr as any).prevBlob = new Blob(['segment précédent complet'], { type: 'video/webm' })
+    // currentStartedAt reste « maintenant » : le segment en cours vient tout juste de commencer (< 6 s).
+    const blob = await hr.stop()
+    expect(blob).toBe((hr as any).prevBlob) // le précédent l'emporte, pas le segment trop court en cours
+  })
+})

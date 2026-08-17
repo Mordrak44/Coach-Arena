@@ -812,6 +812,22 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       engine.test.ts 214 → 217. Couverture `sound.ts` 0 % → 94,5 %.
       Couverture globale de `systems/` 0 % il y a quelques itérations →
       84,8 % maintenant. `tsc --noEmit` + `npm run build` verts.
+- [x] Dernier trou de `recorder.ts` fermé : le chemin de SUCCÈS de
+      `stop()` (résoudre avec un vrai `Blob`, pas juste échouer proprement)
+      n'avait jamais été exercé pour NI `MatchRecorder` ni
+      `HighlightRecorder` — tous les tests précédents sur ce fichier
+      couvraient les chemins d'échec (le vrai gisement de bugs trouvés
+      cette session), jamais le chemin heureux. 4 nouveaux tests : le Blob
+      résolu contient bien le bon type MIME et les pistes sont relâchées ;
+      `stop()` sans recorder actif résout `null` proprement ; et surtout
+      la décision de `HighlightRecorder.stop()` entre segment courant et
+      `prevBlob` — un segment en cours trop jeune (< 6 s, simulé en
+      reculant `currentStartedAt` plutôt qu'en attendant pour de vrai)
+      doit céder la place au dernier segment COMPLET, pas être renvoyé
+      tel quel juste parce qu'il existe. Aucun bug trouvé. `recorder.ts`
+      atteint 100 % de couverture de lignes. engine.test.ts 217 → 221.
+      Couverture `recorder.ts` 74,8 % → 97,2 % (stmts). `tsc --noEmit` +
+      `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1732,6 +1748,16 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Dernier trou de `recorder.ts` fermé : le chemin
+  de SUCCÈS de `stop()` (résoudre avec un vrai `Blob`) n'avait jamais été
+  exercé, ni pour `MatchRecorder` ni `HighlightRecorder` — tout ce qui a
+  été testé cette session dessus couvrait les chemins d'échec (là où les
+  vrais bugs étaient). 4 tests, dont la décision entre segment courant et
+  `prevBlob` dans `HighlightRecorder.stop()` : un segment trop jeune
+  (< 6 s, simulé en reculant `currentStartedAt`) doit céder au dernier
+  segment complet. Aucun bug trouvé. `recorder.ts` atteint 100 % de
+  couverture de lignes. engine.test.ts 217 → 221. Couverture recorder.ts
+  74,8 % → 97,2 %. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-17 (routine) : Reconsidéré `systems/sound.ts` (WebAudio,
   laissé de côté à l'itération précédente comme « effort de mock élevé »)
   — en fait bon marché : toutes ses méthodes sont déjà gardées par
