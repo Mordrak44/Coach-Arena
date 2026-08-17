@@ -606,6 +606,30 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       2e `MediaRecorder` qui jette à la rotation, confirme `rotate()` et
       `stop()` ne plantent plus). engine.test.ts 161 → 162. `tsc --noEmit`
       + `npm run build` verts.
+- [x] BUG RÉEL trouvé, pas juste un trou de couverture : `matchCommand`
+      (`systems/voice.ts`), la fonction qui traduit le texte reconnu par
+      la voix en commande de jeu, n'avait jamais eu un seul test — alors
+      que c'est littéralement le cœur du pitch « coacher à la voix ».
+      `COMMAND_PATTERNS` teste ses regex DANS L'ORDRE et retourne au
+      premier match ; le pattern `attack` (`attaqu|fonce|...`) était
+      testé AVANT `counter` (`contre|contr[- ]?attaque|punis`). Or
+      « contre-attaque » contient le substring « attaqu » — donc `attack`
+      gagnait TOUJOURS en premier, rendant le `contr[- ]?attaque` explicite
+      du pattern `counter` inatteignable en pratique : une preuve dans le
+      code même que cette phrase était censée être gérée, mais qui ne
+      l'était jamais. « Contre-attaque ! » est une consigne de boxe on ne
+      peut plus naturelle et fréquente — un coach qui la crie au moment
+      précis où il veut punir une ouverture se voyait répondre par une
+      attaque à l'aveugle au lieu d'un contre, l'exact opposé de son
+      intention, potentiellement décisif sur l'issue d'un round. Confirmé
+      réel avant fix (`git stash`, le test échoue bien avant le correctif).
+      Fix : réordonné `COMMAND_PATTERNS` pour tester `counter` AVANT
+      `attack` (vérifié qu'aucune autre phrase de `attack` ne chevauche
+      `counter`, donc aucune régression introduite). 4 nouveaux tests : la
+      régression « contre-attaque », la non-régression de « attaque »
+      seule, un balayage d'une phrase par commande (7 commandes), et
+      l'absence de faux positif sur du bruit ambiant. engine.test.ts
+      162 → 166. `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1524,6 +1548,22 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : BUG RÉEL trouvé en donnant enfin un premier test
+  à `matchCommand` (systems/voice.ts), le cœur du pitch « coacher à la
+  voix », jamais testé jusqu'ici. `COMMAND_PATTERNS` retourne au premier
+  match, et le pattern `attack` (`attaqu|fonce|...`) était testé AVANT
+  `counter` (`contre|contr[- ]?attaque|...`). Comme « contre-attaque »
+  contient le substring « attaqu », `attack` gagnait toujours en premier —
+  le `contr[- ]?attaque` explicite de `counter` était du code mort en
+  pratique. « Contre-attaque ! » est une consigne de boxe naturelle et
+  fréquente : un coach qui la crie pour punir une ouverture précise se
+  voyait répondre par une attaque à l'aveugle, l'exact opposé de son
+  intention. Confirmé réel avant fix (`git stash`, échec confirmé sans le
+  correctif). Fix : `counter` réordonné avant `attack` dans la table
+  (vérifié qu'aucune régression n'est introduite sur les autres
+  commandes). 4 tests (régression + non-régression + balayage des 7
+  commandes + bruit ambiant). engine.test.ts 162 → 166. `tsc --noEmit` +
+  `npm run build` verts.
 - 2026-08-17 (routine) : Retour bref à la résilience, un dernier maillon
   trouvé en relisant `systems/recorder.ts` : `HighlightRecorder.rotate()`
   (appelé toutes les 14 s par un `setInterval` pour faire tourner les

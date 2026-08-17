@@ -29,6 +29,7 @@ import { parseConsigne } from './speechTactics'
 import { buildScenePlans, colorWord } from './sceneDirector'
 import { ROSTER, createFromPrompt } from './characters'
 import { ArenaRenderer } from '../render/arenaRenderer'
+import { matchCommand } from '../systems/voice'
 import type { CardId, CoachInput, MatchState } from './types'
 
 const quiet: CoachInput = { command: null, voiceEnergy: 0, faceEnergy: 0 }
@@ -2313,5 +2314,42 @@ describe("HighlightRecorder — une panne transitoire du MediaRecorder à la rot
     expect(hr.start(fakeCanvas, null)).toBe(true) // 1er MediaRecorder construit sans souci
     expect(() => (hr as any).rotate()).not.toThrow() // le 2e (dans rotate) échoue, ne doit pas remonter
     await expect(hr.stop()).resolves.not.toBeUndefined() // pas de throw non plus au stop()
+  })
+})
+
+describe('matchCommand (voice.ts) — reconnaissance des consignes parlées, jamais testée jusqu\'ici', () => {
+  it("bug d'audit : « contre-attaque ! » était classé 'attack' au lieu de 'counter'", () => {
+    // Le pattern 'counter' contient explicitement `contr[- ]?attaque` —
+    // preuve que cette phrase est une consigne INTENTIONNELLEMENT gérée —
+    // mais comme 'attack' était testé AVANT dans la table et que
+    // « contre-attaque » contient le substring « attaqu », 'attack'
+    // gagnait toujours en premier : le sous-pattern de 'counter' était
+    // du code mort en pratique. Une vraie consigne de boxe, mal comprise.
+    expect(matchCommand('contre-attaque !')).toBe('counter')
+    expect(matchCommand('contre attaque')).toBe('counter')
+    expect(matchCommand('contre-attaque, vas-y')).toBe('counter')
+  })
+
+  it("« attaque ! » toute seule reste bien classée 'attack' (pas de régression de la réorganisation)", () => {
+    expect(matchCommand('attaque !')).toBe('attack')
+    expect(matchCommand('vas-y, fonce')).toBe('attack')
+  })
+
+  it('une phrase par commande, pour balayer toute la table sans en oublier une', () => {
+    const cases: Array<[string, ReturnType<typeof matchCommand>]> = [
+      ['contre, punis-le', 'counter'],
+      ['fonce, cogne fort', 'attack'],
+      ['défends-toi, garde haute', 'defend'],
+      ['esquive, bouge !', 'dodge'],
+      ['ultime, achève-le', 'ulti'],
+      ['spécial, maintenant !', 'special'],
+      ['allez, bravo champion', 'cheer'],
+    ]
+    for (const [phrase, expected] of cases) expect(matchCommand(phrase)).toBe(expected)
+  })
+
+  it('ignore le bruit ambiant sans faux positif', () => {
+    expect(matchCommand('il fait beau ce soir non ?')).toBeNull()
+    expect(matchCommand('')).toBeNull()
   })
 })

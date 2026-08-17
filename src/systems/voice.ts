@@ -22,11 +22,17 @@ export interface VoiceState {
   listening: boolean
 }
 
+// ORDRE DÉLIBÉRÉ : 'counter' AVANT 'attack'. « Contre-attaque ! » contient
+// le substring « attaqu » (celui du pattern 'attack'), donc si 'attack'
+// était testé en premier il gagnerait TOUJOURS sur « contre-attaque » —
+// rendant le `contr[- ]?attaque` de 'counter' inatteignable en pratique,
+// alors que c'est une consigne naturelle et fréquente en combat (bug
+// d'audit, 2026-08-17 : confirmé jusque-là mal classé en 'attack').
 const COMMAND_PATTERNS: Array<[RegExp, CoachCommand]> = [
+  [/contre|contr[- ]?attaque|punis/i, 'counter'],
   [/attaqu|fonce|frappe|défonce|cogne|vas[- ]?y|charge/i, 'attack'],
   [/défend|garde|protège|recule|bloque/i, 'defend'],
   [/esquive|bouge|évite|danse/i, 'dodge'],
-  [/contre|contr[- ]?attaque|punis/i, 'counter'],
   [/ultime|ulti|ach[èe]ve[- ]?le|termine[- ]?le/i, 'ulti'],
   [/spécial|special|maintenant|finis[- ]?le/i, 'special'],
   [/allez|allé|bravo|meilleur|champion|t'es le|tu peux|courage|plus fort|ouais|oui !/i, 'cheer'],
