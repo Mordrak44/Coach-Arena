@@ -8,16 +8,13 @@ s'affronte seul dans l'arène — et toi tu le coaches **à la voix** et **à la
 facecam**, comme un vrai coach au bord du ring. L'IA analyse tes cris et ton
 énergie : ton perso les ressent.
 
-## Jouer
+## 🕹️ Jouer en ligne
 
-```bash
-npm install
-npm run dev
-```
-
-Ouvre l'URL affichée (Chrome recommandé pour la reconnaissance vocale).
-Autorise le micro et la caméra — c'est toi le coach à l'écran. Sans micro,
-des boutons et le clavier (A/D/E/C/S, espace) prennent le relais.
+**[mordrak44.github.io/Coach-Arena](https://mordrak44.github.io/Coach-Arena/)**
+— rien à installer, ouvre le lien et coache (Chrome recommandé pour la
+reconnaissance vocale). Autorise le micro et la caméra — c'est toi le coach à
+l'écran. Sans micro, des boutons et le clavier (A/D/E/C/S, espace) prennent le
+relais. 100 % client, aucune donnée ne quitte ton appareil.
 
 ## Comment coacher
 
@@ -55,7 +52,8 @@ des boutons et le clavier (A/D/E/C/S, espace) prennent le relais.
 ## Dev
 
 ```bash
-npm run dev        # serveur de développement
+npm install
+npm run dev        # serveur de développement local (mêmes contrôles que la version en ligne)
 npm test           # tests unitaires du moteur (vitest)
 npx tsx scripts/sim.ts    # simulation d'équilibrage (winrates, durées)
 npm run build && node scripts/shot.mjs   # captures du funnel complet

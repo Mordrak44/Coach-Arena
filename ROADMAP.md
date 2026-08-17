@@ -849,6 +849,24 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       d'itérations. 3 nouveaux tests. engine.test.ts 221 → 224. Couverture
       `voice.ts` 74,7 % → 93,4 % (stmts). `tsc --noEmit` + `npm run build`
       verts.
+- [x] README.md mis à jour — pivot depuis les tests/résilience (le seam
+      de couverture est maintenant très mûr : `combat.ts` ~85 %,
+      `systems/` 95,5 %) vers un vrai trou de FINITION jamais remarqué :
+      le jeu est en ligne depuis plusieurs heures maintenant
+      (`https://mordrak44.github.io/Coach-Arena/`), mais le README ne le
+      mentionnait NULLE PART — la seule section « Jouer » disait
+      `npm install && npm run dev`, comme si le jeu n'existait qu'en
+      local. Pour un dépôt dont le README est souvent le tout premier
+      contact (collaborateurs, curieux), c'est un vrai manque de
+      finition maintenant que l'hébergement est réellement fonctionnel.
+      Ajouté une section « 🕹️ Jouer en ligne » en tête, avec le lien
+      direct, juste après le pitch — avant même la section Dev. Fusionné
+      l'ancienne section « Jouer » (install + `npm run dev`) dans la
+      section « Dev » existante plus bas, pour éviter la redondance de
+      deux blocs `npm install && npm run dev` séparés. Rien à tester
+      (changement de documentation pur) — `npm test` + `npm run build`
+      relancés quand même pour confirmer qu'aucun fichier source n'a été
+      touché par erreur.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1769,6 +1787,17 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Pivot depuis les tests (le seam de couverture
+  est maintenant mûr : combat.ts ~85 %, systems/ 95,5 %) vers un trou de
+  finition : le jeu est en ligne depuis plusieurs heures
+  (mordrak44.github.io/Coach-Arena/), mais le README n'en parlait nulle
+  part — la section « Jouer » disait juste `npm install && npm run dev`,
+  comme si le jeu n'existait qu'en local. Ajouté « 🕹️ Jouer en ligne » en
+  tête avec le lien direct, juste après le pitch. Fusionné l'ancienne
+  section « Jouer » dans la section « Dev » existante pour éviter deux
+  blocs `npm run dev` redondants. Documentation pure, rien à tester —
+  `npm test`/`npm run build` relancés quand même pour confirmer qu'aucun
+  fichier source n'a bougé.
 - 2026-08-17 (routine) : Dernier trou de `systems/voice.ts` fermé : la
   boucle de volume/pitch de `startVolumeMeter` — le signal réel qui
   alimente le gain de Hype et la prosodie côté joueur — n'avait jamais
