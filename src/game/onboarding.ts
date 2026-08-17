@@ -5,7 +5,17 @@
 // immédiatement, elles ne reviennent plus jamais après.
 
 const KEY = 'coach-arena-onboarding-v1'
-const hasStorage = typeof localStorage !== 'undefined'
+// try/catch, pas juste typeof : certains modes de confidentialité stricts
+// font planter la LECTURE de la propriété localStorage elle-même (pas
+// seulement ses méthodes) avec une SecurityError, et typeof ne protège pas
+// contre un getter qui jette.
+const hasStorage = (() => {
+  try {
+    return typeof localStorage !== 'undefined'
+  } catch {
+    return false
+  }
+})()
 
 interface Seen {
   combat?: boolean

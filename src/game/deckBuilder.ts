@@ -14,7 +14,17 @@ export const DECK_MAX = 60
 export type DeckTemplate = Partial<Record<CardId, number>>
 
 const KEY = 'coach-arena-deck-v1'
-const hasStorage = typeof localStorage !== 'undefined'
+// try/catch, pas juste typeof : certains modes de confidentialité stricts
+// font planter la LECTURE de la propriété localStorage elle-même (pas
+// seulement ses méthodes) avec une SecurityError, et typeof ne protège pas
+// contre un getter qui jette.
+const hasStorage = (() => {
+  try {
+    return typeof localStorage !== 'undefined'
+  } catch {
+    return false
+  }
+})()
 
 /** Modèle par défaut : DECK_COPIES copies de chaque carte de base. */
 export function defaultTemplate(): DeckTemplate {

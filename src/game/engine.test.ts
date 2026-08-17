@@ -2203,3 +2203,36 @@ describe('ArenaRenderer — prefers-reduced-motion (WCAG 2.3.3, audit accessibil
     expect((new ArenaRenderer() as any).reducedMotion).toBe(false)
   })
 })
+
+describe("Résilience : l'accès à `localStorage` LUI-MÊME bloqué (pas juste ses méthodes)", () => {
+  // Certains modes de confidentialité stricts (anciens Safari, extensions
+  // qui bloquent tout stockage) font planter la LECTURE de la propriété
+  // `window.localStorage` elle-même avec une SecurityError — pas
+  // seulement `.getItem`/`.setItem` (déjà couvert ailleurs dans ce
+  // fichier). `typeof localStorage` ne protège PAS contre ça, contre
+  // l'intuition : `typeof` doit quand même évaluer la propriété pour
+  // connaître son type, et un getter qui jette jette aussi à travers
+  // `typeof`. Un crash ici arrive AU CHARGEMENT DU MODULE, avant même que
+  // React ne monte — même l'ErrorBoundary ne peut rien y faire.
+  const MODULES = ['./cardForge', './deckBuilder', './onboarding', './progression', './stable', './story']
+
+  beforeEach(() => {
+    vi.resetModules() // sinon un import déjà mis en cache plus haut dans ce fichier ne se ré-évaluerait pas
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new Error('SecurityError: localStorage access is blocked')
+      },
+    })
+  })
+
+  afterEach(() => {
+    delete (globalThis as any).localStorage
+  })
+
+  for (const path of MODULES) {
+    it(`${path} : le chargement du module ne plante pas même si l'accès à localStorage jette`, async () => {
+      await expect(import(/* @vite-ignore */ path)).resolves.toBeDefined()
+    })
+  }
+})

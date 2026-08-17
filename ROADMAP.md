@@ -519,6 +519,33 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       partout ailleurs de vérifier le comportement UI via Chromium réel
       plutôt que d'ajouter cette dépendance). `tsc --noEmit` + `npm run
       build` verts.
+- [x] Suite de la passe résilience : un trou PLUS grave que ce que
+      l'Error Boundary peut couvrir, trouvé en creusant le motif
+      `hasStorage` réutilisé dans 6 modules (cardForge, deckBuilder,
+      onboarding, progression, stable, story). `const hasStorage = typeof
+      localStorage !== 'undefined'` protège contre `localStorage`
+      ABSENT — mais PAS contre `localStorage` PRÉSENT mais dont la seule
+      LECTURE de la propriété jette une SecurityError (certains modes de
+      confidentialité stricts, vieux Safari, extensions qui bloquent tout
+      stockage) : `typeof` doit quand même évaluer la propriété pour en
+      connaître le type, donc un getter qui jette jette aussi À TRAVERS
+      `typeof` — piège JS contre-intuitif, bien connu des mainteneurs de
+      libs de stockage mais jamais vérifié dans ce dépôt. Un crash ici
+      arrive AU CHARGEMENT DU MODULE, avant même que React ne monte : même
+      l'Error Boundary de l'itération précédente ne peut RIEN y faire.
+      Confirmé RÉEL avant tout correctif (discipline habituelle de cette
+      session) : un test avec `Object.defineProperty(globalThis,
+      'localStorage', { get() { throw … } })` + `vi.resetModules()` (pour
+      forcer une VRAIE ré-évaluation, pas un module déjà mis en cache par
+      un test précédent) a fait planter les 6 imports avant correctif.
+      Fix identique dans les 6 fichiers : la ligne `const hasStorage =
+      typeof localStorage !== 'undefined'` passe dans un `try { … } catch
+      { return false }` — dupliqué à l'identique dans chaque fichier
+      plutôt que centralisé dans un utilitaire partagé, cohérent avec le
+      choix déjà fait par ce dépôt de garder ce motif en ligne (le grep
+      montrait déjà 6 copies quasi identiques avant ce fix). 6 nouveaux
+      tests (un par module touché), engine.test.ts 153 → 159. `tsc
+      --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1437,6 +1464,21 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Suite de la passe résilience, un cran plus
+  profond que l'Error Boundary : le motif `const hasStorage = typeof
+  localStorage !== 'undefined'`, dupliqué dans 6 modules (cardForge,
+  deckBuilder, onboarding, progression, stable, story), protège contre
+  `localStorage` ABSENT mais pas contre `localStorage` PRÉSENT dont la
+  LECTURE seule jette une SecurityError (modes de confidentialité stricts,
+  vieux Safari) — `typeof` doit évaluer la propriété pour connaître son
+  type, donc un getter qui jette jette aussi à travers `typeof`. Un crash
+  ici arrive AU CHARGEMENT DU MODULE, avant React : l'Error Boundary
+  d'hier ne peut rien y faire. Confirmé réel avant correctif (un test avec
+  `Object.defineProperty` + un getter qui jette + `vi.resetModules()` a
+  fait planter les 6 imports avant fix). Fix identique × 6 : `try { … }
+  catch { return false }` autour de la ligne, dupliqué plutôt que
+  centralisé (cohérent avec le motif déjà dupliqué 6× dans ce dépôt). 6
+  tests, engine.test.ts 153 → 159. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-17 (routine) : Après 3 passes de coverage sur `combat.ts`
   (rendements décroissants), pivot vers un vrai trou de résilience jamais
   adressé : aucun Error Boundary React n'existait nulle part (`grep`

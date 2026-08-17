@@ -211,7 +211,17 @@ export function forgeCard(prompt: string): ForgeResult | null {
 
 const FORGE_KEY = 'coach-arena-forged-cards-v1'
 const MAX_FORGED = 8
-const hasStorage = typeof localStorage !== 'undefined'
+// try/catch, pas juste typeof : certains modes de confidentialité stricts
+// font planter la LECTURE de la propriété localStorage elle-même (pas
+// seulement ses méthodes) avec une SecurityError, et typeof ne protège pas
+// contre un getter qui jette.
+const hasStorage = (() => {
+  try {
+    return typeof localStorage !== 'undefined'
+  } catch {
+    return false
+  }
+})()
 
 export function saveForgedCard(card: CoachCard): void {
   registerCustomCard(card)

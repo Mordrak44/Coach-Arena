@@ -23,7 +23,17 @@ export interface CharProgress {
 
 type ProgressMap = Record<string, CharProgress>
 
-const hasStorage = typeof localStorage !== 'undefined'
+// try/catch, pas juste typeof : certains modes de confidentialité stricts
+// font planter la LECTURE de la propriété localStorage elle-même (pas
+// seulement ses méthodes) avec une SecurityError, et typeof ne protège pas
+// contre un getter qui jette.
+const hasStorage = (() => {
+  try {
+    return typeof localStorage !== 'undefined'
+  } catch {
+    return false
+  }
+})()
 
 function readJson<T>(key: string, fallback: T): T {
   if (!hasStorage) return fallback
