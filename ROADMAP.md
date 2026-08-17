@@ -696,6 +696,29 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       téléchargement a bien eu lieu), pas juste l'absence de crash.
       engine.test.ts 196 → 202. Couverture `recorder.ts` 35,8 % → 50 %
       (stmts). `tsc --noEmit` + `npm run build` verts.
+- [x] BUG RÉEL trouvé en creusant `MatchRecorder`/`HighlightRecorder`
+      juste après les avoir couverts : `start()` construit le flux
+      composite (`canvas.captureStream(30)` + piste micro CLONÉE ajoutée
+      dessus) AVANT de construire le `MediaRecorder` — et si CETTE
+      construction échoue (mimeType non supporté, erreur transitoire),
+      le `catch` se contentait de `return false`, SANS jamais relâcher ce
+      flux déjà créé. Résultat : l'indicateur micro du navigateur pouvait
+      rester allumé indéfiniment, et le canvas continuait d'être sollicité
+      à 30 fps pour un flux sans aucun consommateur — exactement la fuite
+      déjà documentée et corrigée pour le chemin d'arrêt NORMAL
+      (`releaseTracks`, audit du 2026-08-16), mais jamais couverte sur le
+      chemin d'ÉCHEC du démarrage. Le même bug, dupliqué à l'identique,
+      existait dans LES DEUX classes (`MatchRecorder.start()` ET
+      `HighlightRecorder.start()`), qui partagent la même structure de
+      code copiée-collée. Confirmé réel avant fix (script `tsx` autonome
+      d'abord — un `MediaRecorder` qui jette à la construction laissait
+      `mixStream` non-null et 0 piste stoppée —, puis `git stash` du
+      fichier source pour confirmer que les 2 nouveaux tests échouent bien
+      sans le correctif). Fix identique × 2 : `this.releaseTracks()`
+      ajouté dans le `catch` de `start()` des deux classes. 2 nouveaux
+      tests (un par classe, avec un faux flux/piste micro qui trace
+      précisément quelles pistes sont arrêtées). engine.test.ts 202 → 204.
+      `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1616,6 +1639,19 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : BUG RÉEL trouvé en creusant `MatchRecorder`/
+  `HighlightRecorder` juste après les avoir couverts. `start()` construit
+  le flux composite (canvas + piste micro clonée) AVANT le
+  `MediaRecorder` — si CETTE construction échoue, le `catch` faisait
+  juste `return false` sans jamais relâcher le flux déjà créé : micro
+  potentiellement allumé indéfiniment, canvas sollicité à 30 fps sans
+  consommateur. Même fuite déjà corrigée sur le chemin d'arrêt normal
+  (`releaseTracks`, 2026-08-16) mais jamais couverte sur le chemin
+  d'échec du démarrage — et dupliquée à l'identique dans les DEUX classes
+  qui partagent la même structure copiée-collée. Confirmé réel avant fix
+  (script autonome, puis `git stash` du fichier source). Fix identique
+  × 2 : `this.releaseTracks()` dans le `catch`. 2 tests. engine.test.ts
+  202 → 204. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-17 (routine) : Coverage sur `systems/recorder.ts` (35,8 % stmts,
   laissé de côté même pendant toute la série résilience qui a pourtant
   corrigé un bug juste à côté, dans `HighlightRecorder.rotate()`).

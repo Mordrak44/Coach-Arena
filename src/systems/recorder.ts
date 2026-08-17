@@ -67,6 +67,15 @@ export class MatchRecorder {
       this.recording = true
       return true
     } catch {
+      // Le flux composite (piste micro CLONÉE + piste vidéo de
+      // captureStream()) peut avoir été créé avec succès AVANT que la
+      // construction du MediaRecorder échoue plus bas — sans ce nettoyage,
+      // l'indicateur micro du navigateur reste allumé et le canvas
+      // continue d'être sollicité à 30 fps pour un flux sans consommateur,
+      // exactement la fuite déjà documentée pour le chemin d'arrêt normal
+      // (releaseTracks), mais sur le chemin d'ÉCHEC du démarrage — jamais
+      // couvert jusqu'ici (trouvé en audit, 2026-08-17).
+      this.releaseTracks()
       return false
     }
   }
@@ -137,6 +146,11 @@ export class HighlightRecorder {
       this.rotateTimer = window.setInterval(() => this.rotate(), this.segmentMs)
       return true
     } catch {
+      // Même fuite que MatchRecorder.start() : this.stream (piste micro
+      // clonée + piste vidéo de captureStream()) peut exister même si
+      // startSegment() (qui construit le 1er MediaRecorder) échoue —
+      // trouvé en auditant le même motif ici après l'avoir trouvé là-bas.
+      this.releaseTracks()
       return false
     }
   }

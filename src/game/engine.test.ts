@@ -30,7 +30,7 @@ import { buildScenePlans, colorWord } from './sceneDirector'
 import { ROSTER, createFromPrompt } from './characters'
 import { ArenaRenderer } from '../render/arenaRenderer'
 import { matchCommand } from '../systems/voice'
-import { fileExt, pickMimeType, shareOrDownload } from '../systems/recorder'
+import { MatchRecorder, fileExt, pickMimeType, shareOrDownload } from '../systems/recorder'
 import type { CardId, CoachInput, MatchState } from './types'
 
 const quiet: CoachInput = { command: null, voiceEnergy: 0, faceEnergy: 0 }
@@ -2466,5 +2466,66 @@ describe('recorder.ts — fileExt/pickMimeType/shareOrDownload, jamais testés j
     const result = await shareOrDownload(new Blob(['x'], { type: 'video/webm' }), 'match', 'texte')
     expect(result).toBe('downloaded')
     expect(clicked).toContain('clicked')
+  })
+})
+
+describe("MatchRecorder/HighlightRecorder.start() : fuite de flux si le MediaRecorder échoue à se construire", () => {
+  afterEach(() => {
+    delete (globalThis as any).MediaRecorder
+    delete (globalThis as any).window
+  })
+
+  function fakeCanvasAndMic() {
+    const stopped: string[] = []
+    const fakeVideoTrack = { stop: () => stopped.push('video') }
+    const fakeMicTrackClone = { stop: () => stopped.push('mic-clone') }
+    const fakeMicTrack = { clone: () => fakeMicTrackClone }
+    const tracks = [fakeVideoTrack]
+    const fakeCanvasStream = {
+      addTrack: (t: unknown) => tracks.push(t as typeof fakeVideoTrack),
+      getTracks: () => tracks,
+      getAudioTracks: () => [],
+    }
+    const fakeCanvas = { captureStream: () => fakeCanvasStream } as unknown as HTMLCanvasElement
+    const fakeMicStream = { getAudioTracks: () => [fakeMicTrack] } as unknown as MediaStream
+    return { stopped, fakeCanvas, fakeMicStream }
+  }
+
+  it("bug d'audit : MatchRecorder.start() qui échoue laissait le flux composite (micro cloné + vidéo canvas) actif indéfiniment", () => {
+    class ThrowingRecorder {
+      static isTypeSupported() {
+        return false
+      }
+      constructor() {
+        throw new Error('construction du MediaRecorder échouée')
+      }
+    }
+    ;(globalThis as any).MediaRecorder = ThrowingRecorder
+    const { stopped, fakeCanvas, fakeMicStream } = fakeCanvasAndMic()
+    const mr = new MatchRecorder()
+    expect(mr.start(fakeCanvas, fakeMicStream)).toBe(false)
+    expect((mr as any).mixStream).toBeNull() // le flux composite ne doit plus traîner
+    expect(stopped.sort()).toEqual(['mic-clone', 'video']) // piste micro clonée ET piste vidéo relâchées
+  })
+
+  it("même bug, même correctif : HighlightRecorder.start() qui échoue relâche aussi son flux", () => {
+    class ThrowingRecorder {
+      static isTypeSupported() {
+        return false
+      }
+      constructor() {
+        throw new Error('construction du MediaRecorder échouée')
+      }
+    }
+    ;(globalThis as any).MediaRecorder = ThrowingRecorder
+    ;(globalThis as any).window = { setInterval: () => 0, clearInterval: () => {} }
+    const { stopped, fakeCanvas, fakeMicStream } = fakeCanvasAndMic()
+    // Import dynamique : cohérent avec l'usage existant de HighlightRecorder plus haut dans ce fichier.
+    return import('../systems/recorder').then(({ HighlightRecorder }) => {
+      const hr = new HighlightRecorder()
+      expect(hr.start(fakeCanvas, fakeMicStream)).toBe(false)
+      expect((hr as any).stream).toBeNull()
+      expect(stopped.sort()).toEqual(['mic-clone', 'video'])
+    })
   })
 })
