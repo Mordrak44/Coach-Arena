@@ -901,6 +901,25 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       `progression.ts` atteignent tous les trois 100 % de couverture de
       lignes. engine.test.ts 225 → 227. `tsc --noEmit` + `npm run build`
       verts.
+- [x] 4e passe de coverage-driven bug hunt sur `combat.ts` (83,3 %), même
+      motif gagnant que les 3 précédentes : `enemyCoachAI` — la logique de
+      posture du coin adverse (le vrai « niveau de difficulté » du jeu) —
+      n'avait JAMAIS tourné sous test, exactement comme `resolveAttack`
+      avant les 4 bugs trouvés là-bas. Relu attentivement toute la chaîne
+      de décision (verrouillage Provoqué → ulti/spécial probabilistes →
+      arbre de posture selon PV propres/PV du joueur/posture du joueur)
+      avant d'écrire quoi que ce soit, en cherchant un bug — rien trouvé
+      cette fois, la logique est déjà cohérente et se lit bien (survie si
+      bas, achève si l'adversaire est bas, contre-jeu contre l'agressivité,
+      pression contre la défense, mix aléatoire sinon), avec un
+      early-return propre empêchant tout déclenchement en double. 8
+      nouveaux tests via `vi.spyOn(Math.random)`, un par branche :
+      Provoqué verrouillé (sourd à sa propre IA) ; Ulti/Spécial adverses
+      qui se déclenchent seuls, probabilistes ; les 4 branches de l'arbre
+      de posture (PV bas propres, PV bas adverses, joueur agressif, joueur
+      défensif) ; et le cas par défaut (pioche dans les 5 postures).
+      engine.test.ts 227 → 235. Couverture `combat.ts` 83,3 % → 86,5 %
+      (stmts). `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1821,6 +1840,16 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : 4e passe de coverage-driven bug hunt sur
+  `combat.ts` : `enemyCoachAI`, la logique de posture du coin adverse (le
+  vrai « niveau de difficulté »), n'avait jamais tourné sous test — même
+  motif que `resolveAttack` avant les 4 bugs déjà trouvés là-bas. Relu
+  toute la chaîne de décision en cherchant un bug avant d'écrire quoi que
+  ce soit : rien trouvé cette fois, déjà cohérente (survie/achève/contre-
+  jeu/pression/mix aléatoire selon la situation), early-return propre. 8
+  tests via `vi.spyOn(Math.random)`, un par branche. engine.test.ts
+  227 → 235. Couverture combat.ts 83,3 % → 86,5 %. `tsc --noEmit` + `npm
+  run build` verts.
 - 2026-08-17 (routine) : Le même angle mort qu'`onboarding.ts` (l'itération
   précédente), systématiquement recherché dans les autres modules
   `readJson`-like qui partagent ce motif : `progression.ts`,

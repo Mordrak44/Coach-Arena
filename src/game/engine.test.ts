@@ -3078,3 +3078,102 @@ describe('VoiceCoach.startVolumeMeter — la boucle de volume/pitch, jamais exer
     expect(ctx.resumeCalls).toBe(callsAtStart + 1) // suspendu : débloqué
   })
 })
+
+describe("enemyCoachAI — la logique de posture du coin adverse, jamais exercée", () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // Gèle l'action des deux côtés : on ne veut mesurer QUE la décision de
+  // posture d'enemyCoachAI, pas un coup qui se résoudrait dans le même tick.
+  function freeze(m: MatchState): void {
+    m.player.nextActionAt = m.t + 1000
+    m.enemy.nextActionAt = m.t + 1000
+  }
+
+  it('Provoqué (carte du joueur) : verrouillé agressif, sourd à son propre coach fantôme', () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.mods.provokedUntil = m.t + 5
+    m.enemy.stance = 'defensive' // posture initiale volontairement différente, pour prouver le changement
+    vi.spyOn(Math, 'random').mockReturnValue(0) // sans le verrou, ce 0 ferait aussi trembler d'autres branches
+    tick(m, 1, quiet)
+    expect(m.enemy.stance).toBe('aggressive')
+  })
+
+  it("Ulti adverse prêt : se déclenche seul (probabiliste), sans attendre de voix", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.enemy.ulti = ULTI_MAX
+    m.enemy.ultiUsed = false
+    vi.spyOn(Math, 'random').mockReturnValue(0) // sous le seuil 0.9×dt (dt=1)
+    const hpBefore = m.player.hp
+    tick(m, 1, quiet)
+    expect(m.enemy.ultiUsed).toBe(true)
+    expect(m.player.hp).toBeLessThan(hpBefore)
+  })
+
+  it('Hype adverse pleine : le spécial se déclenche seul (probabiliste)', () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.enemy.hype = HYPE_MAX
+    vi.spyOn(Math, 'random').mockReturnValue(0) // sous le seuil 1.2×dt (dt=1)
+    const hpBefore = m.player.hp
+    tick(m, 1, quiet)
+    expect(m.enemy.hype).toBe(0) // fireSpecial() la remet à zéro
+    expect(m.player.hp).toBeLessThan(hpBefore)
+  })
+
+  it('PV adverses bas (< 30 %) : bascule en posture de survie (défensive/évasive/contre)', () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.enemy.hp = Math.round(m.enemy.maxHp * 0.2)
+    vi.spyOn(Math, 'random').mockReturnValue(0.5) // sous 0.9, entre bien dans le bloc de décision
+    tick(m, 1, quiet)
+    expect(['defensive', 'evasive', 'counter']).toContain(m.enemy.stance)
+  })
+
+  it('PV du joueur bas (< 35 %), adverse en pleine forme : passe à l\'offensive pour achever', () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.player.hp = Math.round(m.player.maxHp * 0.2)
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    tick(m, 1, quiet)
+    expect(m.enemy.stance).toBe('aggressive')
+  })
+
+  it('Le joueur est agressif : le coin adverse répond en contre-jeu (contre/défensive/évasive)', () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.player.stance = 'aggressive'
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    tick(m, 1, quiet)
+    expect(['counter', 'defensive', 'evasive']).toContain(m.enemy.stance)
+  })
+
+  it('Le joueur est défensif : le coin adverse presse (neutre/agressive)', () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.player.stance = 'defensive'
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    tick(m, 1, quiet)
+    expect(['neutral', 'aggressive']).toContain(m.enemy.stance)
+  })
+
+  it("Situation par défaut (personne en danger, joueur ni agressif ni défensif) : pioche dans les 5 postures", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.player.stance = 'neutral'
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    tick(m, 1, quiet)
+    expect(['neutral', 'aggressive', 'defensive', 'evasive', 'counter']).toContain(m.enemy.stance)
+  })
+})
