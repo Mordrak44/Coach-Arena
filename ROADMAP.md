@@ -569,6 +569,24 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       réussie. 2 nouveaux tests (constructeur qui jette → `supported`
       correctement `false`, constructeur qui réussit → `true`),
       engine.test.ts 159 → 161. `tsc --noEmit` + `npm run build` verts.
+- [x] Après 4 itérations de résilience d'affilée, pivot vers une dimension
+      jamais vérifiée : le DÉBORDEMENT HORIZONTAL sur petit écran. Le CSS
+      de `.screen` porte déjà la cicatrice d'un vrai bug trouvé comme ça
+      une fois (l'écran Histoire à 8 chapitres débloqués, `justify-content:
+      safe center`) — mais jamais un balayage SYSTÉMATIQUE sur plusieurs
+      tailles de téléphone n'avait été fait. Chromium headless, viewport
+      forcé à 3 tailles réalistes (320×568 iPhone SE 1re gén. — la plus
+      étroite en circulation —, 360×640 petit Android, 390×844 iPhone 14),
+      `document.documentElement.scrollWidth` comparé à `window.innerWidth`
+      (signal objectif de débordement, pas juste une capture regardée à
+      l'œil) sur 5 points du parcours réel : Titre, Sélection de perso
+      (avant/après sélection d'un perso — le deck-builder se déploie),
+      confirmation du deck-builder (via le lien d'évitement), et l'Arène
+      (mode `?demo`, canvas 9:16 + HUD). 15 vérifications au total (3
+      tailles × 5 écrans) : ZÉRO débordement détecté partout. Aucun code
+      changé — le layout responsive est déjà solide, dérisque une partie
+      du TODO « Polish mobile/iOS » encore ouvert (le reste — Safari réel,
+      budget batterie — reste non vérifiable dans ce sandbox).
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1487,6 +1505,16 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Après 4 itérations de résilience d'affilée, pivot
+  vers une dimension jamais vérifiée systématiquement : le débordement
+  horizontal sur petit écran. Chromium headless, viewport forcé à 3
+  tailles réalistes (320×568 iPhone SE 1re gén., 360×640 petit Android,
+  390×844 iPhone 14), `scrollWidth` vs `innerWidth` comparé sur 5 points
+  du parcours réel (Titre, Sélection avant/après choix de perso,
+  confirmation du deck-builder, Arène en mode `?demo`). 15 vérifications,
+  zéro débordement détecté. Aucun code changé — vérification pure, comme
+  la passe offline PWA du 16 : le layout responsive est déjà solide, ça
+  dérisque une partie du TODO « Polish mobile/iOS » encore ouvert.
 - 2026-08-17 (routine) : 3e maillon de la passe résilience, trouvé en
   suivant les autres accès à des API navigateur potentiellement
   jetables : `VoiceCoach.startRecognition()` posait `state.supported =
