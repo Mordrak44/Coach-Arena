@@ -761,6 +761,37 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       corrigé en l'ajoutant au mock. 5 nouveaux tests. engine.test.ts
       205 → 210. Couverture `voice.ts` 49,4 % → 74,7 % (stmts). `tsc
       --noEmit` + `npm run build` verts.
+- [x] Incident CI transitoire, diagnostiqué avant de toucher au code —
+      le run de déploiement déclenché par le commit précédent a échoué,
+      première fois depuis que Pages est en ligne. Logs du job vérifiés
+      (`get_job_logs`) : l'échec vient de `codeload.github.com` qui a
+      renvoyé 429 (Too Many Requests) puis 503 en boucle en essayant de
+      télécharger le BUNDLE de l'action `configure-pages@v5` elle-même —
+      AVANT même que `npm test`/`npm run build` ne tournent. Rien à voir
+      avec ce dépôt. Confirmé, pas supposé : relancé le run échoué via
+      `rerun_workflow_run` plutôt que d'attendre le prochain push — succès
+      immédiat au 2e essai, sans aucun changement de code.
+- [x] `systems/facecam.ts` (`FaceCoach`, énergie de mouvement par diff
+      d'images pour la facecam) — 0 % de couverture, jamais touché même
+      pendant toute la série de tests sur `voice.ts`/`recorder.ts` cette
+      session. Contrairement à `sound.ts` (synthèse WebAudio, chaque
+      méthode déjà protégée par un garde-fou `if (!this.ctx...) return`,
+      effort de mock élevé pour un risque de bug faible — délibérément
+      laissé de côté), `facecam.ts` est bon marché à tester (juste un
+      élément vidéo, un canvas 2D, un `setInterval`) pour un vrai
+      algorithme de diff de pixels à vérifier. 4 tests : la 1re frame
+      n'initialise que la référence (énergie reste à 0) ; un changement de
+      pixels total entre deux frames fait monter l'énergie à EXACTEMENT
+      0,5 (pas juste « plus que 0 » — vérifié le lissage asymétrique
+      documenté dans le code, moitié du saut brut à la 1re détection) ;
+      une vidéo pas encore prête (`readyState < 2`) ne plante pas et ne
+      touche à rien ; et le contrat déjà documenté dans `stop()` (« sans
+      ça, un futur start() comparerait sa 1re frame au dernier souvenir de
+      l'ANCIENNE session ») vérifié pour de vrai avec une VRAIE 2e
+      session simulée après `stop()`, pas juste en lisant le commentaire.
+      Aucun bug trouvé — le fichier était déjà correct — mais couvert
+      pour de bon maintenant. engine.test.ts 210 → 214. Couverture
+      `facecam.ts` 0 % → 96,9 %. `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1681,6 +1712,23 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Deux choses cette itération. D'abord un incident
+  CI transitoire diagnostiqué avant de toucher au code : le déploiement
+  Pages a échoué pour la 1re fois depuis sa mise en ligne — logs vérifiés,
+  `codeload.github.com` a renvoyé 429/503 en boucle en téléchargeant le
+  bundle de `configure-pages@v5` lui-même, avant même que `npm test` ne
+  tourne. Rien à voir avec ce dépôt. Relancé via `rerun_workflow_run`
+  plutôt que d'attendre le prochain push — succès immédiat, sans aucun
+  changement de code. Ensuite, `systems/facecam.ts` (0 % de couverture,
+  jamais touché même pendant toute la série `voice.ts`/`recorder.ts`) :
+  bon marché à tester (vidéo + canvas 2D + interval) contrairement à
+  `sound.ts` (WebAudio pur, déjà bien gardé, laissé de côté). 4 tests :
+  diff de pixels entre deux frames, lissage asymétrique vérifié à la
+  valeur exacte (0,5, pas juste « > 0 »), vidéo pas prête ne plante pas,
+  et le contrat de `stop()` (prev effacé pour une VRAIE nouvelle session,
+  pas juste lu dans le commentaire). Aucun bug trouvé, déjà correct.
+  engine.test.ts 210 → 214. Couverture facecam.ts 0 % → 96,9 %. `tsc
+  --noEmit` + `npm run build` verts.
 - 2026-08-17 (routine) : Retour sur `systems/voice.ts` pour couvrir enfin
   `onresult`/`onend`, le cœur réel du flux de reco vocale — malgré 2 bugs
   déjà trouvés dans ce fichier cette session. Vérifié le fix du

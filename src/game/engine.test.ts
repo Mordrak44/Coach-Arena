@@ -2660,3 +2660,84 @@ describe('VoiceCoach — onresult/onend, le cœur du flux de reco vocale, jamais
     expect(vc.state.listening).toBe(false)
   })
 })
+
+describe('FaceCoach (systems/facecam.ts) — énergie de mouvement par diff d\'images, jamais testée', () => {
+  afterEach(() => {
+    delete (globalThis as any).document
+    delete (globalThis as any).window
+  })
+
+  // 48×64 RGBA (W/H internes du fichier) : W*H*4 = 12288 octets par frame.
+  const FRAME_LEN = 48 * 64 * 4
+
+  function setup(initialFrame: Uint8ClampedArray) {
+    let currentFrame = initialFrame
+    const fakeVideo = { muted: false, playsInline: false, srcObject: null as unknown, readyState: 2, play: async () => {} }
+    const fakeCtx = {
+      drawImage: () => {},
+      getImageData: () => ({ data: currentFrame }),
+    }
+    const fakeCanvas = { getContext: () => fakeCtx }
+    ;(globalThis as any).document = {
+      createElement: (tag: string) => (tag === 'video' ? fakeVideo : fakeCanvas),
+    }
+    ;(globalThis as any).window = { setInterval: () => 999 }
+    return {
+      fakeVideo,
+      setFrame: (f: Uint8ClampedArray) => {
+        currentFrame = f
+      },
+    }
+  }
+
+  it("la 1re frame ne fait qu'initialiser prev (rien à comparer, énergie reste 0)", async () => {
+    setup(new Uint8ClampedArray(FRAME_LEN).fill(0))
+    const { FaceCoach } = await import('../systems/facecam')
+    const fc = new FaceCoach()
+    ;(fc as any).sample()
+    expect(fc.state.energy).toBe(0)
+    expect((fc as any).prev).not.toBeNull()
+  })
+
+  it("un fort changement de pixels entre deux frames fait monter l'énergie", async () => {
+    const { setFrame } = setup(new Uint8ClampedArray(FRAME_LEN).fill(0))
+    const { FaceCoach } = await import('../systems/facecam')
+    const fc = new FaceCoach()
+    ;(fc as any).sample() // établit la frame de référence (noire)
+    setFrame(new Uint8ClampedArray(FRAME_LEN).fill(255)) // frame suivante : blanche, changement maximal
+    ;(fc as any).sample()
+    // Lissage asymétrique (monte à 50 % du saut brut la 1re fois) : un
+    // changement de pixels total et immédiat donne raw=1, donc énergie=0,5
+    // pile — la valeur EXACTE attendue, pas juste « plus que 0 ».
+    expect(fc.state.energy).toBe(0.5)
+  })
+
+  it("readyState < 2 (vidéo pas encore prête) : sample() ne plante pas et ne touche pas l'énergie", async () => {
+    const { fakeVideo } = setup(new Uint8ClampedArray(FRAME_LEN).fill(0))
+    fakeVideo.readyState = 0
+    const { FaceCoach } = await import('../systems/facecam')
+    const fc = new FaceCoach()
+    expect(() => (fc as any).sample()).not.toThrow()
+    expect(fc.state.energy).toBe(0)
+    expect((fc as any).prev).toBeNull() // jamais atteint le calcul, prev reste vierge
+  })
+
+  it("stop() efface prev : une NOUVELLE session ne compare pas avec l'ancienne (contrat déjà documenté, vérifié ici)", async () => {
+    const { setFrame } = setup(new Uint8ClampedArray(FRAME_LEN).fill(0))
+    const { FaceCoach } = await import('../systems/facecam')
+    const fc = new FaceCoach()
+    await fc.start({} as any)
+    ;(fc as any).sample()
+    expect((fc as any).prev).not.toBeNull()
+    fc.stop()
+    expect((fc as any).prev).toBeNull()
+    expect(fc.state.active).toBe(false)
+    expect(fc.state.energy).toBe(0)
+    // Une nouvelle frame blanche juste après stop() : sans le reset de prev,
+    // la 1re sample() de la session suivante comparerait contre l'ancienne
+    // frame noire au lieu de simplement initialiser sa propre référence.
+    setFrame(new Uint8ClampedArray(FRAME_LEN).fill(255))
+    ;(fc as any).sample()
+    expect(fc.state.energy).toBe(0) // 1re frame de la nouvelle session : juste une initialisation
+  })
+})
