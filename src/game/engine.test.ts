@@ -135,6 +135,11 @@ describe('deck-builder', () => {
       expect(() => loadTemplate()).not.toThrow()
       expect(loadTemplate()).toEqual(defaultTemplate())
     }
+    // JSON réellement invalide (syntaxe cassée), pas juste de mauvaise
+    // forme : un catch DIFFÉRENT dans loadTemplate, jamais exercé jusqu'ici.
+    localStorage.setItem('coach-arena-deck-v1', '{ceci ne parse pas')
+    expect(() => loadTemplate()).not.toThrow()
+    expect(loadTemplate()).toEqual(defaultTemplate())
   })
 
   it('saveTemplate : une écriture qui échoue (quota dépassé) ne plante jamais', async () => {
@@ -814,6 +819,13 @@ describe('Progression Histoire persistée (story.ts) — loadCleared/markCleared
       expect(() => loadCleared()).not.toThrow()
       expect(loadCleared().size).toBe(0)
     }
+  })
+
+  it('JSON réellement invalide (syntaxe cassée) : même repli, catch différent jamais exercé jusqu\'ici', async () => {
+    const { loadCleared } = await import('./story')
+    localStorage.setItem('coach-arena-story-v1', '[ceci ne parse pas')
+    expect(() => loadCleared()).not.toThrow()
+    expect(loadCleared().size).toBe(0)
   })
 
   it('markCleared : une écriture qui échoue (quota dépassé) ne plante jamais', async () => {
@@ -1556,8 +1568,9 @@ describe('Progression / Lien (progression.ts) — couverture des cas limites', (
   })
 
   it('pendingReward / claimReward : ordre strict des paliers, jamais de saut, jamais deux fois', async () => {
-    const { recordResult, pendingReward, claimReward, rewardOptionsFor } = await import('./progression')
+    const { recordResult, pendingReward, claimReward, rewardOptionsFor, getExtraCopies } = await import('./progression')
     expect(pendingReward('goro')).toBeNull() // 0 victoire, rien à réclamer
+    expect(getExtraCopies('goro')).toEqual([]) // jamais appelé jusqu'ici : rien de réclamé, tableau vide
 
     // 6 victoires -> bondLevel(6) = 3, mais le palier proposé reste le PREMIER non réclamé (1), jamais un saut à 3.
     for (let i = 0; i < 6; i++) recordResult('goro', true)
@@ -1569,6 +1582,7 @@ describe('Progression / Lien (progression.ts) — couverture des cas limites', (
     expect(claimReward('goro', 'carte-inexistante-xyz' as any)).toBe(false)
     // Réclame la vraie récompense du palier 1.
     expect(claimReward('goro', first!.options[0])).toBe(true)
+    expect(getExtraCopies('goro')).toEqual([first!.options[0]]) // la carte réclamée apparaît bien
     // Le palier suivant proposé est bien le 2, pas un saut plus loin.
     expect(pendingReward('goro')?.level).toBe(2)
     // Impossible de réclamer deux fois le même palier avec la même carte déjà réclamée.
@@ -1637,6 +1651,16 @@ describe('Progression / Lien (progression.ts) — couverture des cas limites', (
       expect(() => loadCustoms()).not.toThrow()
       expect(loadCustoms()).toEqual([])
     }
+  })
+
+  it('JSON réellement invalide (syntaxe cassée, ne parse même pas) : même repli, jamais de crash — même angle mort que onboarding.ts', async () => {
+    const { getProgress, loadCustoms } = await import('./progression')
+    localStorage.setItem('coach-arena-progress-v1', '{ceci ne parse pas')
+    localStorage.setItem('coach-arena-customs-v1', '[ceci non plus')
+    expect(() => getProgress('kenta')).not.toThrow()
+    expect(getProgress('kenta')).toEqual({ wins: 0, losses: 0 })
+    expect(() => loadCustoms()).not.toThrow()
+    expect(loadCustoms()).toEqual([])
   })
 })
 

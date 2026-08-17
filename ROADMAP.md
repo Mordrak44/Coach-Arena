@@ -883,6 +883,24 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       trop marginale pour l'effort face aux vrais trous encore possibles
       ailleurs. 1 nouveau test. engine.test.ts 224 → 225. `tsc --noEmit`
       + `npm run build` verts.
+- [x] Même angle mort (JSON réellement invalide vs juste de mauvaise
+      forme) systématiquement recherché dans les AUTRES modules
+      `readJson`-like qui le partagent tous : `progression.ts`,
+      `deckBuilder.ts` et `story.ts` avaient chacun le même trou que
+      `onboarding.ts` — testés pour le JSON valide-mais-mauvaise-forme,
+      jamais pour une vraie syntaxe cassée (2 catch différents dans
+      chaque `load`/`readJson`, un seul exercé). 3 tests ajoutés (dont
+      un qui étend un test existant plutôt que d'en dupliquer un
+      nouveau pour `deckBuilder.ts`). Au passage, `getExtraCopies()`
+      (`progression.ts`) — fonction exportée, utilisée par
+      `CharacterSelect.tsx` pour afficher les copies de carte gagnées
+      aux paliers de Lien, jamais appelée par un seul test — couverte
+      en étendant le test `pendingReward`/`claimReward` déjà existant :
+      vide avant toute réclamation, contient bien la carte réclamée
+      après. Aucun bug trouvé nulle part. `deckBuilder.ts`/`story.ts`/
+      `progression.ts` atteignent tous les trois 100 % de couverture de
+      lignes. engine.test.ts 225 → 227. `tsc --noEmit` + `npm run build`
+      verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1803,6 +1821,17 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Le même angle mort qu'`onboarding.ts` (l'itération
+  précédente), systématiquement recherché dans les autres modules
+  `readJson`-like qui partagent ce motif : `progression.ts`,
+  `deckBuilder.ts` et `story.ts` avaient chacun le même trou (JSON de
+  mauvaise forme testé, JSON réellement invalide jamais). 3 tests. Au
+  passage, `getExtraCopies()` (progression.ts, utilisée par
+  CharacterSelect.tsx, jamais appelée par un test) couverte en étendant
+  le test `pendingReward`/`claimReward` existant. Aucun bug trouvé.
+  `deckBuilder.ts`/`story.ts`/`progression.ts` atteignent tous les trois
+  100 % de couverture de lignes. engine.test.ts 225 → 227. `tsc --noEmit`
+  + `npm run build` verts.
 - 2026-08-17 (routine) : Dernier résidu de `onboarding.ts` : les tests
   couvraient déjà le JSON valide mais de mauvaise forme, pas le JSON
   RÉELLEMENT invalide (syntaxe cassée) — deux catch différents dans
