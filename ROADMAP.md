@@ -867,6 +867,22 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       (changement de documentation pur) — `npm test` + `npm run build`
       relancés quand même pour confirmer qu'aucun fichier source n'a été
       touché par erreur.
+- [x] Dernier résidu de `onboarding.ts` (85,7 %) : les tests existants
+      couvraient déjà le JSON valide mais de mauvaise forme (`[]`, `42`,
+      `"oops"` → repli sur `{}`), mais pas le JSON RÉELLEMENT invalide
+      (syntaxe cassée, ne parse même pas) — deux catch différents dans le
+      même `load()`, un seul testé. 1 test avec une chaîne non-parsable
+      (`{ceci ne parse pas`), confirmant `hasSeenCombatHint`/
+      `hasSeenCornerHint` retombent proprement sur « pas encore vu » au
+      lieu de planter. `onboarding.ts` atteint 100 % de couverture de
+      lignes. Reste (`sceneDirector.ts` lignes 110/174, un `hit` non-crit
+      qui retourne `null`, et une branche `default` du sélecteur de
+      personnage dans un switch déjà exhaustif) délibérément laissé de
+      côté : code de génération de prompts vidéo pour le pipeline Kling
+      serveur, jamais branché (`STUB_SCENE_SUBMITTER`) — valeur de test
+      trop marginale pour l'effort face aux vrais trous encore possibles
+      ailleurs. 1 nouveau test. engine.test.ts 224 → 225. `tsc --noEmit`
+      + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1787,6 +1803,15 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Dernier résidu de `onboarding.ts` : les tests
+  couvraient déjà le JSON valide mais de mauvaise forme, pas le JSON
+  RÉELLEMENT invalide (syntaxe cassée) — deux catch différents dans
+  `load()`, un seul testé. 1 test avec une chaîne non-parsable, confirme
+  le repli propre sur « pas encore vu ». `onboarding.ts` atteint 100 % de
+  couverture de lignes. Le reste résiduel (2 lignes de `sceneDirector.ts`,
+  génération de prompts pour un pipeline Kling jamais branché) laissé de
+  côté délibérément — valeur trop marginale. engine.test.ts 224 → 225.
+  `tsc --noEmit` + `npm run build` verts.
 - 2026-08-17 (routine) : Pivot depuis les tests (le seam de couverture
   est maintenant mûr : combat.ts ~85 %, systems/ 95,5 %) vers un trou de
   finition : le jeu est en ligne depuis plusieurs heures

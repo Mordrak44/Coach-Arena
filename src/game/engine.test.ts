@@ -1855,6 +1855,14 @@ describe('Onboarding (onboarding.ts) — dernier module localStorage jamais test
       expect(() => markCombatHintSeen()).not.toThrow()
     }
   })
+
+  it('JSON réellement invalide (pas juste de mauvaise forme, du texte non-parsable) : jamais de crash non plus', async () => {
+    const { hasSeenCombatHint, hasSeenCornerHint } = await import('./onboarding')
+    localStorage.setItem('coach-arena-onboarding-v1', '{ceci ne parse pas')
+    expect(() => hasSeenCombatHint()).not.toThrow()
+    expect(hasSeenCombatHint()).toBe(false)
+    expect(hasSeenCornerHint()).toBe(false)
+  })
 })
 
 describe('Bugs trouvés par audit (code-review, 2026-08-16) — verrouillés par des tests', () => {
