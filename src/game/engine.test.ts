@@ -519,6 +519,88 @@ describe('applyCardEffects (DSL → runtime) — kinds jamais exercés via une V
   })
 })
 
+describe('resolveAttack/fireSpecial : branches à issue rare (RNG ou fenêtre étroite), jamais exercées', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('Contre parfait + Orgueil du Rival : les deux bonus armés se déclenchent ensemble et se consomment', () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.enemy.nextActionAt = m.t // l'adversaire attaque ce tick
+    m.player.nextActionAt = m.t + 1000 // le joueur n'attaque pas ce tick
+    m.player.stance = 'counter'
+    m.player.counterUntil = m.t + 2.5 // fenêtre de contre active
+    m.mods.armedCounterMul = 1.8
+    m.mods.counterHypeAmount = 30
+    m.player.hype = 0
+    const enemyHpBefore = m.enemy.hp
+    tick(m, 0.001, quiet)
+    expect(m.enemy.hp).toBeLessThan(enemyHpBefore) // le contre a bien tapé l'attaquant
+    expect(m.mods.armedCounterMul).toBe(0) // consommé
+    expect(m.mods.counterHypeAmount).toBe(0) // consommé
+    expect(m.player.hype).toBeCloseTo(44, 0) // +30 (Orgueil) + 14 (contre de base)
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('CONTRE PARFAIT'))).toBe(true)
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('ORGUEIL DU RIVAL'))).toBe(true)
+    expect(m.events.some(e => e.kind === 'countered' && e.by === 'player')).toBe(true)
+  })
+
+  it('Garde (posture défensive) : réduit bien les dégâts et accorde de la Hype au défenseur', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.25) // sous le seuil de garde (0,35), au-dessus de l'esquive
+    const m = createMatch(ROSTER[3], ROSTER[0]) // Gorō (spd 3) défend : esquive quasi nulle
+    toFighting(m)
+    m.player.stance = 'defensive'
+    m.player.nextActionAt = m.t + 1000
+    m.enemy.nextActionAt = m.t
+    m.player.hype = 0
+    const hpBefore = m.player.hp
+    tick(m, 0.001, quiet)
+    expect(m.player.hp).toBeLessThan(hpBefore) // touché quand même, juste amorti
+    expect(m.player.hype).toBeCloseTo(6, 0) // bonus de garde
+    expect(m.events.some(e => e.kind === 'blocked' && e.target === 'player')).toBe(true)
+  })
+
+  it('Cœur Vaillant : encaisser le Nème coup déclenche le bonus de Hype et se désarme', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99) // jamais d'esquive, jamais de crit, jamais de garde
+    const m = freshMatch()
+    toFighting(m)
+    m.player.nextActionAt = m.t
+    m.enemy.nextActionAt = m.t + 1000
+    m.enemyMods.hitsTakenTarget = 1
+    m.enemyMods.hitsTakenHype = 25
+    m.enemyMods.hitsTakenCount = 0
+    m.enemy.hype = 0
+    tick(m, 0.001, quiet)
+    expect(m.enemyMods.hitsTakenTarget).toBe(0) // désarmé après déclenchement
+    expect(m.enemy.hype).toBeCloseTo(28, 0) // +3 (encaisser) + 25 (Cœur Vaillant)
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('CŒUR VAILLANT'))).toBe(true)
+  })
+
+  it("Leçon d'Expérience : le premier spécial adverse encaissé après armement est divisé par deux, une seule fois", () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.enemyMods.halveEnemySpecial = true
+    m.player.hype = HYPE_MAX
+    m.player.nextActionAt = m.t + 1000
+    m.enemy.nextActionAt = m.t + 1000
+    const enemyHpBefore = m.enemy.hp
+    tick(m, 0.05, { command: 'special', voiceEnergy: 0.6, faceEnergy: 0 })
+    const fullDmg = enemyHpBefore - m.enemy.hp
+    expect(m.enemyMods.halveEnemySpecial).toBe(false) // consommé
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes("LEÇON D'EXPÉRIENCE"))).toBe(true)
+    // Match retour, sans le mod armé : le même spécial doit taper ~2× plus fort.
+    const m2 = freshMatch()
+    toFighting(m2)
+    m2.player.hype = HYPE_MAX
+    m2.player.nextActionAt = m2.t + 1000
+    m2.enemy.nextActionAt = m2.t + 1000
+    const enemyHpBefore2 = m2.enemy.hp
+    tick(m2, 0.05, { command: 'special', voiceEnergy: 0.6, faceEnergy: 0 })
+    const fullDmg2 = enemyHpBefore2 - m2.enemy.hp
+    expect(fullDmg).toBeLessThan(fullDmg2 * 0.6) // clairement divisé par ~2, pas juste réduit
+  })
+})
+
 describe('prosodie (pitch local)', () => {
   it('détecte une onde à 220 Hz à ±5 %', async () => {
     const { detectPitch } = await import('../systems/pitch')

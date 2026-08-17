@@ -469,6 +469,30 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       face à un futur refactor est maintenant réelle. engine.test.ts
       143 → 149. Couverture `combat.ts` 75,58 % → 80,6 % (stmts), 66,42 %
       → 71,22 % (branch). `tsc --noEmit` + `npm run build` verts.
+- [x] 3e passe du coverage-driven bug hunt sur `combat.ts` : cette fois
+      `resolveAttack`/`fireSpecial`, les branches à ISSUE RARE (fenêtre de
+      contre étroite, ou dépendantes d'un jet de dé) que ni les tests
+      précédents ni une simulation de match ordinaire ne déclenchent
+      naturellement. 4 branches jamais exercées, isolées via `vi.spyOn
+      (Math, 'random')` (motif déjà en place ailleurs dans ce fichier) :
+      Contre Parfait + Orgueil du Rival (les deux bonus armés du contre se
+      déclenchent ensemble et se consomment) ; la posture Garde
+      (réduction de dégâts + Hype au défenseur — nécessite un jet PILE
+      entre le seuil d'esquive et celui de garde, `mockReturnValue(0.25)`
+      avec Gorō en défense pour une esquive quasi nulle) ; Cœur Vaillant
+      (le Nème coup encaissé déclenche le bonus et se désarme,
+      `mockReturnValue(0.99)` pour garantir aucune esquive/crit/garde
+      parasite) ; Leçon d'Expérience (le premier spécial adverse encaissé
+      après armement est divisé par deux — vérifié par COMPARAISON entre
+      deux matchs identiques avec/sans le mod armé, pas seulement la
+      formule en isolation, pour prouver que le facteur ×0,5 s'applique
+      bien réellement dans `fireSpecial`). Aucun bug trouvé, tout se
+      comportait déjà comme documenté dans les commentaires du code — mais
+      ces 4 mécaniques de comeback (des cartes réelles du jeu) n'avaient
+      littéralement jamais tourné une seule fois sous test avant
+      aujourd'hui. 4 nouveaux tests, engine.test.ts 149 → 153. Couverture
+      `combat.ts` 80,6 % → 84,94 % (stmts), 71,22 % → 72,42 % (branch).
+      `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1387,6 +1411,21 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : 3e passe du coverage-driven bug hunt sur
+  `combat.ts`, ciblée sur `resolveAttack`/`fireSpecial` : les branches à
+  ISSUE RARE qu'aucune simulation de match ordinaire ne déclenche
+  naturellement (fenêtre de contre étroite, ou dépendantes d'un jet de dé
+  précis). Isolées via `vi.spyOn(Math, 'random')` : Contre Parfait +
+  Orgueil du Rival (les deux bonus armés du contre) ; la posture Garde
+  (mockReturnValue(0.25), Gorō en défense pour esquive quasi nulle) ; Cœur
+  Vaillant (mockReturnValue(0.99), aucune esquive/crit/garde parasite) ;
+  Leçon d'Expérience (vérifié par COMPARAISON entre deux matchs
+  identiques avec/sans le mod armé, pas juste la formule en isolation).
+  Aucun bug trouvé — tout se comportait déjà comme documenté — mais ces 4
+  mécaniques de comeback (des cartes réelles du jeu) n'avaient
+  littéralement jamais tourné sous test avant aujourd'hui. 4 tests,
+  engine.test.ts 149 → 153. Couverture combat.ts 80,6 % → 84,94 % (stmts).
+  `tsc --noEmit` + `npm run build` verts.
 - 2026-08-17 (routine) : Suite du coverage-driven bug hunt sur `combat.ts`,
   ciblé cette fois sur le switch `applyCardEffects` lui-même — le point
   unique où le DSL déclaratif des cartes devient de l'état runtime. 11 des
