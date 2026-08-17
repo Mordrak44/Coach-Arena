@@ -2353,3 +2353,48 @@ describe('matchCommand (voice.ts) — reconnaissance des consignes parlées, jam
     expect(matchCommand('')).toBeNull()
   })
 })
+
+describe('deriveTrait (characters.ts, via createFromPrompt) — TRAIT_RULES jamais balayée mot par mot', () => {
+  // Même motif « premier match qui gagne » que COMMAND_PATTERNS
+  // (voice.ts), qui cachait un vrai bug de collision de substring — donc
+  // même traitement ici : chaque mot-clé de TRAIT_RULES testé isolément
+  // pour vérifier qu'aucun n'est en réalité inatteignable.
+  const CASES: Array<[string, 'cerebral' | 'sanguin' | 'fusionnel' | 'tetu']> = [
+    ['calme', 'cerebral'],
+    ['sage', 'cerebral'],
+    ['maître', 'cerebral'],
+    ['cérébral', 'cerebral'],
+    ['précis', 'cerebral'],
+    ['stratège', 'cerebral'],
+    ['froid', 'cerebral'],
+    ['sauvage', 'sanguin'],
+    ['bête', 'sanguin'],
+    ['fauve', 'sanguin'],
+    ['rage', 'sanguin'],
+    ['colérique', 'sanguin'],
+    ['sanguin', 'sanguin'],
+    ['furieux', 'sanguin'],
+    ['démon', 'sanguin'],
+    ['loyal', 'fusionnel'],
+    ['fidèle', 'fusionnel'],
+    ['gentil', 'fusionnel'],
+    ['cœur', 'fusionnel'],
+    ['coeur', 'fusionnel'],
+    ['ami', 'fusionnel'],
+    ['chien', 'fusionnel'],
+    ['têtu', 'tetu'],
+    ['tetu', 'tetu'],
+    ['rebelle', 'tetu'],
+    ['fier', 'tetu'],
+    ['ego', 'tetu'],
+    ['rival', 'tetu'],
+    ['solitaire', 'tetu'],
+    ['ombre', 'tetu'],
+  ]
+  for (const [word, expected] of CASES) {
+    it(`« ${word} » donne bien le trait ${expected}`, () => {
+      const c = createFromPrompt(`Un personnage ${word} et déterminé, prêt à en découdre.`)
+      expect(c.trait).toBe(expected)
+    })
+  }
+})

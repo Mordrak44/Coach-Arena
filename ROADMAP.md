@@ -630,6 +630,22 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       seule, un balayage d'une phrase par commande (7 commandes), et
       l'absence de faux positif sur du bruit ambiant. engine.test.ts
       162 → 166. `tsc --noEmit` + `npm run build` verts.
+- [x] Suite logique du bug « contre-attaque » : `TRAIT_RULES`
+      (`characters.ts`, utilisée par `deriveTrait`/`createFromPrompt`)
+      utilise EXACTEMENT le même motif « premier match qui gagne, par
+      ordre du tableau » que `COMMAND_PATTERNS` — et n'avait jamais été
+      balayée mot-clé par mot-clé (un seul test existant, celui du repli
+      sur l'archétype quand AUCUN mot-clé ne matche). Vu le bug trouvé la
+      fois précédente dans une table structurée EXACTEMENT pareil, même
+      traitement : 30 tests, un par mot-clé des 4 règles (cerebral,
+      sanguin, fusionnel, tetu), chacun dans une phrase réaliste. Cette
+      fois, RIEN trouvé — les 30 passent du premier coup, aucune collision
+      de substring entre les mots-clés (contrairement à « attaqu » ⊂
+      « contre-attaque »). Résultat honnête à documenter quand même :
+      c'est le test qui aurait attrapé une régression future à ce même
+      endroit précis, et sa valeur ne dépend pas d'avoir trouvé un bug
+      cette fois-ci. engine.test.ts 166 → 196. `tsc --noEmit` + `npm run
+      build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1548,6 +1564,17 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Suite logique du bug « contre-attaque » de tout à
+  l'heure : `TRAIT_RULES` (characters.ts, `deriveTrait`/
+  `createFromPrompt`) utilise le MÊME motif « premier match qui gagne, par
+  ordre du tableau » que `COMMAND_PATTERNS` — et n'avait jamais été
+  balayée mot-clé par mot-clé. Même traitement : 30 tests, un par mot-clé
+  des 4 traits (cerebral/sanguin/fusionnel/tetu). Résultat cette fois :
+  RIEN trouvé, les 30 passent du premier coup, aucune collision de
+  substring entre les mots-clés. Documenté quand même — la valeur du test
+  ne dépend pas d'avoir trouvé un bug, c'est lui qui attraperait une
+  régression future à ce même endroit. engine.test.ts 166 → 196. `tsc
+  --noEmit` + `npm run build` verts.
 - 2026-08-17 (routine) : BUG RÉEL trouvé en donnant enfin un premier test
   à `matchCommand` (systems/voice.ts), le cœur du pitch « coacher à la
   voix », jamais testé jusqu'ici. `COMMAND_PATTERNS` retourne au premier
