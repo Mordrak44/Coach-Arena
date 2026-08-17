@@ -424,6 +424,101 @@ describe('consignes parlées', () => {
   })
 })
 
+describe('applyCardEffects (DSL → runtime) — kinds jamais exercés via une VRAIE consigne/carte', () => {
+  // Ces primitives sont testées côté CONSOMMATION (mods déjà posés à la
+  // main) ailleurs dans ce fichier, mais jamais côté APPLICATION : rien ne
+  // vérifie que jouer une consigne avec ce kind mute effectivement le bon
+  // champ. Un typo dans le switch de applyCardEffects (combat.ts) serait
+  // passé inaperçu jusqu'ici.
+  it('hype et enemyHype mutent bien les jauges des deux camps', () => {
+    const m = freshMatch()
+    m.phase = 'tactics'
+    m.player.hype = 10
+    m.enemy.hype = 50
+    applyConsigne(
+      m,
+      [
+        { kind: 'hype', amount: 20 },
+        { kind: 'enemyHype', amount: -20 },
+      ],
+      'test',
+    )
+    expect(m.player.hype).toBe(30)
+    expect(m.enemy.hype).toBe(30)
+  })
+
+  it('dodgeBonus et immuneConfusion mutent bien mods', () => {
+    const m = freshMatch()
+    m.phase = 'tactics'
+    applyConsigne(
+      m,
+      [
+        { kind: 'dodgeBonus', add: 0.15 },
+        { kind: 'immuneConfusion' },
+      ],
+      'test',
+    )
+    expect(m.mods.dodgeBonus).toBeCloseTo(0.15)
+    expect(m.mods.immuneConfusion).toBe(true)
+  })
+
+  it('armCheerHype et armAttackFrenzy arment bien les mods (pas encore consommés)', () => {
+    const m = freshMatch()
+    m.phase = 'tactics'
+    applyConsigne(
+      m,
+      [
+        { kind: 'armCheerHype', amount: 25 },
+        { kind: 'armAttackFrenzy', mul: 1.5, duration: 5 },
+      ],
+      'test',
+    )
+    expect(m.mods.armedCheerHype).toBe(25)
+    expect(m.mods.armedFrenzyMul).toBe(1.5)
+    expect(m.mods.armedFrenzyDuration).toBe(5)
+  })
+
+  it('counterHype et hitsTakenHype arment bien mods (compteur remis à zéro)', () => {
+    const m = freshMatch()
+    m.phase = 'tactics'
+    applyConsigne(
+      m,
+      [
+        { kind: 'counterHype', amount: 30 },
+        { kind: 'hitsTakenHype', hits: 3, amount: 20 },
+      ],
+      'test',
+    )
+    expect(m.mods.counterHypeAmount).toBe(30)
+    expect(m.mods.hitsTakenTarget).toBe(3)
+    expect(m.mods.hitsTakenHype).toBe(20)
+    expect(m.mods.hitsTakenCount).toBe(0)
+  })
+
+  it('halveEnemySpecial et blockEnemyCard passent bien à true', () => {
+    const m = freshMatch()
+    m.phase = 'tactics'
+    applyConsigne(
+      m,
+      [{ kind: 'halveEnemySpecial' }, { kind: 'blockEnemyCard' }],
+      'test',
+    )
+    expect(m.mods.halveEnemySpecial).toBe(true)
+    expect(m.mods.blockNextEnemyCard).toBe(true)
+  })
+
+  it('drainSouffle CUMULE (+=) sur deux pauses au lieu de remplacer', () => {
+    const m = freshMatch()
+    m.phase = 'tactics'
+    applyConsigne(m, [{ kind: 'drainSouffle', amount: 2 }], 'test1')
+    expect(m.mods.drainEnemySouffle).toBe(2)
+    m.consigneUsed = false
+    m.phase = 'tactics'
+    applyConsigne(m, [{ kind: 'drainSouffle', amount: 1 }], 'test2')
+    expect(m.mods.drainEnemySouffle).toBe(3)
+  })
+})
+
 describe('prosodie (pitch local)', () => {
   it('détecte une onde à 220 Hz à ±5 %', async () => {
     const { detectPitch } = await import('../systems/pitch')

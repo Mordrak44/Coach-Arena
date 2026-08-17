@@ -447,6 +447,28 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       nouvelles branches AUTOUR des 6 couvertes sont apparues visibles au
       rapport sans être elles-mêmes exercées, pas une régression réelle).
       `tsc --noEmit` + `npm run build` verts.
+- [x] Suite du coverage-driven bug hunt sur `combat.ts` : cette fois le
+      switch `applyCardEffects` (le cœur du DSL cartes/consignes,
+      combat.ts:262-320) lui-même. Constat en relisant le rapport de
+      couverture : PRESQUE tous les kinds de `EffectPrimitive` (hype,
+      enemyHype, dodgeBonus, immuneConfusion, armCheerHype,
+      armAttackFrenzy, counterHype, hitsTakenHype, halveEnemySpecial,
+      blockEnemyCard, drainSouffle — 11 sur 15) n'étaient testés QUE côté
+      CONSOMMATION, avec les mods posés directement à la main dans le
+      test (`m.mods.blockNextEnemyCard = true`, etc.) — jamais côté
+      APPLICATION, c'est-à-dire en vérifiant qu'une VRAIE consigne jouée
+      via `applyConsigne` mute effectivement le bon champ. Un typo de nom
+      de champ dans ce switch (l'unique endroit où le DSL déclaratif des
+      cartes devient de l'état runtime) serait passé inaperçu par tous
+      les tests existants. 6 nouveaux tests couvrant les 11 kinds (groupés
+      par 2, la limite `MAX_CONSIGNE_EFFECTS` d'une vraie consigne), plus
+      un test dédié pour `drainSouffle` qui CUMULE (+=) au lieu de
+      remplacer — un comportement délibérément différent des autres kinds
+      qui écrasent (=), à distinguer explicitement. Aucun bug trouvé — le
+      switch était déjà correct — mais la garantie qu'il RESTE correct
+      face à un futur refactor est maintenant réelle. engine.test.ts
+      143 → 149. Couverture `combat.ts` 75,58 % → 80,6 % (stmts), 66,42 %
+      → 71,22 % (branch). `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1365,6 +1387,20 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Suite du coverage-driven bug hunt sur `combat.ts`,
+  ciblé cette fois sur le switch `applyCardEffects` lui-même — le point
+  unique où le DSL déclaratif des cartes devient de l'état runtime. 11 des
+  15 kinds d'effet (hype, enemyHype, dodgeBonus, immuneConfusion,
+  armCheerHype, armAttackFrenzy, counterHype, hitsTakenHype,
+  halveEnemySpecial, blockEnemyCard, drainSouffle) n'étaient testés QUE côté
+  consommation (mods posés à la main), jamais côté application via une
+  vraie consigne — un typo de champ dans ce switch serait passé inaperçu.
+  6 tests via `applyConsigne` (groupés par 2, la limite d'une vraie
+  consigne), dont un dédié à `drainSouffle` qui cumule (+=) au lieu de
+  remplacer. Aucun bug trouvé, mais la garantie que ce switch reste correct
+  face à un futur refactor est désormais réelle. engine.test.ts 143 → 149.
+  Couverture combat.ts 75,58 % → 80,6 % (stmts). `tsc --noEmit` + `npm run
+  build` verts.
 - 2026-08-17 (routine) : Retour à la couverture de tests après 3 itérations
   d'accessibilité d'affilée, ciblé sur `combat.ts` (74 % stmts, le plus gros
   fichier le moins couvert). Trouvaille : toute la modulation des ORDRES DE
