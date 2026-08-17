@@ -468,6 +468,86 @@ describe('prosodie (pitch local)', () => {
   })
 })
 
+describe('coaching modulé par trait/état (jamais exercé — trouvé en audit de couverture)', () => {
+  // Gèle les attaques automatiques des deux côtés : « encaisser fait monter
+  // la rage » (+3 Hype) contaminerait sinon les mesures ci-dessous — un
+  // combat auto-résolu peut démarrer dès la sortie de l'intro.
+  function freeze(m: MatchState): void {
+    m.player.nextActionAt = m.t + 1000
+    m.enemy.nextActionAt = m.t + 1000
+  }
+
+  it('Cérébral : un ordre calme et posé le transcende (bonus de Hype supérieur au défaut)', () => {
+    const m = createMatch(ROSTER[2], ROSTER[1]) // Yuna, cérébrale, hrt=6 → hrtScale=1
+    toFighting(m)
+    freeze(m)
+    m.player.hype = 20
+    // volume bas ET ton posé : les deux conditions du calme, à la fois
+    tick(m, 0.001, { command: 'attack', voiceEnergy: 0.2, faceEnergy: 0, voiceTone: 1 })
+    expect(m.player.hype).toBeCloseTo(25, 1) // 20 + 5 * hrtScale(1) — pas le défaut 2 * hrtScale
+    expect(m.player.stance).toBe('aggressive')
+    expect(m.events.some(e => e.kind === 'trait')).toBe(false) // aucun malus déclenché
+  })
+
+  it("Têtu : le premier ordre de posture du round est superbement ignoré, le second s'applique", () => {
+    const m = createMatch(ROSTER[1], ROSTER[0]) // Rei, têtue
+    toFighting(m)
+    freeze(m)
+    tick(m, 0.001, { command: 'attack', voiceEnergy: 0.5, faceEnergy: 0 })
+    expect(m.player.stance).not.toBe('aggressive')
+    expect(m.events.some(e => e.kind === 'trait' && e.text.includes("T'IGNORE"))).toBe(true)
+    m.player.lastOrderAt = m.t - 10 // hors fenêtre anti-confusion pour le 2e ordre
+    tick(m, 0.001, { command: 'attack', voiceEnergy: 0.5, faceEnergy: 0 })
+    expect(m.player.stance).toBe('aggressive')
+  })
+
+  it("Boudeur (Vie d'Écurie) : le tout premier ordre du match passe à la trappe, une seule fois", () => {
+    const m = createMatch(ROSTER[0], ROSTER[1], [], { sulky: true })
+    toFighting(m)
+    freeze(m)
+    tick(m, 0.001, { command: 'attack', voiceEnergy: 0.5, faceEnergy: 0 })
+    expect(m.player.stance).not.toBe('aggressive')
+    expect(m.sulky).toBe(false) // consommé, même s'il boude
+    expect(m.events.some(e => e.kind === 'trait' && e.text.includes('BOUDE'))).toBe(true)
+    m.player.lastOrderAt = m.t - 10
+    tick(m, 0.001, { command: 'attack', voiceEnergy: 0.5, faceEnergy: 0 })
+    expect(m.player.stance).toBe('aggressive')
+  })
+
+  it("Provoqué (carte adverse) : verrouillé agressif, le coach ne peut plus donner d'ordre", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.enemyMods.provokedUntil = m.t + 5
+    tick(m, 0.001, { command: 'defend', voiceEnergy: 0.5, faceEnergy: 0 })
+    expect(m.player.stance).not.toBe('defensive') // l'ordre est refusé, pas juste ignoré silencieusement
+    expect(m.events.some(e => e.kind === 'trait' && e.text.includes('PROVOQU'))).toBe(true)
+  })
+
+  it("Frénésie armée (Fang) : le premier ordre d'attaque après armement déclenche le bonus, une seule fois", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.mods.armedFrenzyDuration = 8
+    tick(m, 0.001, { command: 'attack', voiceEnergy: 0.5, faceEnergy: 0 })
+    expect(m.mods.armedFrenzyDuration).toBe(0) // déclencheur consommé
+    expect(m.mods.frenzyUntil).toBeGreaterThan(m.t)
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('FRÉNÉSIE'))).toBe(true)
+  })
+
+  it("Cri de Guerre armé : le prochain 'cheer' consomme le bonus de Hype, une seule fois", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.mods.armedCheerHype = 10
+    m.player.hype = 20
+    tick(m, 0.001, { command: 'cheer', voiceEnergy: 0.3, faceEnergy: 0 })
+    expect(m.mods.armedCheerHype).toBe(0) // consommé
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('CRI DE GUERRE'))).toBe(true)
+    expect(m.player.hype).toBeGreaterThan(29) // gain de base + les 10 bonus (marge dt/hrtScale)
+  })
+})
+
 describe('mode Histoire', () => {
   it('8 chapitres, adversaires valides, difficulté croissante', async () => {
     const { STORY_CHAPTERS, chapterOpponent, chapterOpponentTeam, isUnlocked } = await import('./story')

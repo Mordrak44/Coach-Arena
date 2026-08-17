@@ -414,6 +414,39 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       signatures, deck-builder, confusion, Ulti/spécial, mulligan,
       Souffle, coin adverse symétrique, consignes, forge, réalisateur.
       scripts/sim.ts reste l'outil d'équilibrage (winrates, durées).
+- [x] Coverage-driven bug hunt sur `combat.ts` (moteur de combat) — après
+      3 dimensions d'accessibilité passées en revue coup sur coup
+      (ARIA/clavier, contraste, mouvement réduit), retour à la couverture
+      de tests comme angle, cette fois ciblé sur le fichier le plus gros
+      et le moins couvert (74 % stmts). `npm run coverage` a montré que
+      toute la modulation des ORDRES DE POSTURE (`attack`/`defend`/
+      `dodge`/`counter`) par trait et par état de jeu — le cœur même du
+      gameplay « coacher à la voix » — n'était testée QUE pour Sanguin/
+      Cérébral en `stable.ts` (Vie d'Écurie) et jamais dans `combat.ts` :
+      6 branches réelles jamais exercées : le bonus Hype d'un ordre CALME
+      pour un perso Cérébral (5×hrtScale, supérieur au défaut 2×hrtScale
+      — testé seulement à l'envers, l'ordre hurlé, jusqu'ici) ; Têtu
+      ignorant superbement son premier ordre de posture du round ;
+      Boudeur (Vie d'Écurie) avalant le tout premier ordre du match ;
+      Provoqué (carte adverse) verrouillé agressif et sourd à tout nouvel
+      ordre ; Frénésie armée (Fang) déclenchée par le premier ordre
+      d'attaque après armement ; Cri de Guerre armé consommé par le
+      prochain `cheer`. Aucun bug trouvé — la logique était déjà correcte
+      — mais un vrai piège de MÉTHODE DE TEST découvert et corrigé au
+      passage : le premier essai du bonus Hype « calme » donnait 28 au
+      lieu des 25 attendus, à cause d'un combat auto-résolu qui a démarré
+      DANS le même tick que la mesure (« encaisser fait monter la rage »,
+      +3 Hype sur le défenseur, combat.ts:596) — contamination silencieuse
+      d'une mesure sensée être isolée. Diagnostiqué avec un script de
+      debug (jamais un correctif à l'aveugle), puis corrigé en gelant
+      `nextActionAt` des deux côtés AVANT chaque tick de mesure, comme le
+      font déjà les tests voisins de cette section — repris pour les 6
+      nouveaux tests via un helper `freeze()` local. 6 nouveaux tests,
+      engine.test.ts 137 → 143. Couverture `combat.ts` 74,41 % → 75,58 %
+      (stmts), 66,66 % → 66,42 % (branch — en légère baisse car de
+      nouvelles branches AUTOUR des 6 couvertes sont apparues visibles au
+      rapport sans être elles-mêmes exercées, pas une régression réelle).
+      `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1332,6 +1365,21 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Retour à la couverture de tests après 3 itérations
+  d'accessibilité d'affilée, ciblé sur `combat.ts` (74 % stmts, le plus gros
+  fichier le moins couvert). Trouvaille : toute la modulation des ORDRES DE
+  POSTURE par trait/état — le cœur du gameplay « coacher à la voix » —
+  n'était jamais testée dans le moteur (seulement en Vie d'Écurie) : bonus
+  Hype d'un ordre calme (Cérébral), Têtu ignorant son premier ordre, Boudeur
+  avalant le premier ordre du match, Provoqué verrouillé agressif, Frénésie
+  armée (Fang), Cri de Guerre armé. Aucun bug de jeu trouvé, mais un piège
+  de méthode de test attrapé en cours de route : la mesure du bonus « calme »
+  donnait 28 au lieu de 25, un combat auto-résolu ayant démarré dans le même
+  tick que la mesure (+3 Hype d'« encaisser fait monter la rage »,
+  combat.ts:596) — diagnostiqué via un script de debug, corrigé en gelant
+  `nextActionAt` avant chaque tick de mesure (motif déjà utilisé par les
+  tests voisins). 6 tests, engine.test.ts 137 → 143. Couverture combat.ts
+  74,41 % → 75,58 % (stmts). `tsc --noEmit` + `npm run build` verts.
 - 2026-08-16 (routine) : 3e dimension d'accessibilité, après ARIA/clavier
   puis contraste couleur : `prefers-reduced-motion` (WCAG 2.3.3). Le combat
   a un screen shake (7-34px) et un zoom dramatique brutal (jusqu'à ×1,32)
