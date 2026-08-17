@@ -68,6 +68,7 @@ export default function TitleScreen({
         ref={canvasRef}
         width={CANVAS_W}
         height={CANVAS_H}
+        aria-hidden="true"
         style={{
           position: 'absolute',
           inset: 0,

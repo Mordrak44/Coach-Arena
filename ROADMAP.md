@@ -646,6 +646,37 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       endroit précis, et sa valeur ne dépend pas d'avoir trouvé un bug
       cette fois-ci. engine.test.ts 166 → 196. `tsc --noEmit` + `npm run
       build` verts.
+- [x] 4e passe d'accessibilité — les précédentes n'avaient touché que
+      `ArenaScreen.tsx` et `CharacterSelect.tsx` ; `grep -c "aria-"` sur
+      tous les écrans a confirmé que `TitleScreen`, `StoryScreen`,
+      `ReadyScreen`, `ResultsScreen` et `PrivacyScreen` en avaient ZÉRO.
+      Lecture complète des 5, PAS de correctifs automatiques par grep —
+      chaque bouton avec du texte visible est déjà accessible nativement
+      (pas besoin d'aria-label), donc 3 vrais trous seulement, PrivacyScreen
+      et ReadyScreen laissés intacts (texte descriptif déjà suffisant) :
+      1. `StoryScreen.tsx` — le chapitre OUVERT (celui dont la narration
+         est dépliée) n'était signalé que par une bordure de couleur, même
+         bug que `CharCard` corrigé lors de la 1re passe a11y. `aria-pressed`
+         ajouté sur le bouton de chapitre.
+      2. `TitleScreen.tsx` — le canvas de l'attract mode (combat IA vs IA
+         décoratif derrière le titre, zéro info de jeu réelle contrairement
+         au canvas de combat d'`ArenaScreen`) n'avait ni label ni
+         `aria-hidden` : un lecteur d'écran l'annonçait comme un élément
+         canvas vide et sans nom. `aria-hidden="true"` ajouté — traitement
+         inverse et correct pour du PUREMENT décoratif (contraste
+         volontaire avec le `role="img"` + `aria-label` du vrai combat).
+      3. `ResultsScreen.tsx` — plusieurs `<video>` (le clip du moment fort
+         + une par scène du Réalisateur) sans label distinctif : un
+         lecteur d'écran qui tabule dans les contrôles natifs entend
+         juste « vidéo » répété, sans savoir laquelle est laquelle.
+         `aria-label` descriptif ajouté sur chacune.
+      Vérifié en conditions réelles, pas supposé : Chromium headless,
+      `aria-hidden` du canvas confirmé présent, ET `aria-pressed` du
+      chapitre vérifié DYNAMIQUE (tous à `false` avant clic, le bon passe
+      à `true` après clic sur un chapitre précis, les 7 autres restent
+      `false`) — pas juste la présence statique de l'attribut. 196 tests
+      inchangés (pur ajout de markup). `tsc --noEmit` + `npm run build`
+      verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1564,6 +1595,21 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : 4e passe d'accessibilité — les précédentes
+  n'avaient touché qu'ArenaScreen.tsx et CharacterSelect.tsx ; `grep -c
+  "aria-"` a confirmé zéro attribut sur les 5 autres écrans. Lecture
+  complète, pas de correctifs au grep : la plupart des boutons ont déjà du
+  texte visible (accessibles nativement). 3 vrais trous trouvés :
+  StoryScreen (chapitre ouvert signalé seulement par une bordure de
+  couleur → `aria-pressed`, même bug que CharCard la 1re passe) ;
+  TitleScreen (canvas d'attract mode décoratif sans `aria-hidden`,
+  annoncé comme un élément vide par un lecteur d'écran — traitement
+  inverse du vrai canvas de combat qui a lui un `role="img"` descriptif) ;
+  ResultsScreen (plusieurs `<video>` sans label distinctif — « vidéo »
+  répété au clavier/lecteur d'écran). Vérifié en conditions réelles
+  (Chromium headless) : `aria-hidden` confirmé, ET `aria-pressed` vérifié
+  DYNAMIQUE (bascule vraiment au clic, pas juste présent dans le DOM).
+  196 tests inchangés. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-17 (routine) : Suite logique du bug « contre-attaque » de tout à
   l'heure : `TRAIT_RULES` (characters.ts, `deriveTrait`/
   `createFromPrompt`) utilise le MÊME motif « premier match qui gagne, par

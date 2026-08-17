@@ -42,6 +42,7 @@ export default function StoryScreen({
               key={ch.id}
               className="planCard"
               disabled={!unlocked}
+              aria-pressed={open?.id === ch.id}
               style={{
                 width: '100%',
                 textAlign: 'left',

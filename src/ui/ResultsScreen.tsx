@@ -89,6 +89,7 @@ export default function ResultsScreen({
         <>
           <video
             src={highlightUrl}
+            aria-label="Clip du moment fort du match"
             controls
             autoPlay
             muted
@@ -150,6 +151,7 @@ export default function ResultsScreen({
               {job.status === 'ready' && job.clipUrl && (
                 <video
                   src={job.clipUrl}
+                  aria-label={`Scène : ${job.plan.title}`}
                   controls
                   muted
                   playsInline
