@@ -677,6 +677,25 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       `false`) — pas juste la présence statique de l'attribut. 196 tests
       inchangés (pur ajout de markup). `tsc --noEmit` + `npm run build`
       verts.
+- [x] Coverage sur `systems/recorder.ts` (35,8 % stmts, un des fichiers
+      les moins couverts, jamais adressé même pendant la série résilience
+      qui a pourtant corrigé un bug dans `HighlightRecorder.rotate()`
+      juste à côté) : `fileExt`, `pickMimeType` et `shareOrDownload`
+      (partage natif mobile → TikTok/Shorts direct, ou repli
+      téléchargement) n'avaient jamais eu un seul test. Relecture attentive
+      cherchant un bug avant d'écrire les tests (même réflexe qu'à chaque
+      fois cette session) : rien trouvé, la chaîne de repli est déjà
+      correcte par construction — `canShare` absent, `share()` absent, OU
+      `share()` qui rejette (partage annulé) retombent tous proprement sur
+      le téléchargement, jamais de crash. 6 nouveaux tests : `fileExt`
+      (mp4/webm/type vide) ; `pickMimeType` (MediaRecorder absent →
+      `undefined`, priorité mp4 avant webm) ; les 3 chemins de
+      `shareOrDownload` (partage réussi, navigateur sans partage de
+      fichiers, partage refusé/annulé) — chacun vérifiant le VRAI
+      comportement observable (résultat retourné + le clic de
+      téléchargement a bien eu lieu), pas juste l'absence de crash.
+      engine.test.ts 196 → 202. Couverture `recorder.ts` 35,8 % → 50 %
+      (stmts). `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1597,6 +1616,18 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Coverage sur `systems/recorder.ts` (35,8 % stmts,
+  laissé de côté même pendant toute la série résilience qui a pourtant
+  corrigé un bug juste à côté, dans `HighlightRecorder.rotate()`).
+  `fileExt`, `pickMimeType`, `shareOrDownload` (partage natif mobile →
+  TikTok direct, ou repli téléchargement) n'avaient jamais eu un test.
+  Relu en cherchant un bug avant d'écrire les tests : rien trouvé, la
+  chaîne de repli est déjà correcte par construction (canShare absent,
+  share absent, ou share qui rejette retombent tous proprement sur le
+  téléchargement). 6 tests couvrant les 3 chemins de `shareOrDownload` +
+  `fileExt`/`pickMimeType`, chacun vérifiant le vrai résultat observable
+  (pas juste l'absence de crash). engine.test.ts 196 → 202. Couverture
+  recorder.ts 35,8 % → 50 %. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-17 (routine) : 🎉 GitHub Pages EN LIGNE. Après ~26 runs échoués
   sur ~10 heures de vérifications de routine (toujours la même cause :
   `configure-pages@v5` ❌, site Pages jamais activé côté réglages du

@@ -30,6 +30,7 @@ import { buildScenePlans, colorWord } from './sceneDirector'
 import { ROSTER, createFromPrompt } from './characters'
 import { ArenaRenderer } from '../render/arenaRenderer'
 import { matchCommand } from '../systems/voice'
+import { fileExt, pickMimeType, shareOrDownload } from '../systems/recorder'
 import type { CardId, CoachInput, MatchState } from './types'
 
 const quiet: CoachInput = { command: null, voiceEnergy: 0, faceEnergy: 0 }
@@ -2397,4 +2398,73 @@ describe('deriveTrait (characters.ts, via createFromPrompt) — TRAIT_RULES jama
       expect(c.trait).toBe(expected)
     })
   }
+})
+
+describe('recorder.ts — fileExt/pickMimeType/shareOrDownload, jamais testés jusqu\'ici', () => {
+  afterEach(() => {
+    delete (globalThis as any).MediaRecorder
+    delete (globalThis as any).navigator
+    delete (globalThis as any).document
+    delete (URL as any).createObjectURL
+    delete (URL as any).revokeObjectURL
+  })
+
+  it('fileExt lit le type MIME du blob (repli webm si absent/inconnu)', () => {
+    expect(fileExt(new Blob([], { type: 'video/mp4' }))).toBe('mp4')
+    expect(fileExt(new Blob([], { type: 'video/webm;codecs=vp9,opus' }))).toBe('webm')
+    expect(fileExt(new Blob([]))).toBe('webm')
+  })
+
+  it('pickMimeType : undefined si MediaRecorder est absent (vieux navigateur)', () => {
+    expect(pickMimeType()).toBeUndefined()
+  })
+
+  it('pickMimeType : choisit le premier conteneur supporté, mp4 prioritaire sur webm', () => {
+    ;(globalThis as any).MediaRecorder = { isTypeSupported: (m: string) => m === 'video/webm' }
+    expect(pickMimeType()).toBe('video/webm')
+  })
+
+  it('shareOrDownload : utilise le partage natif (feuille de partage mobile) quand disponible', async () => {
+    let shared: any = null
+    ;(globalThis as any).navigator = {
+      canShare: () => true,
+      share: async (data: any) => {
+        shared = data
+      },
+    }
+    const result = await shareOrDownload(new Blob(['x'], { type: 'video/webm' }), 'match', 'texte')
+    expect(result).toBe('shared')
+    expect(shared.title).toBe('Coach Arena')
+  })
+
+  it("shareOrDownload : repli téléchargement si le navigateur ne sait pas partager de fichiers", async () => {
+    ;(globalThis as any).navigator = {}
+    const clicked: string[] = []
+    ;(globalThis as any).document = {
+      createElement: () => ({ href: '', download: '', click: () => clicked.push('clicked') }),
+    }
+    ;(URL as any).createObjectURL = () => 'blob:fake'
+    ;(URL as any).revokeObjectURL = () => {}
+    const result = await shareOrDownload(new Blob(['x'], { type: 'video/webm' }), 'match', 'texte')
+    expect(result).toBe('downloaded')
+    expect(clicked).toContain('clicked')
+  })
+
+  it('shareOrDownload : repli téléchargement si le partage est annulé/refusé (share() rejette)', async () => {
+    ;(globalThis as any).navigator = {
+      canShare: () => true,
+      share: async () => {
+        throw new DOMException('cancelled', 'AbortError')
+      },
+    }
+    const clicked: string[] = []
+    ;(globalThis as any).document = {
+      createElement: () => ({ href: '', download: '', click: () => clicked.push('clicked') }),
+    }
+    ;(URL as any).createObjectURL = () => 'blob:fake'
+    ;(URL as any).revokeObjectURL = () => {}
+    const result = await shareOrDownload(new Blob(['x'], { type: 'video/webm' }), 'match', 'texte')
+    expect(result).toBe('downloaded')
+    expect(clicked).toContain('clicked')
+  })
 })
