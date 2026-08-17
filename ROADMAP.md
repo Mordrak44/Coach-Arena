@@ -1225,7 +1225,7 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       badge dans les DEUX rendus (DOM live + composite exporté). Restent :
       CGU/CGV formelles au moment du paiement, relecture par un juriste
       avant lancement.
-- [~] Hébergement — GitHub Pages, demandé explicitement par l'utilisateur
+- [x] Hébergement — GitHub Pages, demandé explicitement par l'utilisateur
       (« github page ? »). `vite.config.ts` : `base: '/Coach-Arena/'` (site
       de PROJET, pas un domaine dédié — servi sous un sous-chemin). Trois
       fichiers en dehors du graphe de modules Vite (donc jamais réécrits
@@ -1255,20 +1255,22 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       sur push vers `claude/coaching-game-voice-arena-yrja2t` — seule
       branche du dépôt — et `workflow_dispatch` manuel ; `npm test` +
       `npm run build` tournent DANS le workflow avant tout déploiement).
-      **[~] et pas [x]** : un réglage dépôt hors de portée des outils de
-      cette session reste à faire — Settings → Pages → Build and
-      deployment → Source → « GitHub Actions » (au lieu de « Deploy from
-      a branch », le défaut). Sans ce clic, le workflow tourne mais
-      `deploy-pages` échoue (aucun site Pages configuré pour le recevoir).
-      Une fois fait, l'URL sera `https://mordrak44.github.io/Coach-Arena/`.
-      **Confirmé, pas supposé** : le premier run
-      (https://github.com/Mordrak44/Coach-Arena/actions/runs/31937250358)
-      a échoué exactement comme prévu — `npm test` ✅, `npm run build` ✅,
-      puis `actions/configure-pages@v5` ❌ (site Pages introuvable), le
-      reste `skipped` en cascade. Rien à corriger côté code : c'est
-      précisément le réglage manuel décrit ci-dessus qui manque. Une fois
-      activé, un nouveau push (ou un run manuel via l'onglet Actions)
-      suffira à publier.
+      **2026-08-17 : PASSÉ EN [x]** — le réglage manuel hors de portée des
+      outils de cette session (Settings → Pages → Source → « GitHub
+      Actions ») a enfin été fait côté utilisateur, après ~26 runs
+      échoués sur ~10 heures de vérifications de routine (chaque échec
+      confirmait précisément la même cause : `configure-pages@v5` ❌, site
+      Pages introuvable, jamais un problème de code). Le run #27
+      (2026-08-17T10:27:33Z, déclenché par le push du commit `8af7ccc`)
+      est le premier `success` — `npm test` ✅, `npm run build` ✅,
+      `configure-pages`/`upload-pages-artifact`/`deploy-pages` tous ✅.
+      Le jeu est maintenant en ligne à
+      `https://mordrak44.github.io/Coach-Arena/`. Non vérifié visuellement
+      dans ce sandbox : le proxy de sortie réseau bloque
+      `mordrak44.github.io` (politique d'environnement, pas un problème du
+      site) — la confirmation vient du statut `success` de l'action
+      GitHub officielle elle-même, qui ne le rapporte qu'après acceptation
+      réelle de l'artefact par Pages, pas d'une supposition.
 - [ ] Analytics funnel (arrivée → match 1 → match 3 → achat)
 - [x] Couverture de tests par rapport de coverage (`@vitest/coverage-v8`,
       `npm run coverage`) — angle différent des rounds d'audit
@@ -1595,6 +1597,18 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : 🎉 GitHub Pages EN LIGNE. Après ~26 runs échoués
+  sur ~10 heures de vérifications de routine (toujours la même cause :
+  `configure-pages@v5` ❌, site Pages jamais activé côté réglages du
+  dépôt — jamais un problème de code), le réglage manuel (Settings →
+  Pages → Source → « GitHub Actions ») a enfin été fait. Le run #27,
+  déclenché par le push du commit `8af7ccc`, est le premier `success` de
+  bout en bout. Le jeu est accessible à
+  `https://mordrak44.github.io/Coach-Arena/`. Non vérifié visuellement
+  dans ce sandbox (le proxy de sortie réseau bloque ce domaine — politique
+  d'environnement, pas un souci du site) ; la confirmation vient du statut
+  `success` de l'action GitHub officielle elle-même. Item ROADMAP
+  « Hébergement » passé de `[~]` à `[x]`.
 - 2026-08-17 (routine) : 4e passe d'accessibilité — les précédentes
   n'avaient touché qu'ArenaScreen.tsx et CharacterSelect.tsx ; `grep -c
   "aria-"` a confirmé zéro attribut sur les 5 autres écrans. Lecture
