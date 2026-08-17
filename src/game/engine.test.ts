@@ -2953,3 +2953,96 @@ describe('recorder.ts — chemins de succès de stop(), jamais exercés (seuls l
     expect(blob).toBe((hr as any).prevBlob) // le précédent l'emporte, pas le segment trop court en cours
   })
 })
+
+describe('VoiceCoach.startVolumeMeter — la boucle de volume/pitch, jamais exercée', () => {
+  afterEach(() => {
+    delete (globalThis as any).AudioContext
+    delete (globalThis as any).requestAnimationFrame
+    delete (globalThis as any).cancelAnimationFrame
+    delete (globalThis as any).window
+  })
+
+  class FakeAnalyser {
+    fftSize = 0
+    frequencyBinCount = 32
+    freqData = new Uint8Array(32)
+    timeData = new Float32Array(2048)
+    getByteFrequencyData(arr: Uint8Array) {
+      arr.set(this.freqData)
+    }
+    getFloatTimeDomainData(arr: Float32Array) {
+      arr.set(this.timeData)
+    }
+  }
+  class FakeAudioContext {
+    state = 'running'
+    sampleRate = 48000
+    resumeCalls = 0
+    createMediaStreamSource() {
+      return { connect: () => {} }
+    }
+    createAnalyser() {
+      return new FakeAnalyser()
+    }
+    resume() {
+      this.resumeCalls++
+      return Promise.resolve()
+    }
+    close() {
+      return Promise.resolve()
+    }
+  }
+
+  function setup() {
+    ;(globalThis as any).AudioContext = FakeAudioContext
+    ;(globalThis as any).window = {} // pas de SpeechRecognition : évite un throw ReferenceError sur `window` lui-même
+    const rafQueue: Array<() => void> = []
+    ;(globalThis as any).requestAnimationFrame = (cb: () => void) => {
+      rafQueue.push(cb)
+      return rafQueue.length
+    }
+    ;(globalThis as any).cancelAnimationFrame = () => {}
+    return { rafQueue }
+  }
+
+  it('un volume fort (fréquentiel) fait monter energy à la frame suivante', async () => {
+    const { rafQueue } = setup()
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    expect(vc.state.energy).toBe(0) // 1re frame : buffer vide (silence)
+    const analyser = (vc as any).analyser as FakeAnalyser
+    analyser.freqData.fill(200) // volume fort
+    rafQueue.shift()!() // avance manuellement d'une frame
+    expect(vc.state.energy).toBeGreaterThan(0)
+  })
+
+  it('un signal voisé (temporel) met à jour le ratio de hauteur (prosodie)', async () => {
+    const { rafQueue } = setup()
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const analyser = (vc as any).analyser as FakeAnalyser
+    // Onde à 220 Hz à 48 kHz — même construction que le test dédié de detectPitch.
+    for (let i = 0; i < analyser.timeData.length; i++) {
+      analyser.timeData[i] = Math.sin((2 * Math.PI * 220 * i) / 48000) * 0.3
+    }
+    rafQueue.shift()!()
+    expect(vc.state.pitchRatio).toBeGreaterThan(0) // la ligne de base venant d'être posée, ratio=1 la 1re fois
+  })
+
+  it("resume() débloque bien un contexte resté « suspended » (Safari/iOS), mais ne touche pas à un contexte déjà actif", async () => {
+    setup()
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const ctx = (vc as any).audioCtx as FakeAudioContext
+    const callsAtStart = ctx.resumeCalls
+    ctx.state = 'running'
+    vc.resume()
+    expect(ctx.resumeCalls).toBe(callsAtStart) // déjà actif : pas d'appel superflu
+    ctx.state = 'suspended'
+    vc.resume()
+    expect(ctx.resumeCalls).toBe(callsAtStart + 1) // suspendu : débloqué
+  })
+})

@@ -828,6 +828,27 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       atteint 100 % de couverture de lignes. engine.test.ts 217 → 221.
       Couverture `recorder.ts` 74,8 % → 97,2 % (stmts). `tsc --noEmit` +
       `npm run build` verts.
+- [x] Dernier vrai trou de `systems/voice.ts` fermé : la boucle de
+      volume/pitch de `startVolumeMeter` — le signal RÉEL qui alimente le
+      gain de Hype et la prosodie côté joueur — n'avait jamais tourné une
+      seule fois sous test, malgré 3 bugs déjà trouvés dans ce fichier
+      cette session. Faux `AudioContext`/`AnalyserNode` minimal (assez
+      pour `createMediaStreamSource`/`createAnalyser`/`getByteFrequency
+      Data`/`getFloatTimeDomainData`) + `requestAnimationFrame` capturé
+      manuellement (pas laissé tourner en vrai) pour avancer la boucle
+      frame par frame de façon contrôlée. 3 tests : un volume fréquentiel
+      fort fait bien monter `state.energy` à la frame suivante ; une onde
+      à 220 Hz dans le buffer temporel (même construction que le test déjà
+      existant de `detectPitch`) met bien à jour `pitchRatio` — la
+      prosodie fonctionne réellement de bout en bout, pas seulement la
+      fonction pure `detectPitch` en isolation ; et `resume()` débloque
+      bien un contexte `suspended` (Safari/iOS) sans jamais toucher à un
+      contexte déjà actif. Aucun bug trouvé — ce coin du fichier était
+      déjà correct. `systems/` (les 5 fichiers du dossier réunis) atteint
+      95,5 % de couverture — parti de 0 % il y a une dizaine
+      d'itérations. 3 nouveaux tests. engine.test.ts 221 → 224. Couverture
+      `voice.ts` 74,7 % → 93,4 % (stmts). `tsc --noEmit` + `npm run build`
+      verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1748,6 +1769,19 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Dernier trou de `systems/voice.ts` fermé : la
+  boucle de volume/pitch de `startVolumeMeter` — le signal réel qui
+  alimente le gain de Hype et la prosodie côté joueur — n'avait jamais
+  tourné sous test, malgré 3 bugs déjà trouvés dans ce fichier cette
+  session. Faux AudioContext/AnalyserNode + `requestAnimationFrame`
+  capturé manuellement pour avancer frame par frame. 3 tests : volume
+  fort → energy monte ; onde à 220 Hz → pitchRatio se met à jour (la
+  prosodie marche de bout en bout, pas juste `detectPitch` en isolation) ;
+  `resume()` débloque un contexte suspendu sans toucher à un contexte
+  déjà actif. Aucun bug trouvé. `systems/` (5 fichiers) atteint 95,5 % de
+  couverture — parti de 0 % il y a une dizaine d'itérations. 3 tests.
+  engine.test.ts 221 → 224. Couverture voice.ts 74,7 % → 93,4 %. `tsc
+  --noEmit` + `npm run build` verts.
 - 2026-08-17 (routine) : Dernier trou de `recorder.ts` fermé : le chemin
   de SUCCÈS de `stop()` (résoudre avec un vrai `Blob`) n'avait jamais été
   exercé, ni pour `MatchRecorder` ni `HighlightRecorder` — tout ce qui a
