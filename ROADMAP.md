@@ -587,6 +587,25 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       changé — le layout responsive est déjà solide, dérisque une partie
       du TODO « Polish mobile/iOS » encore ouvert (le reste — Safari réel,
       budget batterie — reste non vérifiable dans ce sandbox).
+- [x] `HighlightRecorder.rotate()` (`systems/recorder.ts`) : trouvé en
+      relisant les fichiers `systems/` après la passe résilience, dans la
+      continuité du même réflexe (chercher les appels risqués non
+      protégés). `start()` protège son appel à
+      `startSegment()` (qui construit un `new MediaRecorder`) par un
+      try/catch — mais `rotate()`, appelé toutes les 14 s par un
+      `setInterval` pour faire tourner les segments du moment fort,
+      appelait ce MÊME `startSegment()` SANS filet. Une panne transitoire
+      du MediaRecorder à la rotation (rare, mais réelle — pas juste au
+      tout premier démarrage) plantait donc hors de toute pile
+      surveillée, silencieusement. Confirmé réel avant fix (`git stash` du
+      fichier source, le test échoue bien AVANT le correctif). Fix :
+      l'appel de `rotate()` à `startSegment()` passe dans son propre
+      try/catch — dégradation déjà gracieuse en aval (le prochain
+      `rotate()` retentera, `stop()` retombe déjà sur `prevBlob`), il ne
+      manquait que le filet à cet unique appel. 1 nouveau test (simule un
+      2e `MediaRecorder` qui jette à la rotation, confirme `rotate()` et
+      `stop()` ne plantent plus). engine.test.ts 161 → 162. `tsc --noEmit`
+      + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1505,6 +1524,17 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Retour bref à la résilience, un dernier maillon
+  trouvé en relisant `systems/recorder.ts` : `HighlightRecorder.rotate()`
+  (appelé toutes les 14 s par un `setInterval` pour faire tourner les
+  segments du moment fort) appelait `startSegment()` — qui construit un
+  `new MediaRecorder` — SANS le try/catch que `start()` a pour ce même
+  appel. Une panne transitoire à la rotation plantait donc hors de toute
+  pile surveillée. Confirmé réel avant fix (`git stash`, le test échoue
+  bien avant le correctif). Fix : cet appel passe dans son propre
+  try/catch — la dégradation était déjà gracieuse en aval, il ne manquait
+  que le filet à ce point précis. 1 test, engine.test.ts 161 → 162. `tsc
+  --noEmit` + `npm run build` verts.
 - 2026-08-17 (routine) : Après 4 itérations de résilience d'affilée, pivot
   vers une dimension jamais vérifiée systématiquement : le débordement
   horizontal sur petit écran. Chromium headless, viewport forcé à 3

@@ -2276,3 +2276,42 @@ describe('VoiceCoach — le constructeur SpeechRecognition peut exister mais pla
     expect(vc.state.supported).toBe(true)
   })
 })
+
+describe("HighlightRecorder — une panne transitoire du MediaRecorder à la rotation ne doit pas jeter", () => {
+  afterEach(() => {
+    delete (globalThis as any).window
+    delete (globalThis as any).MediaRecorder
+  })
+
+  it("bug d'audit : rotate() appelait startSegment() SANS le try/catch que start() a pour le même appel", async () => {
+    let constructCount = 0
+    class FlakyRecorder {
+      static isTypeSupported(): boolean {
+        return false // force pickMimeType() à retomber sur `undefined` (webm par défaut)
+      }
+      state = 'recording'
+      mimeType = 'video/webm'
+      ondataavailable: ((e: { data: { size: number } }) => void) | null = null
+      onstop: (() => void) | null = null
+      constructor() {
+        constructCount++
+        if (constructCount === 2) throw new Error('panne transitoire du MediaRecorder')
+      }
+      start() {}
+      stop() {
+        this.state = 'inactive'
+        this.onstop?.()
+      }
+    }
+    ;(globalThis as any).MediaRecorder = FlakyRecorder
+    ;(globalThis as any).window = { setInterval: () => 0, clearInterval: () => {} }
+    const { HighlightRecorder } = await import('../systems/recorder')
+    const hr = new HighlightRecorder()
+    const fakeCanvas = {
+      captureStream: () => ({ getTracks: () => [], getAudioTracks: () => [], addTrack: () => {} }),
+    } as unknown as HTMLCanvasElement
+    expect(hr.start(fakeCanvas, null)).toBe(true) // 1er MediaRecorder construit sans souci
+    expect(() => (hr as any).rotate()).not.toThrow() // le 2e (dans rotate) échoue, ne doit pas remonter
+    await expect(hr.stop()).resolves.not.toBeUndefined() // pas de throw non plus au stop()
+  })
+})

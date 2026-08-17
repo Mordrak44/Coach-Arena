@@ -165,7 +165,16 @@ export class HighlightRecorder {
       this.prevBlob = chunks.length ? new Blob(chunks, { type: rec.mimeType || 'video/webm' }) : null
     }
     rec.stop()
-    this.startSegment()
+    try {
+      this.startSegment()
+    } catch {
+      // Contrairement à start() (protégé par son propre try/catch), cet
+      // appel tournait NU dans le callback du setInterval — une panne
+      // transitoire du prochain MediaRecorder (rare mais réelle) plantait
+      // silencieusement hors de toute pile surveillée. Sans dégâts pour
+      // autant : le prochain rotate() (14 s plus tard) retentera, et
+      // stop() retombe déjà sur prevBlob si `current` reste invalide.
+    }
   }
 
   /** Arrête tout et retourne le meilleur segment de fin de match. */
