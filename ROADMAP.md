@@ -743,6 +743,24 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       succès), vérifiant que la 3e construction est bien tentée ET
       réussit. engine.test.ts 204 → 205. `tsc --noEmit` + `npm run build`
       verts.
+- [x] Retour sur `systems/voice.ts` (49,4 % stmts) pour couvrir le cœur
+      RÉEL du flux de reco vocale : `onresult`/`onend`, jamais exercés
+      malgré 2 bugs déjà trouvés/corrigés dans ce fichier cette session.
+      Vérifié en particulier le fix documenté du 2026-08-16 (plusieurs
+      résultats finalisés dans le même event Web Speech, pas seulement
+      `resultIndex`) avec un VRAI test (event à 2 résultats finaux
+      construits), pas seulement en faisant confiance au commentaire —
+      confirme que `finalSeq` compte bien les deux et que le DERNIER
+      commande gagne. Testé aussi le cycle relance/arrêt : `onend` relance
+      la reco quand le coach n'a pas appelé `stop()` (Chrome la coupe
+      régulièrement), et NE relance PAS après un `stop()` explicite.
+      Chemin faisant, un `cancelAnimationFrame` non mocké dans
+      l'environnement Node de vitest a fait planter le tout premier essai
+      — pas un bug du jeu (cette API est universelle dans un vrai
+      navigateur), juste un global manquant du bac à sable de test,
+      corrigé en l'ajoutant au mock. 5 nouveaux tests. engine.test.ts
+      205 → 210. Couverture `voice.ts` 49,4 % → 74,7 % (stmts). `tsc
+      --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1663,6 +1681,18 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Retour sur `systems/voice.ts` pour couvrir enfin
+  `onresult`/`onend`, le cœur réel du flux de reco vocale — malgré 2 bugs
+  déjà trouvés dans ce fichier cette session. Vérifié le fix du
+  2026-08-16 (plusieurs résultats finalisés dans un même event traités,
+  pas seulement `resultIndex`) avec un vrai test, pas juste en faisant
+  confiance au commentaire. Testé aussi le cycle relance/arrêt : `onend`
+  relance la reco sauf après un `stop()` explicite. Un
+  `cancelAnimationFrame` non mocké a fait planter le 1er essai — pas un
+  bug du jeu (API universelle en vrai navigateur), juste un global
+  manquant du bac à sable de test. 5 tests. engine.test.ts 205 → 210.
+  Couverture voice.ts 49,4 % → 74,7 %. `tsc --noEmit` + `npm run build`
+  verts.
 - 2026-08-17 (routine) : Second bug réel, trouvé en vérifiant mon PROPRE
   commentaire du fix précédent avant de lui faire confiance : j'avais
   écrit que « le prochain rotate() (14 s plus tard) retentera » après une

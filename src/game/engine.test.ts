@@ -2564,3 +2564,99 @@ describe("MatchRecorder/HighlightRecorder.start() : fuite de flux si le MediaRec
     })
   })
 })
+
+describe('VoiceCoach — onresult/onend, le cœur du flux de reco vocale, jamais exercé', () => {
+  afterEach(() => {
+    delete (globalThis as any).window
+    delete (globalThis as any).cancelAnimationFrame
+  })
+
+  class FakeRecognition {
+    lang = ''
+    continuous = false
+    interimResults = false
+    onresult: ((ev: unknown) => void) | null = null
+    onend: (() => void) | null = null
+    onerror: (() => void) | null = null
+    startCalls = 0
+    start() {
+      this.startCalls++
+    }
+    stop() {}
+  }
+
+  function finalResult(transcript: string, isFinal = true) {
+    return Object.assign([{ transcript }], { isFinal })
+  }
+
+  it('un résultat final reconnu met à jour lastHeard/lastFinal/finalSeq/pendingCommand', async () => {
+    ;(globalThis as any).window = { SpeechRecognition: FakeRecognition }
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const rec = (vc as any).recognition
+    rec.onresult({ resultIndex: 0, results: [finalResult('attaque maintenant')] })
+    expect(vc.state.lastHeard).toBe('attaque maintenant')
+    expect(vc.state.lastFinal).toBe('attaque maintenant')
+    expect(vc.state.finalSeq).toBe(1)
+    expect(vc.state.pendingCommand).toBe('attack')
+  })
+
+  it("bug d'audit déjà corrigé (2026-08-16), reconfirmé ici : PLUSIEURS résultats finalisés dans le même event sont TOUS traités, le dernier gagne", async () => {
+    ;(globalThis as any).window = { SpeechRecognition: FakeRecognition }
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const rec = (vc as any).recognition
+    // Deux ordres courts dits coup sur coup, finalisés dans le MÊME event —
+    // ne lire que resultIndex (le premier changé) perdrait le second.
+    rec.onresult({
+      resultIndex: 0,
+      results: [finalResult('défends'), finalResult('esquive')],
+    })
+    expect(vc.state.finalSeq).toBe(2) // les deux comptent comme finalisés
+    expect(vc.state.lastFinal).toBe('esquive') // le second, traité en dernier
+    expect(vc.state.pendingCommand).toBe('dodge') // pas 'defend' : le dernier écrase
+  })
+
+  it('un résultat intermédiaire (pas final) déclenche quand même une commande, sans incrémenter finalSeq', async () => {
+    ;(globalThis as any).window = { SpeechRecognition: FakeRecognition }
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const rec = (vc as any).recognition
+    rec.onresult({ resultIndex: 0, results: [finalResult('fonce', false)] })
+    expect(vc.state.pendingCommand).toBe('attack')
+    expect(vc.state.finalSeq).toBe(0)
+    expect(vc.state.lastFinal).toBe('')
+  })
+
+  it("onend relance la reconnaissance si le coach n'a pas appelé stop() (Chrome la coupe régulièrement)", async () => {
+    ;(globalThis as any).window = { SpeechRecognition: FakeRecognition }
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const rec = (vc as any).recognition
+    expect(rec.startCalls).toBe(1)
+    rec.onend()
+    expect(rec.startCalls).toBe(2) // relancée automatiquement
+    expect(vc.state.listening).toBe(true)
+  })
+
+  it('onend NE relance PAS après un stop() explicite du coach', async () => {
+    ;(globalThis as any).window = { SpeechRecognition: FakeRecognition }
+    // cancelAnimationFrame est un global toujours présent en vrai navigateur
+    // (contrairement à requestAnimationFrame ici, jamais atteint : la boucle
+    // du volume-mètre échoue avant, faute d'AudioContext) — juste absent de
+    // l'environnement Node de vitest, donc nécessaire pour que stop() tourne.
+    ;(globalThis as any).cancelAnimationFrame = () => {}
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const rec = (vc as any).recognition
+    vc.stop()
+    rec.onend()
+    expect(rec.startCalls).toBe(1) // pas de relance post-stop
+    expect(vc.state.listening).toBe(false)
+  })
+})
