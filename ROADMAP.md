@@ -985,6 +985,31 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       avant de commiter. engine.test.ts 244 → 248. Couverture `combat.ts`
       90,1 % → 90,8 % (stmts), lignes 92,8 %. `tsc --noEmit` + `npm run
       build` verts.
+- [x] Suite du flake trouvé la fois précédente : la même discipline
+      (relancer la suite plusieurs fois, pas juste une) appliquée
+      SYSTÉMATIQUEMENT sur toute la suite existante — 25 exécutions
+      complètes d'affilée des 248 tests, zéro échec. Confirme que le
+      mécanisme de fuite découvert (`enemyCornerPlay` piochant une VRAIE
+      carte pendant un test mal isolé) était bien isolé à ce seul test
+      corrigé, pas un symptôme d'un problème plus large ailleurs dans la
+      suite. Vérification pure, aucun changement de code pour ce
+      constat-là.
+      Ensuite, 3 dernières zones RÉELLES de `combat.ts` jamais exercées,
+      trouvées en cherchant d'autres branches encore non couvertes : (1)
+      le KO NATUREL (PV à 0 pendant le combat, pas via `forceRoundTimeout`
+      qui compare des ratios) déclenchant `endRound` pour le bon camp, des
+      deux côtés ; (2) perdre un round avec l'Ulti déjà proche du plein
+      (90/100) le fait déborder à 100 pile et déclenche `ultiReady` — un
+      vrai moment de comeback jamais vérifié ; (3) l'Initiative — jauge de
+      Hype pleine ET coach silencieux plus de 6 secondes → le perso tire
+      son spécial tout seul (et NE le fait PAS avant 6 s) — et la Dernière
+      Chance côté JOUEUR (déjà testée côté adverse et via temps mort
+      d'urgence, jamais pour ce déclenchement automatique précis en combat
+      normal). 5 nouveaux tests, chacun vérifié sur 15 exécutions
+      consécutives de la suite complète avant de commiter (leçon
+      directement tirée du flake de la fois précédente). Aucun bug trouvé.
+      engine.test.ts 248 → 253. Couverture `combat.ts` 90,8 % → 92,1 %
+      (stmts), lignes 94,2 %. `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1905,6 +1930,22 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite du flake trouvé la fois précédente : 25
+  exécutions complètes de la suite (248 tests) d'affilée, zéro échec —
+  confirme que la fuite (`enemyCornerPlay` piochant une vraie carte
+  pendant un test mal isolé) était bien limitée au seul test déjà
+  corrigé, pas symptomatique d'un problème plus large. Ensuite, 3
+  dernières zones réelles de `combat.ts` jamais exercées : le KO NATUREL
+  (PV à 0 en combat, pas via `forceRoundTimeout`) déclenchant `endRound`
+  pour le bon camp ; perdre un round avec l'Ulti déjà proche du plein
+  (90/100) déborde à 100 et déclenche `ultiReady` ; l'Initiative (Hype
+  pleine + coach silencieux > 6 s → spécial automatique, et PAS avant 6 s)
+  et la Dernière Chance côté JOUEUR en combat normal (déjà testée côté
+  adverse et via temps mort d'urgence, jamais ce déclenchement précis). 5
+  tests, chacun vérifié sur 15 exécutions consécutives de la suite
+  complète avant de commiter — leçon directement tirée du flake
+  précédent. Aucun bug trouvé. engine.test.ts 248 → 253. Couverture
+  combat.ts 90,8 % → 92,1 %. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Même sujet que juste avant, mais avec un flake
   attrapé au passage — la discipline de relancer la suite plusieurs fois
   avant de pousser (pas juste une) a payé. Le test « Vol de Souffle

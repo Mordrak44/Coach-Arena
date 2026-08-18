@@ -3343,3 +3343,80 @@ describe('Transition roundEnd → tactics/matchEnd — jamais exercée directeme
     expect(m.souffle).toBe(0)
   })
 })
+
+describe('KO naturel → endRound, Initiative (auto-spécial après silence), Dernière Chance côté joueur', () => {
+  function freeze(m: MatchState): void {
+    m.player.nextActionAt = m.t + 1000
+    m.enemy.nextActionAt = m.t + 1000
+  }
+
+  it("un KO naturel (PV à 0 en combat) termine le round pour le bon camp, des deux côtés", () => {
+    const win = freshMatch()
+    toFighting(win)
+    freeze(win)
+    win.enemy.hp = 0
+    tick(win, 0.01, quiet)
+    expect(win.phase).toBe('roundEnd')
+    expect(win.playerWins).toBe(1)
+    expect(win.enemyWins).toBe(0)
+
+    const lose = freshMatch()
+    toFighting(lose)
+    freeze(lose)
+    lose.player.hp = 0
+    tick(lose, 0.01, quiet)
+    expect(lose.phase).toBe('roundEnd')
+    expect(lose.enemyWins).toBe(1)
+    expect(lose.playerWins).toBe(0)
+  })
+
+  it("perdre un round avec l'Ulti déjà proche du plein le fait déborder à 100 et déclenche ultiReady", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.player.ulti = 90 // perdre le round ajoute +15 -> 105, plafonné à 100
+    m.player.ultiUsed = false
+    m.player.hp = 0 // le joueur perd ce round
+    tick(m, 0.01, quiet)
+    expect(m.player.ulti).toBe(ULTI_MAX)
+    expect(m.events.some(e => e.kind === 'ultiReady' && e.who === 'player')).toBe(true)
+  })
+
+  it("Initiative : Hype pleine + coach silencieux plus de 6s → le perso tire seul son spécial", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.player.hype = HYPE_MAX
+    m.player.hypeFullSince = m.t - 7 // déjà plein depuis 7s (silence prolongé)
+    const hpBefore = m.enemy.hp
+    tick(m, 0.01, quiet) // aucune commande : quiet = { command: null, ... }
+    expect(m.player.hype).toBe(0) // fireSpecial() la remet à zéro
+    expect(m.enemy.hp).toBeLessThan(hpBefore)
+  })
+
+  it("Initiative : Hype pleine mais depuis MOINS de 6s → ne tire pas encore tout seul", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.player.hype = HYPE_MAX
+    m.player.hypeFullSince = m.t - 2 // pleine depuis seulement 2s
+    const hpBefore = m.enemy.hp
+    tick(m, 0.01, quiet)
+    expect(m.player.hype).toBe(HYPE_MAX) // pas encore consommée
+    expect(m.enemy.hp).toBe(hpBefore)
+  })
+
+  it("Dernière Chance côté joueur : sous le seuil de PV, la Hype se remplit d'un coup, une seule fois", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.mods.lowHpThreshold = 0.15
+    m.player.hp = Math.round(m.player.maxHp * 0.1) // sous les 15%
+    m.player.hype = 0
+    tick(m, 0.01, quiet)
+    expect(m.player.hype).toBe(HYPE_MAX)
+    expect(m.mods.lowHpThreshold).toBe(0) // désarmée, ne se redéclenche pas
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('DERNIÈRE CHANCE'))).toBe(true)
+    expect(m.events.some(e => e.kind === 'hypeFull' && e.who === 'player')).toBe(true)
+  })
+})
