@@ -3507,3 +3507,72 @@ describe('story.ts : 4 branches défensives jamais exercées (fallbacks id incon
     })
   })
 })
+
+describe('enemyCardValue (grille de valeur du coach fantôme adverse) : 9 cases du switch jamais évaluées', () => {
+  // enemyCardValue() n'est pas exportée, mais enemyCornerPlay() l'appelle
+  // sur CHAQUE carte de la main adverse pendant l'évaluation (avant de
+  // choisir la meilleure) — qu'elle soit achetée ou non. Il suffit donc de
+  // mettre une carte de chaque effet en main pour exercer son `case`, sans
+  // avoir besoin qu'elle soit réellement jouée.
+  it("état favorable au coin joueur (Hype haute, perso adverse blessé) : coldShower (enemyHype) gagne, les 8 autres cases s'évaluent sans être achetées", () => {
+    const m = freshMatch()
+    m.player.hype = 70 // > 50 (enemyHype) ET > 60 (halveEnemySpecial)
+    m.enemy.hp = Math.round(m.enemy.maxHp * 0.3) // < 50 % PV (lowHpHypeFull)
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = [
+      'coldShower', // enemyHype -30 : v = 30/15 = 2.0 (le plus fort, achetée)
+      'sigYuna', // immuneConfusion : v = 0 (carte morte pour l'IA, jamais achetée)
+      'perfectCounter', // armCounterMul : v = 0.5
+      'sigFang', // armAttackFrenzy : v = 1.0
+      'lastChance', // lowHpHypeFull (branche <50% PV) : v = 1.4
+      'provocation', // provoke : v = 1.3
+      'sigRei', // counterHype : v = 0.4
+      'sigKenta', // hitsTakenHype : v = 0.7
+      'sigGoro', // halveEnemySpecial (branche Hype>60) : v = 1.6
+    ]
+    enemyCornerPlay(m)
+    // Une seule carte achetée : coldShower (2.0), la plus forte, seule à
+    // dépasser le seuil de 0,75 ET tenir dans les 3 Souffle de départ.
+    expect(m.enemyDiscard).toEqual(['coldShower'])
+    expect(m.enemySouffle).toBe(1) // 3 - coût 2 ; plus rien d'affordable au-dessus du seuil ensuite
+    expect(m.enemyHand.length).toBe(8)
+    expect(m.player.hype).toBe(40) // 70 - 30 : l'effet de coldShower a bien été APPLIQUÉ, pas juste évalué
+    // Les 8 autres cartes ont été ÉVALUÉES (chaque case du switch exécutée
+    // au moins une fois) mais aucune n'a été achetée : leurs mods restent
+    // à leur valeur par défaut.
+    expect(m.enemyMods.armedFrenzyMul).toBe(0)
+    expect(m.enemyMods.armedCounterMul).toBe(0)
+    expect(m.enemyMods.lowHpThreshold).toBe(0)
+    expect(m.enemyMods.provokedUntil).toBe(0)
+    expect(m.enemyMods.counterHypeAmount).toBe(0)
+    expect(m.enemyMods.hitsTakenHype).toBe(0)
+    expect(m.enemyMods.halveEnemySpecial).toBe(false)
+    expect(m.enemyMods.immuneConfusion).toBe(false)
+  })
+
+  it("état inverse (Hype basse, perso adverse en pleine forme) : provocation (provoke) gagne — ferme les branches « else » des ternaires enemyHype/lowHpHypeFull/halveEnemySpecial", () => {
+    const m = freshMatch()
+    m.player.hype = 30 // ≤ 50 ET ≤ 60 : branches « else » de enemyHype/halveEnemySpecial
+    m.enemy.hp = Math.round(m.enemy.maxHp * 0.9) // ≥ 50 % PV : branche « else » de lowHpHypeFull
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = [
+      'coldShower', // enemyHype (branche else) : v = 0, jamais achetée cette fois
+      'sigYuna', // immuneConfusion : v = 0
+      'perfectCounter', // armCounterMul : v = 0.5
+      'sigFang', // armAttackFrenzy : v = 1.0 (2e plus forte, mais pas assez de Souffle après l'achat de provocation)
+      'lastChance', // lowHpHypeFull (branche else) : v = 0.6
+      'provocation', // provoke : v = 1.3 (la plus forte)
+      'sigRei', // counterHype : v = 0.4
+      'sigKenta', // hitsTakenHype : v = 0.7
+      'sigGoro', // halveEnemySpecial (branche else) : v = 0.6
+    ]
+    enemyCornerPlay(m)
+    expect(m.enemyDiscard).toEqual(['provocation'])
+    expect(m.enemySouffle).toBe(1) // 3 - coût 2 ; sigFang (coût 2) ne rentre plus
+    expect(m.enemyMods.provokedUntil).toBe(-1) // armé pour le round suivant (voir combat.ts)
+    expect(m.player.hype).toBe(30) // coldShower jamais achetée cette fois : Hype joueur intacte
+    expect(m.enemyMods.armedFrenzyMul).toBe(0) // sigFang évaluée mais jamais achetée
+  })
+})

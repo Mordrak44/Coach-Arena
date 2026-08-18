@@ -1043,6 +1043,28 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       consécutives avant de commiter. `story.ts` disparaît du rapport de
       coverage (100 % sur toutes les métriques). `tsc --noEmit` +
       `npm run build` verts.
+- [x] Coverage-driven bug hunt sur `enemyCardValue` (`combat.ts`, la grille
+      de valeur du coach fantôme adverse) : 9 des 15 cases de son switch
+      n'avaient JAMAIS été exercées (enemyHype, immuneConfusion,
+      armCounterMul, armAttackFrenzy, lowHpHypeFull, provoke, counterHype,
+      hitsTakenHype, halveEnemySpecial). La fonction n'est pas exportée
+      mais `enemyCornerPlay` l'appelle sur CHAQUE carte de la main adverse
+      pendant l'évaluation — achetée ou non —, donc il suffit de garnir la
+      main adverse d'une carte par effet pour exercer chaque `case`, sans
+      dépendre du choix final de l'IA. 2 tests avec des états opposés
+      (Hype haute + perso adverse blessé, puis l'inverse) pour fermer aussi
+      les branches des trois ternaires internes (enemyHype/lowHpHypeFull/
+      halveEnemySpecial selon Hype et PV) — chaque test vérifie EN PLUS
+      quelle carte a réellement été achetée (valeur la plus haute sous 3
+      Souffle) et que son effet a été appliqué (Hype adverse réduite de 30,
+      ou `provokedUntil` armé), pas seulement que rien ne plante. Calculs
+      de valeur pré-dérivés à la main avant d'écrire le test (méthodologie
+      habituelle) — les deux tests sont passés du premier coup, confirmant
+      le calcul ET l'absence de bug dans cette grille de valeur. 2 nouveaux
+      tests, suite complète (262 tests) vérifiée sur 8 exécutions
+      consécutives avant de commiter. Couverture `combat.ts` 95,31 % (stmts,
+      92,97 % → 95,31 %), branches 82,49 % → 86,81 %. `tsc --noEmit` +
+      `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1963,6 +1985,22 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Coverage-driven bug hunt sur `enemyCardValue`
+  (`combat.ts`, la grille de valeur du coach fantôme adverse) : 9 de ses 15
+  cases de switch (enemyHype, immuneConfusion, armCounterMul,
+  armAttackFrenzy, lowHpHypeFull, provoke, counterHype, hitsTakenHype,
+  halveEnemySpecial) n'avaient jamais tourné. Fonction non exportée, mais
+  `enemyCornerPlay` l'appelle sur chaque carte de la main adverse pendant
+  l'évaluation (achetée ou non) : garnir la main d'une carte par effet
+  suffit à exercer chaque case, sans dépendre du choix final de l'IA. 2
+  tests avec états opposés (Hype haute + adversaire blessé, puis l'inverse)
+  pour fermer aussi les branches des 3 ternaires internes, chacun
+  vérifiant EN PLUS la carte réellement achetée et l'effet réellement
+  appliqué (pas juste l'absence de crash) — valeurs pré-calculées à la main
+  avant d'écrire le test, les deux passent du premier coup. Aucun bug
+  trouvé. 2 tests, engine.test.ts 260 → 262, suite complète vérifiée sur 8
+  exécutions consécutives. Couverture `combat.ts` 92,97 % → 95,31 % (stmts),
+  branches 82,49 % → 86,81 %. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Coverage-driven bug hunt sur `story.ts` (Mode
   Histoire) : le résumé texte de `npm run coverage` affichait « Lignes
   100 % » pour ce fichier alors que 4 branches précises restaient mortes —
