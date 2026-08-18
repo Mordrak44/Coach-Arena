@@ -966,6 +966,21 @@ describe('LiveCutPlayer (lecteur en direct — respecte la règle « instant dé
     expect(player.current()).toBeNull()
   })
 
+  it("setLibrary() — jamais appelée par aucun test jusqu'ici (tous passaient la bibliothèque au constructeur) : la VRAIE API utilisée par ArenaScreen après le préchargement async remplace bien la bibliothèque vide pour les prochains update()", async () => {
+    const { LiveCutPlayer } = await import('./liveCutPlayer')
+    const m = freshMatch()
+    const player = new LiveCutPlayer(ROSTER[0], ROSTER[1]) // construit AVANT que le préchargement async ne finisse
+    m.events.push({ kind: 'hit', t: 1, target: 'enemy', dmg: 5, crit: false, onoma: 'BAM!' })
+    m.t = 1
+    player.update(m)
+    expect(player.current()).toBeNull() // toujours EMPTY_CUT_LIBRARY à cet instant
+    player.setLibrary({ getClip: (kind: string) => ({ url: `fake://${kind}`, duration: 999 }) })
+    m.events.push({ kind: 'hit', t: 2, target: 'enemy', dmg: 5, crit: false, onoma: 'BAM!' })
+    m.t = 2
+    player.update(m)
+    expect(player.current()?.url).toBe('fake://attack-solo') // le préchargement a bien pris effet
+  })
+
   it('avec une bibliothèque garnie : les cuts du même événement jouent en séquence, puis expirent', async () => {
     // Un seul 'hit' produit 3 cuts (attack-solo, impact-flash, hit-reaction) :
     // ils doivent tous jouer À LA SUITE (garde-fou par budget de durée, pas

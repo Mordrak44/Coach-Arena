@@ -1195,6 +1195,22 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       `facecam.ts` fonctions 66,66 % → **100 %**, stmts/lignes déjà à
       100 % désormais confirmées bout en bout (pas juste par appel
       direct). `tsc --noEmit` + `npm run build` verts.
+- [x] Coverage-driven bug hunt sur `liveCutPlayer.ts` (fonctions 80 %, 4
+      sur 5) : `setLibrary()` — la VRAIE API appelée par `ArenaScreen.tsx`
+      une fois le préchargement async des clips terminé (le lecteur, lui,
+      doit exister dès la création du match, avant que la bibliothèque ne
+      soit prête) — n'avait jamais été appelée par un seul test : tous
+      construisaient le lecteur avec sa bibliothèque déjà en main via le
+      constructeur, contournant entièrement le scénario réel « vide au
+      départ, remplie plus tard ». Vérifié bout en bout : `current()`
+      reste `null` avec `EMPTY_CUT_LIBRARY` au premier `update()`, puis
+      `setLibrary()` avec une vraie bibliothèque, puis un nouvel événement
+      produit bien un clip au `update()` suivant — la substitution prend
+      réellement effet en cours de partie. Aucun bug trouvé. 1 nouveau
+      test, engine.test.ts 279 → 280. Couverture `liveCutPlayer.ts`
+      fonctions 80 % → **100 %**, stmts/lignes déjà à 100 % désormais
+      confirmées par le vrai chemin de préchargement. `tsc --noEmit` +
+      `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2115,6 +2131,17 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Coverage-driven bug hunt sur `liveCutPlayer.ts`
+  (fonctions 80 % → 100 %) : `setLibrary()`, la VRAIE API appelée par
+  `ArenaScreen.tsx` une fois le préchargement async des clips terminé,
+  n'avait jamais été appelée par un seul test — tous construisaient le
+  lecteur avec sa bibliothèque déjà en main via le constructeur,
+  contournant le scénario réel « vide au départ, remplie plus tard ».
+  Vérifié bout en bout : `current()` reste `null` avec la bibliothèque
+  vide, puis `setLibrary()` avec une vraie bibliothèque fait bien
+  apparaître un clip au prochain `update()` — la substitution prend
+  réellement effet en cours de partie. Aucun bug trouvé. 1 test,
+  engine.test.ts 279 → 280. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Coverage-driven bug hunt sur `systems/facecam.ts`
   (fonctions 66,66 % → 100 %) : `start()` câble `setInterval(() =>
   this.sample(), 180)`, mais le mock `setInterval` de TOUS les tests
