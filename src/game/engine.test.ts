@@ -3120,6 +3120,88 @@ describe('SoundSystem (systems/sound.ts) — bande-son synthétisée, jamais tes
       ss.stop()
     }).not.toThrow()
   })
+
+  it("stop() : un ctx.close() qui rejette est absorbé silencieusement — jamais exercé (le fake ci-dessus résout toujours)", () => {
+    class FakeNode {
+      connect() {
+        return this
+      }
+    }
+    class RejectingAudioContext {
+      currentTime = 0
+      sampleRate = 44100
+      state = 'running'
+      destination = new FakeNode()
+      createGain() {
+        return Object.assign(new FakeNode(), { gain: { value: 0 } })
+      }
+      createBufferSource() {
+        return Object.assign(new FakeNode(), { buffer: null, loop: false, start: () => {} })
+      }
+      createBiquadFilter() {
+        return Object.assign(new FakeNode(), { type: 'lowpass', frequency: { value: 0 }, Q: { value: 0 } })
+      }
+      createBuffer(_channels: number, length: number) {
+        return { getChannelData: () => new Float32Array(length) }
+      }
+      resume() {
+        return Promise.resolve()
+      }
+      close() {
+        return Promise.reject(new Error('AudioContext already closed'))
+      }
+    }
+    ;(globalThis as any).AudioContext = RejectingAudioContext
+    const ss = new SoundSystem()
+    ss.start()
+    expect(() => ss.stop()).not.toThrow()
+  })
+
+  it("setCrowdHype() programme réellement une rampe quand aucune clameur n'est en cours — jamais exercé jusqu'ici : le test global appelait toujours hit(crit) AVANT, ce qui arme roarUntil dans le futur du currentTime figé du fake et bloque la rampe par le garde-fou anti-écrasement", () => {
+    class FakeParam {
+      value = 0
+      calls: unknown[] = []
+      linearRampToValueAtTime(...args: unknown[]) {
+        this.calls.push(args)
+      }
+    }
+    class FakeNode {
+      connect() {
+        return this
+      }
+    }
+    class FakeAudioContext {
+      currentTime = 0
+      sampleRate = 44100
+      state = 'running'
+      destination = new FakeNode()
+      createGain() {
+        return Object.assign(new FakeNode(), { gain: new FakeParam() })
+      }
+      createBufferSource() {
+        return Object.assign(new FakeNode(), { buffer: null, loop: false, start: () => {} })
+      }
+      createBiquadFilter() {
+        return Object.assign(new FakeNode(), { type: 'lowpass', frequency: { value: 0 }, Q: { value: 0 } })
+      }
+      createBuffer(_channels: number, length: number) {
+        return { getChannelData: () => new Float32Array(length) }
+      }
+      resume() {
+        return Promise.resolve()
+      }
+      close() {
+        return Promise.resolve()
+      }
+    }
+    ;(globalThis as any).AudioContext = FakeAudioContext
+    const ss = new SoundSystem()
+    ss.start()
+    const crowdGain = (ss as any).crowdGain
+    ss.setCrowdHype(0.9) // aucune clameur en cours : roarUntil encore à 0, currentTime aussi
+    expect(crowdGain.gain.calls.length).toBe(1) // la rampe a bien été programmée
+    expect(crowdGain.gain.calls[0][0]).toBeCloseTo(0.12) // 0,03 + 0,9 * 0,1
+  })
 })
 
 describe('recorder.ts — chemins de succès de stop(), jamais exercés (seuls les chemins d\'échec l\'étaient)', () => {

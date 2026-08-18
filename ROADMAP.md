@@ -1229,6 +1229,25 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       engine.test.ts 280 → 283. Couverture `recorder.ts` fonctions
       91,66 % → **100 %**, stmts/lignes déjà à 100 % désormais confirmées
       par le vrai câblage. `tsc --noEmit` + `npm run build` verts.
+- [x] Dernier passage de la série sur `systems/` : `sound.ts` (fonctions
+      95,45 %). Le handler muet de `stop()` (`ctx.close().catch(() => {})`)
+      n'avait jamais été exercé — même famille que le point laissé de côté
+      sur `voice.ts` il y a 2 itérations, cette fois fermé avec un
+      `AudioContext` factice dont `close()` rejette. Découverte plus
+      intéressante en cours de route : `setCrowdHype()` (la foule qui
+      gronde plus fort avec la Hype) n'avait JAMAIS réellement programmé
+      sa rampe dans aucun test — le test global existant appelle toujours
+      `ss.hit(true)` AVANT `setCrowdHype()`, ce qui arme `roarUntil` dans
+      le FUTUR du `currentTime` figé du faux `AudioContext` (qui n'avance
+      jamais) : le garde-fou anti-écrasement de rampe (ajouté le
+      2026-08-16 pour un tout autre bug) bloquait alors silencieusement
+      CE test-ci en plus de protéger la vraie clameur qu'il visait à
+      l'origine — jamais remarqué faute d'assertion sur l'appel réel de
+      `linearRampToValueAtTime`. Nouveau test isolé (aucune clameur
+      préalable) confirmant la rampe programmée à la valeur exacte. Aucun
+      bug trouvé. 2 nouveaux tests, engine.test.ts 283 → 285. Couverture
+      `sound.ts` fonctions 95,45 % → **100 %**, lignes → **100 %**, stmts
+      94,48 % → 96,85 %. `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2149,6 +2168,19 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Dernier passage de la série sur `systems/` :
+  `sound.ts` (fonctions 95,45 % → 100 %). Le catch muet de
+  `stop()`/`ctx.close()` fermé (même point laissé de côté sur voice.ts 2
+  itérations plus tôt). Découverte plus intéressante : `setCrowdHype()`
+  n'avait jamais réellement programmé sa rampe de foule dans aucun test —
+  le test global appelle toujours `ss.hit(true)` AVANT, ce qui arme
+  `roarUntil` dans le futur du `currentTime` figé du fake `AudioContext`
+  (qui n'avance jamais), et le garde-fou anti-écrasement de rampe (ajouté
+  le 16 pour un tout autre bug) bloquait silencieusement ce test-ci aussi
+  — jamais remarqué faute d'assertion sur l'appel réel de
+  `linearRampToValueAtTime`. Nouveau test isolé (sans clameur préalable)
+  confirme la rampe à la valeur exacte. Aucun bug trouvé. 2 tests,
+  engine.test.ts 283 → 285. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Même famille de bug de méthodologie trouvée déjà
   2 fois (facecam.ts, liveCutPlayer.ts) traquée dans `systems/recorder.ts`
   (fonctions 91,66 % → 100 %) : `HighlightRecorder.start()` câble
