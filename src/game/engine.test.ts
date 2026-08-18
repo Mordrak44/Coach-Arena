@@ -2377,6 +2377,26 @@ describe('VoiceCoach — le constructeur SpeechRecognition peut exister mais pla
     await vc.start({} as any)
     expect(vc.state.supported).toBe(true)
   })
+
+  it("un constructeur qui réussit MAIS dont rec.start() jette au tout premier appel repasse `supported` à false — jamais exercé (distinct du constructeur qui jette)", async () => {
+    class RecognitionThatFailsToStart {
+      lang = ''
+      continuous = false
+      interimResults = false
+      onresult: unknown = null
+      onend: unknown = null
+      onerror: unknown = null
+      start() {
+        throw new Error('InvalidStateError: recognition already started')
+      }
+    }
+    ;(globalThis as any).window = { SpeechRecognition: RecognitionThatFailsToStart }
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await expect(vc.start({} as any)).resolves.toBeUndefined()
+    expect(vc.state.supported).toBe(false)
+    expect(vc.state.listening).toBe(false)
+  })
 })
 
 describe("HighlightRecorder — une panne transitoire du MediaRecorder à la rotation ne doit pas jeter", () => {
@@ -2758,6 +2778,30 @@ describe('VoiceCoach — onresult/onend, le cœur du flux de reco vocale, jamais
     rec.onend()
     expect(rec.startCalls).toBe(1) // pas de relance post-stop
     expect(vc.state.listening).toBe(false)
+  })
+
+  it("consumeCommand() — la VRAIE API utilisée par ArenaScreen, jamais appelée par aucun test jusqu'ici (tous lisaient state.pendingCommand directement) : lit ET vide la commande, une seule fois", async () => {
+    ;(globalThis as any).window = { SpeechRecognition: FakeRecognition }
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const rec = (vc as any).recognition
+    expect(vc.consumeCommand()).toBeNull() // rien en attente au départ
+    rec.onresult({ resultIndex: 0, results: [finalResult('attaque maintenant')] })
+    expect(vc.consumeCommand()).toBe('attack') // consommée...
+    expect(vc.state.pendingCommand).toBeNull() // ...et bien vidée dans l'état...
+    expect(vc.consumeCommand()).toBeNull() // ...donc plus rien à consommer une 2e fois
+  })
+
+  it('rec.onerror est un vrai no-op assumé (« géré par onend », commenté dans le code) — ne doit rien changer ni planter', async () => {
+    ;(globalThis as any).window = { SpeechRecognition: FakeRecognition }
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const rec = (vc as any).recognition
+    expect(() => rec.onerror()).not.toThrow()
+    expect(vc.state.listening).toBe(true) // rien n'a bougé
+    expect(vc.state.pendingCommand).toBeNull()
   })
 })
 

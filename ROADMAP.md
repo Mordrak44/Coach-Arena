@@ -1156,6 +1156,27 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       **100 %** — ne restent que 2 lignes de code défensif prouvablement
       inatteignable (gardées par `eventScore`, jamais un vrai scénario de
       jeu). `tsc --noEmit` + `npm run build` verts.
+- [x] Coverage-driven bug hunt sur `systems/voice.ts` (93,4 % stmts,
+      fonctions 75 %) : `consumeCommand()` — la VRAIE API utilisée par
+      `ArenaScreen.tsx` chaque frame pour lire ET vider la commande vocale
+      en attente — n'avait jamais été appelée par un seul test : tous
+      lisaient `state.pendingCommand` directement, contournant entièrement
+      la sémantique « lecture puis remise à zéro » (même famille de piège
+      que les bugs de consommation déjà trouvés ailleurs dans ce dépôt,
+      ex. `armedCheerHype`). Vérifié bout en bout : rien en attente au
+      départ, consommée une fois après un résultat vocal, l'état est bien
+      vidé, une 2e consommation ne retourne plus rien. Complété par :
+      `rec.onerror` (un vrai no-op assumé, commenté « géré par onend ») ;
+      et un cas jamais distingué du bug déjà corrigé sur `supported` — un
+      constructeur qui RÉUSSIT mais dont `rec.start()` jette au tout
+      premier appel (`InvalidStateError`) repasse aussi `supported` à
+      `false`, chemin de code différent du constructeur qui jette
+      lui-même. Aucun (nouveau) bug trouvé. 3 nouveaux tests,
+      engine.test.ts 274 → 277. Couverture `voice.ts` 93,4 % → **97,8 %**
+      (stmts), **100 %** lignes, fonctions 75 % → 91,66 % (ne reste que le
+      handler de rejet de `audioCtx.close()`, nécessiterait un mock
+      d'AudioContext complet pour une valeur marginale trop faible).
+      `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2076,6 +2097,19 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Coverage-driven bug hunt sur `systems/voice.ts`
+  (93,4 % → 97,8 %, fonctions 75 % → 91,66 %) : `consumeCommand()`, la
+  VRAIE API utilisée chaque frame par `ArenaScreen.tsx` pour lire ET vider
+  la commande vocale en attente, n'avait jamais été appelée par un seul
+  test — tous lisaient `state.pendingCommand` directement, contournant
+  entièrement la sémantique de consommation (même famille de piège que
+  d'autres bugs de consommation déjà trouvés dans ce dépôt). Vérifié bout
+  en bout : rien au départ, consommée une fois, l'état vidé, une 2e
+  consommation ne retourne plus rien. Complété par `rec.onerror` (no-op
+  assumé) et un chemin distinct du bug `supported` déjà corrigé — un
+  constructeur qui réussit mais dont `rec.start()` jette au premier appel.
+  Aucun nouveau bug trouvé. 3 tests, engine.test.ts 274 → 277. `tsc
+  --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Coverage-driven bug hunt sur `sceneDirector.ts`
   (le Réalisateur, 87,5 % → 97,72 %) : la fonction manquante (fonctions à
   80 %) était en fait deux callbacks de comparateur `Array.sort()` — garder
