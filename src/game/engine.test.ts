@@ -9,10 +9,13 @@ import {
   TIMEOUTS_PER_ROUND,
   TIMEOUT_DURATION,
   ULTI_MAX,
+  addSpeechHype,
   applyConsigne,
   callTimeout,
+  chooseTacticPlan,
   createMatch,
   enemyCornerPlay,
+  forceRoundTimeout,
   mulligan,
   playCard,
   switchFighter,
@@ -3197,5 +3200,64 @@ describe("enemyCoachAI — la logique de posture du coin adverse, jamais exercé
     expect(m.enemy.hype).toBeGreaterThanOrEqual(20) // le bonus de Cri de Guerre a bien été versé
     expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('FRÉNÉSIE ADVERSE'))).toBe(true)
     expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('CRI DE GUERRE ADVERSE'))).toBe(true)
+  })
+})
+
+describe('forceRoundTimeout / chooseTacticPlan / addSpeechHype — API publique jamais exercée', () => {
+  it('forceRoundTimeout ne fait rien hors de la phase de combat (déjà en pause, déjà fini…)', () => {
+    const m = freshMatch()
+    m.phase = 'tactics'
+    const before = { ...m }
+    forceRoundTimeout(m)
+    expect(m.phase).toBe('tactics') // inchangé
+    expect(m.playerWins).toBe(before.playerWins)
+    expect(m.enemyWins).toBe(before.enemyWins)
+  })
+
+  it('forceRoundTimeout : le round va au camp avec le plus haut % de PV restant', () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.player.hp = Math.round(m.player.maxHp * 0.6)
+    m.enemy.hp = Math.round(m.enemy.maxHp * 0.3) // ratio plus bas que le joueur
+    forceRoundTimeout(m)
+    expect(m.phase).toBe('roundEnd')
+    expect(m.playerWins).toBe(1)
+    expect(m.enemyWins).toBe(0)
+    expect(m.events.some(e => e.kind === 'roundEnd' && e.winner === 'player')).toBe(true)
+  })
+
+  it("forceRoundTimeout : égalité parfaite de ratio PV tranche pour le joueur (>=, pas >)", () => {
+    const m = freshMatch()
+    toFighting(m)
+    // maxHp diffère par perso (Kenta 110, Rei 95…) : égalise-les explicitement
+    // pour obtenir un ratio EXACTEMENT identique des deux côtés, sans arrondi.
+    m.player.maxHp = 100
+    m.enemy.maxHp = 100
+    m.player.hp = 50
+    m.enemy.hp = 50
+    forceRoundTimeout(m)
+    expect(m.playerWins).toBe(1)
+    expect(m.enemyWins).toBe(0)
+  })
+
+  it('chooseTacticPlan pose bien le plan choisi sur le match', () => {
+    const m = freshMatch()
+    expect(m.plan).toBeNull()
+    chooseTacticPlan(m, 'concrete')
+    expect(m.plan).toBe('concrete')
+  })
+
+  it('addSpeechHype ajoute de la Hype au joueur, mise à l\'échelle par son Cœur (HRT)', () => {
+    const m = freshMatch() // Kenta, hrt=7 -> hrtScale = 0.5 + 7/12 ≈ 0,9167
+    m.player.hype = 0
+    addSpeechHype(m, 10)
+    expect(m.player.hype).toBeCloseTo(10 * (0.5 + 7 / 12), 5)
+  })
+
+  it('addSpeechHype reste plafonné à HYPE_MAX même avec un gros bonus', () => {
+    const m = freshMatch()
+    m.player.hype = HYPE_MAX - 1
+    addSpeechHype(m, 999)
+    expect(m.player.hype).toBe(HYPE_MAX)
   })
 })

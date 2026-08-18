@@ -931,6 +931,22 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       deux contraintes à la fois. Aucun bug trouvé. engine.test.ts
       235 → 236. Couverture `combat.ts` 86,5 % → 88,5 %. `tsc --noEmit` +
       `npm run build` verts.
+- [x] `forceRoundTimeout`/`chooseTacticPlan`/`addSpeechHype` : 3 fonctions
+      EXPORTÉES de `combat.ts`, utilisées en production (`forceRoundTimeout`
+      par le timer de round côté UI ET par l'attract mode de
+      `TitleScreen.tsx`, `chooseTacticPlan`/`addSpeechHype` par l'écran de
+      coin du ring), jamais exercées par un seul test. 6 nouveaux tests :
+      no-op hors phase de combat ; le round va au camp au plus haut % de
+      PV ; une VRAIE égalité de ratio (maxHp égalisés explicitement entre
+      les deux persos plutôt que déduits d'un pourcentage — Kenta et Rei
+      ont des maxHp différents, un arrondi séparé de chaque côté aurait
+      cassé une égalité voulue « exacte », piège attrapé en le vivant
+      pendant l'écriture du test) tranche pour le joueur (`>=`, pas `>`,
+      lu directement dans le code) ; `chooseTacticPlan` pose bien le plan ;
+      `addSpeechHype` monte la Hype à l'échelle du Cœur (HRT) et reste
+      plafonnée à `HYPE_MAX`. Aucun bug trouvé. engine.test.ts 236 → 242.
+      Couverture `combat.ts` 88,5 % → 90 % (stmts), fonctions 90 % → 97,5 %.
+      `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1851,6 +1867,17 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : `forceRoundTimeout`/`chooseTacticPlan`/
+  `addSpeechHype` — 3 fonctions exportées de `combat.ts`, utilisées en
+  production (timer de round, attract mode du titre, écran du coin du
+  ring) mais jamais exercées par un test. 6 tests, dont une VRAIE égalité
+  de ratio PV pour tester le `>=` de `forceRoundTimeout` — piège attrapé
+  en l'écrivant : Kenta et Rei ont des maxHp différents (110 vs 95), donc
+  déduire l'égalité d'un pourcentage arrondi séparément de chaque côté ne
+  produit PAS un ratio identique ; corrigé en égalisant les maxHp
+  explicitement. Aucun bug trouvé. engine.test.ts 236 → 242. Couverture
+  combat.ts 88,5 % → 90 % (fonctions 90 % → 97,5 %). `tsc --noEmit` +
+  `npm run build` verts.
 - 2026-08-17 (routine) : Fini de couvrir `enemyCoachAI` : les deux
   dernières branches restantes (Frénésie/Cri de Guerre armés côté coin
   adverse, symétrique du joueur déjà testé). 1 test calibré pour forcer
