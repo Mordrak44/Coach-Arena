@@ -2331,6 +2331,16 @@ describe('ArenaRenderer — prefers-reduced-motion (WCAG 2.3.3, audit accessibil
     expect(() => new ArenaRenderer()).not.toThrow()
     expect((new ArenaRenderer() as any).reducedMotion).toBe(false)
   })
+
+  it("bug d'audit (2026-08-18) : matchMedia() (ou la lecture de .matches) qui JETTE plantait tout le match — un navigateur durci/anti-fingerprinting ne fait pas que l'omettre, il peut le faire échouer", () => {
+    ;(globalThis as any).window = {
+      matchMedia: () => {
+        throw new Error('SecurityError: matchMedia is blocked')
+      },
+    }
+    expect(() => new ArenaRenderer()).not.toThrow()
+    expect((new ArenaRenderer() as any).reducedMotion).toBe(false)
+  })
 })
 
 describe("Résilience : l'accès à `localStorage` LUI-MÊME bloqué (pas juste ses méthodes)", () => {

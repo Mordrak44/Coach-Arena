@@ -55,11 +55,31 @@ export class ArenaRenderer {
   private commentUntil = 0
   /** WCAG 2.3.3 — désactive le shake et le zoom brusque pour les
    * utilisateurs sujets au mal des transports / troubles vestibulaires.
-   * Le flash d'impact reste (couleur, pas de mouvement). */
-  private reducedMotion =
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+   * Le flash d'impact reste (couleur, pas de mouvement).
+   * try/catch, pas juste les gardes typeof : certains navigateurs
+   * durcis / extensions anti-fingerprinting font planter `matchMedia`
+   * lui-même (ou la lecture de `.matches`), pas seulement le rendre
+   * absent — même famille de piège que `hasStorage` dans cardForge.ts/
+   * deckBuilder.ts/onboarding.ts/progression.ts/stable.ts/story.ts. Sans
+   * ce filet, `new ArenaRenderer()` plantait DANS son initialiseur de
+   * champ, remontant jusqu'à l'ErrorBoundary — l'écran « K.O. TECHNIQUE »
+   * à la place du match entier, pour un simple réglage d'accessibilité
+   * (trouvé en audit, 2026-08-18).
+   * Limite assumée : lu une seule fois à la construction, un changement
+   * du réglage OS en cours de match ne prend effet qu'au match suivant
+   * (pas d'écouteur live — l'ArenaRenderer n'a pas de cycle de vie
+   * dispose(), un `addEventListener` non retiré fuirait). */
+  private reducedMotion = (() => {
+    try {
+      return (
+        typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      )
+    } catch {
+      return false
+    }
+  })()
 
   /** Consomme les nouveaux events du match pour déclencher les FX. */
   ingestEvents(m: MatchState, now: number) {

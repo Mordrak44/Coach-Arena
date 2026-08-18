@@ -1262,6 +1262,35 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       à une position aussi spécifique). Aucun bug trouvé. 1 nouveau test,
       engine.test.ts 285 → 286. Couverture `pitch.ts` → **100 %**
       (stmts/lignes/fonctions). `tsc --noEmit` + `npm run build` verts.
+- [x] **Vrai bug trouvé** — `game/` et `systems/` étant désormais
+      essentiellement à 100 % de couverture, changement d'angle : audit
+      de code (skill `code-review`, effort élevé) sur `render/
+      arenaRenderer.ts`, le plus gros fichier du dépôt (1100 lignes),
+      jamais audité pour des bugs de cette façon (seulement effleuré par
+      les captures d'écran visuelles de `scripts/shot.mjs`). Ciblé sur le
+      champ `reducedMotion` (WCAG 2.3.3, ajouté le 2026-08-17) : l'appel
+      `window.matchMedia('(prefers-reduced-motion: reduce)').matches`
+      n'avait AUCUN try/catch — seulement des gardes `typeof`, qui NE
+      protègent PAS contre l'appel lui-même (ou la lecture de `.matches`)
+      qui jette, exactement la même famille de piège que `hasStorage`
+      documentée et corrigée dans cardForge.ts/deckBuilder.ts/
+      onboarding.ts/progression.ts/stable.ts/story.ts — mais jamais
+      appliquée ici. Sur un navigateur durci ou une extension
+      anti-fingerprinting qui fait planter `matchMedia`, `new
+      ArenaRenderer()` plantait DANS son initialiseur de champ, remontant
+      jusqu'à l'ErrorBoundary : l'écran « K.O. TECHNIQUE » remplaçait le
+      match ENTIER pour un simple réglage d'accessibilité qui aurait dû,
+      au pire, se désactiver silencieusement. Confirmé par un test qui
+      échouait avant correctif (`git stash` sur le seul fichier source).
+      Corrigé en enveloppant la détection dans le même patron IIFE
+      try/catch que `hasStorage`. Second point relevé par l'audit mais
+      délibérément écarté (limite assumée, documentée en commentaire) :
+      la préférence n'est lue qu'à la construction, pas en direct — pas
+      de cycle de vie `dispose()` sur `ArenaRenderer` pour retirer
+      proprement un `addEventListener` de changement, le risque de fuite
+      dépasserait la valeur d'un réglage OS changé en plein match. 1
+      nouveau test, engine.test.ts 286 → 287. `tsc --noEmit` +
+      `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2182,6 +2211,23 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Changement d'angle une fois `game/`/`systems/`
+  quasi entièrement couverts : audit de code (skill code-review) sur
+  `render/arenaRenderer.ts`, jamais audité pour des bugs (seulement les
+  captures visuelles). **Vrai bug trouvé** : `reducedMotion` (WCAG 2.3.3)
+  appelait `window.matchMedia(...).matches` sans try/catch — seulement des
+  gardes `typeof`, qui ne protègent PAS contre l'appel lui-même qui jette
+  (même piège que `hasStorage`, déjà corrigé ailleurs mais pas ici). Sur
+  un navigateur durci/anti-fingerprinting, `new ArenaRenderer()` plantait
+  dans son initialiseur de champ → ErrorBoundary → « K.O. TECHNIQUE » sur
+  le match ENTIER pour un simple réglage d'accessibilité. Confirmé par un
+  test qui échouait avant correctif (`git stash` du seul fichier source).
+  Corrigé avec le même patron IIFE try/catch que `hasStorage`. Second
+  point de l'audit (préférence lue seulement à la construction, pas en
+  direct) délibérément écarté : pas de `dispose()` sur `ArenaRenderer`
+  pour retirer un listener proprement, risque de fuite jugé supérieur à
+  la valeur. 1 test, engine.test.ts 286 → 287. `tsc --noEmit` +
+  `npm run build` verts.
 - 2026-08-18 (routine) : `systems/pitch.ts` (97,5 % → 100 %) : le
   garde-fou « buffer trop court pour le lag le plus grave » (MIN_HZ =
   70 Hz) n'avait jamais été exercé, distinct du rejet par énergie faible
