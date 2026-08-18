@@ -1683,6 +1683,24 @@ describe('Progression / Lien (progression.ts) — couverture des cas limites', (
     expect(claimReward('goro', first!.options[0])).toBe(false)
   })
 
+  it("claimReward refuse aussi via la branche `level <= claimed` — jamais exercée : le test précédent la refusait toujours via `!options.includes(cardId)` (options du palier 2, carte du palier 1)", async () => {
+    const { recordResult, pendingReward, claimReward } = await import('./progression')
+    recordResult('nyx', true) // 1 victoire -> bondLevel(1) = 1, ne bougera plus dans ce test
+    const p = pendingReward('nyx')
+    expect(p?.level).toBe(1)
+    expect(claimReward('nyx', p!.options[0])).toBe(true) // claimed passe à 1
+    // Le niveau de Lien n'a PAS changé (toujours 1 victoire) : level(1) <= claimed(1)
+    // doit rejeter directement, avant même de comparer les options.
+    expect(claimReward('nyx', p!.options[0])).toBe(false)
+    expect(claimReward('nyx', p!.options[1])).toBe(false)
+  })
+
+  it("claimReward sur un charId jamais enregistré (jamais passé par recordResult) : le repli `map[charId] ?? {...}` de claimReward lui-même n'était jamais exercé — seul celui de getProgress l'était", async () => {
+    const { claimReward } = await import('./progression')
+    expect(() => claimReward('jamais-vu-de-ce-perso', 'massage')).not.toThrow()
+    expect(claimReward('jamais-vu-de-ce-perso', 'massage')).toBe(false) // 0 victoire, 0 palier : rien à réclamer
+  })
+
   it('applyBond : aucun changement au niveau 0, HRT plafonné à 12 au niveau 5', async () => {
     const { applyBond, recordResult } = await import('./progression')
     const char = ROSTER[0]
@@ -1720,6 +1738,16 @@ describe('Progression / Lien (progression.ts) — couverture des cas limites', (
     const found = loadCustoms().find(x => x.id === 'ancien')
     expect(found?.ulti).toBeTruthy()
     expect(found?.ulti.name).toContain('Zénith')
+  })
+
+  it("loadCustoms migre aussi un perso SANS spécial du tout (branche `?? 'Frappe Légendaire'` jamais exercée — le test ci-dessus a toujours un special.name valide)", async () => {
+    ;(globalThis as any).localStorage.setItem(
+      'coach-arena-customs-v1',
+      JSON.stringify([{ ...ROSTER[0], id: 'sans-special', special: undefined, ulti: undefined }]),
+    )
+    const { loadCustoms } = await import('./progression')
+    const found = loadCustoms().find(x => x.id === 'sans-special')
+    expect(found?.ulti.name).toBe('Frappe Légendaire : Zénith')
   })
 
   it("bug potentiel : un stockage JSON valide « null » ne doit pas planter getProgress ni loadCustoms", async () => {
@@ -3860,6 +3888,13 @@ describe('story.ts : 4 branches défensives jamais exercées (fallbacks id incon
       expect(() => markCombatHintSeen()).not.toThrow()
       expect(() => hasSeenCornerHint()).not.toThrow()
       expect(() => markCornerHintSeen()).not.toThrow()
+    })
+
+    it("progression.ts : getProgress/recordResult avec hasStorage=false — même angle mort, jamais exercé au-delà du chargement du module", async () => {
+      const { getProgress, recordResult } = await import('./progression')
+      expect(() => getProgress('kenta')).not.toThrow()
+      expect(getProgress('kenta')).toEqual({ wins: 0, losses: 0 })
+      expect(() => recordResult('kenta', true)).not.toThrow() // écriture silencieusement ignorée
     })
   })
 })

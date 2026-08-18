@@ -1372,6 +1372,33 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       jamais été exercés. Aucun bug trouvé. 2 nouveaux tests,
       engine.test.ts 287 → 288. Couverture `onboarding.ts` → **100 %**
       (toutes métriques). `tsc --noEmit` + `npm run build` verts.
+- [x] Suite du coverage-driven bug hunt : `progression.ts` (96,03 % → 99 %,
+      branches 88,67 % → 98,11 %). Fermé : `hasStorage === false` (même
+      angle mort) ; la branche `level <= claimed` de `claimReward` (le
+      test existant la refusait toujours via `!options.includes(cardId)`,
+      jamais via ce garde-fou précis) ; le repli `map[charId] ?? {...}`
+      DANS `claimReward` lui-même (celui de `getProgress` était déjà testé,
+      pas celui-ci, un charId jamais vu de `claimReward` directement) ; et
+      la migration `loadCustoms` d'un perso SANS AUCUN spécial (`c.special
+      ?.name ?? 'Frappe Légendaire'`, jusqu'ici toujours exercée avec un
+      `special.name` valide). **Trouvaille mathématique en cours de
+      route**, sur le dernier écart restant (`rewardOptionsFor`, la
+      résolution de collision `if (b === a) b = (b+1) % pool.length`) :
+      brute-forcé 10 millions de combinaisons (perso × palier) sans
+      trouver UNE SEULE collision — pas une coïncidence. Preuve : `hash()`
+      est du FNV-1a, dont le dernier caractère hashé ('a' vs 'b', code 97
+      et 98) diffère par XOR 3, qui bascule toujours le bit de poids
+      faible ; une multiplication par un nombre IMPAIR (16777619, la
+      constante FNV) préserve la parité mod 2^32 ; et `CARD_POOL.length`
+      vaut 22 aujourd'hui (PAIR). Donc `hash(...':a') % 22` et
+      `hash(...':b') % 22` ont TOUJOURS des parités opposées — ils ne
+      peuvent JAMAIS être égaux tant que la taille du pool reste paire.
+      Ce garde-fou est du code mort aujourd'hui, mais deviendrait
+      silencieusement critique (et toujours non testé) le jour où une
+      carte impaire s'ajoute au pool — noté ici plutôt que forcé par un
+      test artificiel qui masquerait cette dépendance cachée. 3 nouveaux
+      tests, engine.test.ts 288 → 292, suite complète vérifiée sur 6
+      exécutions consécutives. `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2292,6 +2319,24 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite du coverage-driven bug hunt sur
+  `progression.ts` (96,03 % → 99 %). Fermé : `hasStorage=false`, la
+  branche `level <= claimed` de `claimReward` (jamais exercée
+  directement), et la migration `loadCustoms` d'un perso sans spécial du
+  tout. **Trouvaille mathématique** sur le dernier écart
+  (`rewardOptionsFor`, résolution de collision `if (b===a) b=(b+1)%pool
+  .length`) : brute-forcé 10M combinaisons sans trouver une collision —
+  preuve que c'est structurellement impossible aujourd'hui. `hash()` est
+  du FNV-1a ; les codes de 'a'/'b' (97/98) diffèrent par XOR 3 qui
+  bascule toujours le bit de poids faible ; multiplier par un IMPAIR
+  (16777619) préserve la parité mod 2^32 ; et `CARD_POOL.length` vaut 22
+  (PAIR) aujourd'hui. Donc les deux hash modulo 22 ont TOUJOURS des
+  parités opposées — jamais égaux tant que le pool reste pair. Code mort
+  aujourd'hui mais deviendrait silencieusement critique (et toujours non
+  testé) si le pool passe à une taille impaire — documenté plutôt que
+  forcé par un test artificiel. 3 tests, engine.test.ts 288 → 292, suite
+  vérifiée sur 6 exécutions consécutives. `tsc --noEmit` +
+  `npm run build` verts.
 - 2026-08-18 (routine) : Audit de code (skill code-review) sur
   `ReadyScreen.tsx` et `PrivacyScreen.tsx` — les 2 seuls écrans jamais
   touchés par la 4e passe d'accessibilité. Aucun bug trouvé sur les deux ;
