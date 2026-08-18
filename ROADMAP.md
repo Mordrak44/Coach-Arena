@@ -947,6 +947,19 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       plafonnée à `HYPE_MAX`. Aucun bug trouvé. engine.test.ts 236 → 242.
       Couverture `combat.ts` 88,5 % → 90 % (stmts), fonctions 90 % → 97,5 %.
       `tsc --noEmit` + `npm run build` verts.
+- [x] Dernier mécanisme de jeu réel encore non testé trouvé dans
+      `startNextRound` : une carte « provocation » jouée au coin du ring
+      ne prend PAS effet immédiatement — elle se met en attente
+      (`provokedUntil === -1`) et n'active le verrouillage agressif de
+      l'adversaire qu'au DÉMARRAGE DU ROUND SUIVANT, jamais exercé par un
+      test. 2 tests (un par camp, symétriques) : une provocation posée
+      par le joueur verrouille bien l'ADVERSAIRE en agressif au round
+      suivant (pas le joueur lui-même), et vice-versa côté coin adverse —
+      confond facilement le sens si on ne relit pas soigneusement (`m.mods`
+      = mods DU camp qui a joué la carte, mais l'effet retombe sur
+      l'AUTRE camp, motif déjà rencontré et documenté ailleurs dans ce
+      fichier). Aucun bug trouvé. engine.test.ts 242 → 244. Couverture
+      `combat.ts` 90 % → 90,1 %. `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1867,6 +1880,16 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Dernier mécanisme de jeu réel non testé trouvé
+  dans `startNextRound` : une carte « provocation » jouée au coin du ring
+  ne prend pas effet immédiatement — elle se met en attente et n'active
+  le verrouillage agressif de l'adversaire qu'au démarrage du round
+  SUIVANT. 2 tests symétriques (un par camp) : une provocation posée par
+  le joueur verrouille l'ADVERSAIRE, pas lui-même, et vice-versa — motif
+  d'inversion déjà rencontré ailleurs dans ce fichier (`m.mods` appartient
+  au camp qui a joué la carte, mais l'effet retombe sur l'autre camp).
+  Aucun bug trouvé. engine.test.ts 242 → 244. Couverture combat.ts 90 %
+  → 90,1 %. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : `forceRoundTimeout`/`chooseTacticPlan`/
   `addSpeechHype` — 3 fonctions exportées de `combat.ts`, utilisées en
   production (timer de round, attract mode du titre, écran du coin du

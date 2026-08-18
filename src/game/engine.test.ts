@@ -3261,3 +3261,29 @@ describe('forceRoundTimeout / chooseTacticPlan / addSpeechHype — API publique 
     expect(m.player.hype).toBe(HYPE_MAX)
   })
 })
+
+describe("Provocation en attente : prend effet au round SUIVANT, jamais exercé", () => {
+  it("une provocation jouée par le joueur (m.mods) verrouille l'ADVERSAIRE en agressif au round suivant", () => {
+    const m = freshMatch()
+    m.phase = 'tactics'
+    m.phaseUntil = m.t // déjà expiré : le prochain tick déclenche startNextRound
+    m.mods.provokedUntil = -1 // carte de provocation jouée au coin du ring, en attente
+    m.enemy.stance = 'defensive' // posture initiale volontairement différente, pour prouver le changement
+    tick(m, 0.01, quiet)
+    expect(m.phase).toBe('intro') // le round suivant a bien démarré
+    expect(m.enemy.stance).toBe('aggressive')
+    expect(m.mods.provokedUntil).toBeGreaterThan(m.t) // -1 (en attente) remplacé par une vraie échéance
+  })
+
+  it("une provocation jouée par le coin adverse (m.enemyMods) verrouille le JOUEUR en agressif au round suivant", () => {
+    const m = freshMatch()
+    m.phase = 'tactics'
+    m.phaseUntil = m.t
+    m.enemyMods.provokedUntil = -1
+    m.player.stance = 'defensive'
+    tick(m, 0.01, quiet)
+    expect(m.phase).toBe('intro')
+    expect(m.player.stance).toBe('aggressive')
+    expect(m.enemyMods.provokedUntil).toBeGreaterThan(m.t)
+  })
+})
