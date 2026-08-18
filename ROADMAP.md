@@ -960,6 +960,31 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       l'AUTRE camp, motif déjà rencontré et documenté ailleurs dans ce
       fichier). Aucun bug trouvé. engine.test.ts 242 → 244. Couverture
       `combat.ts` 90 % → 90,1 %. `tsc --noEmit` + `npm run build` verts.
+- [x] La transition `roundEnd → tactics`/`matchEnd` de `tick()` — le
+      cœur même du passage d'un round à l'autre — n'avait jamais été
+      exercée DIRECTEMENT (seulement traversée incidemment par d'autres
+      tests qui jouaient un match complet). 4 tests : 2 rounds gagnés par
+      un camp déclenche bien `matchEnd` avec le bon vainqueur, pour les
+      deux camps séparément ; et le « Vol de Souffle adverse »
+      (`drainSouffle`, déjà testé pour l'application DSL mais jamais pour
+      son VRAI effet de jeu) réduit bien le Souffle de la pause suivante,
+      exactement une fois (pas reconduit aux pauses d'après), avec
+      l'événement dédié — et ne descend jamais sous zéro même si le vol
+      dépasse le Souffle disponible. Aucun bug trouvé. **Flake attrapé
+      avant de pousser** (discipline habituelle : lancer la suite
+      plusieurs fois, pas juste une) — le test « une seule fois » échouait
+      environ 4 fois sur 5 en suite COMPLÈTE, jamais en isolation :
+      `enemyCornerPlay(m)`, appelé PAR ce même `tick()` juste après la
+      consommation du vol, peut piocher et jouer une VRAIE carte
+      `drainSouffle` du starter deck adverse et réarmer le mod dans le
+      même tick, après que mon assertion pensait le trouver déjà remis à
+      zéro. Pas un bug du jeu — un flou dans le test, qui ne fixait pas
+      assez l'état pour être déterministe. Corrigé en vidant explicitement
+      `enemyHand`/`enemyDeck` avant le tick des deux tests concernés,
+      confirmé stable sur 6 exécutions consécutives de la suite complète
+      avant de commiter. engine.test.ts 244 → 248. Couverture `combat.ts`
+      90,1 % → 90,8 % (stmts), lignes 92,8 %. `tsc --noEmit` + `npm run
+      build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1880,6 +1905,27 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Même sujet que juste avant, mais avec un flake
+  attrapé au passage — la discipline de relancer la suite plusieurs fois
+  avant de pousser (pas juste une) a payé. Le test « Vol de Souffle
+  adverse, une seule fois » échouait ~4 fois sur 5 en suite COMPLÈTE,
+  jamais en isolation : `enemyCornerPlay(m)`, appelé par ce même `tick()`
+  juste après la consommation du vol, peut piocher et jouer une VRAIE
+  carte `drainSouffle` du starter deck adverse et réarmer le mod dans le
+  même tick — pas un bug du jeu, un flou de test pas assez déterministe.
+  Corrigé en vidant `enemyHand`/`enemyDeck` avant le tick des 2 tests
+  concernés, confirmé stable sur 6 exécutions consécutives avant de
+  commiter. Couverture combat.ts finalement 90,1 % → 90,8 %.
+- 2026-08-18 (routine) : La transition `roundEnd → tactics`/`matchEnd`
+  dans `tick()` — le cœur même du passage d'un round à l'autre — n'avait
+  jamais été exercée directement, seulement traversée incidemment par
+  d'autres tests. 4 tests : `matchEnd` avec le bon vainqueur pour les
+  deux camps ; et le « Vol de Souffle adverse » (déjà testé côté
+  application DSL, jamais pour son vrai effet de jeu) réduit le Souffle
+  de la pause suivante exactement une fois, avec l'event dédié, sans
+  jamais descendre sous zéro. Aucun bug trouvé. engine.test.ts 244 → 248.
+  Couverture combat.ts 90,1 % → 93 %. `tsc --noEmit` + `npm run build`
+  verts.
 - 2026-08-18 (routine) : Dernier mécanisme de jeu réel non testé trouvé
   dans `startNextRound` : une carte « provocation » jouée au coin du ring
   ne prend pas effet immédiatement — elle se met en attente et n'active

@@ -3287,3 +3287,59 @@ describe("Provocation en attente : prend effet au round SUIVANT, jamais exercé"
     expect(m.enemyMods.provokedUntil).toBeGreaterThan(m.t)
   })
 })
+
+describe('Transition roundEnd → tactics/matchEnd — jamais exercée directement', () => {
+  it("2 rounds gagnés par le joueur : le match se termine, événement matchEnd avec le bon vainqueur", () => {
+    const m = freshMatch()
+    m.phase = 'roundEnd'
+    m.phaseUntil = m.t
+    m.playerWins = 2
+    m.enemyWins = 0
+    tick(m, 0.01, quiet)
+    expect(m.phase).toBe('matchEnd')
+    expect(m.events.some(e => e.kind === 'matchEnd' && e.winner === 'player')).toBe(true)
+  })
+
+  it('2 rounds gagnés par le coin adverse : le match se termine pour lui aussi', () => {
+    const m = freshMatch()
+    m.phase = 'roundEnd'
+    m.phaseUntil = m.t
+    m.playerWins = 1
+    m.enemyWins = 2
+    tick(m, 0.01, quiet)
+    expect(m.phase).toBe('matchEnd')
+    expect(m.events.some(e => e.kind === 'matchEnd' && e.winner === 'enemy')).toBe(true)
+  })
+
+  it("Vol de Souffle adverse : réduit le Souffle de la pause suivante, une seule fois, avec l'event dédié", () => {
+    const m = freshMatch()
+    m.phase = 'roundEnd'
+    m.phaseUntil = m.t
+    m.playerWins = 0
+    m.enemyWins = 0 // match continue : passe en tactics, pas matchEnd
+    m.enemyMods.drainEnemySouffle = 2
+    // Main/deck adverses vidés : sans ça, enemyCornerPlay() (appelé PAR ce
+    // même tick(), juste après la consommation du vol) peut piocher et
+    // jouer une VRAIE carte drainSouffle du starter deck et réarmer le mod
+    // — un flake trouvé en observant le test échouer ~4 fois sur 5 en
+    // suite complète (jamais en isolation), pas un bug du jeu.
+    m.enemyHand = []
+    m.enemyDeck = []
+    tick(m, 0.01, quiet)
+    expect(m.phase).toBe('tactics')
+    expect(m.souffle).toBe(SOUFFLE_PER_CORNER - 2)
+    expect(m.enemyMods.drainEnemySouffle).toBe(0) // consommé, pas reconduit aux pauses suivantes
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('SOUFFLE EST VOLÉ'))).toBe(true)
+  })
+
+  it('Vol de Souffle adverse : ne descend jamais sous zéro même si le vol dépasse le Souffle disponible', () => {
+    const m = freshMatch()
+    m.phase = 'roundEnd'
+    m.phaseUntil = m.t
+    m.enemyMods.drainEnemySouffle = 999
+    m.enemyHand = []
+    m.enemyDeck = []
+    tick(m, 0.01, quiet)
+    expect(m.souffle).toBe(0)
+  })
+})
