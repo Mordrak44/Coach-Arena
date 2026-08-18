@@ -1010,6 +1010,21 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       directement tirée du flake de la fois précédente). Aucun bug trouvé.
       engine.test.ts 248 → 253. Couverture `combat.ts` 90,8 % → 92,1 %
       (stmts), lignes 94,2 %. `tsc --noEmit` + `npm run build` verts.
+- [x] Nouvelle passe de coverage-driven bug hunt sur `combat.ts` : deux
+      dernières zones jamais exercées trouvées via `npm run coverage`. (1)
+      `chargeUlti` déclenche `ultiReady` par deux chemins distincts — la
+      perte d'un round (déjà testé) ET les DÉGÂTS DE COMBAT normaux qui
+      remplissent la jauge (jamais testé) ; (2) `drawCards` : quand la
+      pioche est vide mais la défausse ne l'est pas, la défausse est
+      remélangée et redevient la pioche (jamais exercé), et quand pioche ET
+      défausse sont vides, la pioche s'arrête proprement sans planter
+      (jamais exercé non plus). La fonction jumelle privée `drawEnemyCards`
+      (logique identique, non exportée) n'a délibérément pas été testée
+      séparément — valeur marginale jugée trop faible. 3 nouveaux tests,
+      vérifiés sur 15 exécutions consécutives de la suite complète avant de
+      commiter. Aucun bug trouvé. engine.test.ts 253 → 256. Couverture
+      `combat.ts` 92,1 % → 93,14 % (stmts), fonctions 97,5 %. `tsc --noEmit`
+      + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1930,6 +1945,16 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Nouvelle passe de coverage-driven bug hunt sur
+  `combat.ts` : `chargeUlti` déclenche `ultiReady` par deux chemins (perte
+  de round, déjà testé ; dégâts de combat normaux, jamais testé) ; `drawCards`
+  n'avait jamais exercé ni le remélange défausse→pioche quand la pioche est
+  vide, ni l'arrêt propre quand pioche ET défausse sont vides. La fonction
+  jumelle privée `drawEnemyCards` (non exportée, logique identique) n'a pas
+  été testée séparément, valeur marginale trop faible. 3 tests, vérifiés sur
+  15 exécutions consécutives de la suite complète avant de commiter. Aucun
+  bug trouvé. engine.test.ts 253 → 256. Couverture `combat.ts` 92,1 % →
+  93,14 % (stmts), fonctions 97,5 %. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Suite du flake trouvé la fois précédente : 25
   exécutions complètes de la suite (248 tests) d'affilée, zéro échec —
   confirme que la fuite (`enemyCornerPlay` piochant une vraie carte

@@ -14,6 +14,7 @@ import {
   callTimeout,
   chooseTacticPlan,
   createMatch,
+  drawCards,
   enemyCornerPlay,
   forceRoundTimeout,
   mulligan,
@@ -3418,5 +3419,47 @@ describe('KO naturel → endRound, Initiative (auto-spécial après silence), De
     expect(m.mods.lowHpThreshold).toBe(0) // désarmée, ne se redéclenche pas
     expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('DERNIÈRE CHANCE'))).toBe(true)
     expect(m.events.some(e => e.kind === 'hypeFull' && e.who === 'player')).toBe(true)
+  })
+})
+
+describe('drawCards : la défausse remélangée, et ultiReady via les dégâts de combat — jamais exercés', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('pioche vide, défausse pleine : la défausse redevient la pioche (mélangée), la pioche continue', () => {
+    const m = freshMatch()
+    m.deck = []
+    m.discard = ['massage', 'secondWind', 'focus']
+    m.hand = []
+    drawCards(m, 2)
+    expect(m.hand.length).toBe(2)
+    expect(m.discard.length).toBe(0) // vidée, devenue la nouvelle pioche
+    expect(m.deck.length).toBe(1) // 3 cartes remélangées, 2 piochées, 1 restante
+    // Aucune carte perdue ni dupliquée dans l'aller-retour défausse → pioche → main.
+    const all = [...m.hand, ...m.deck].sort()
+    expect(all).toEqual(['focus', 'massage', 'secondWind'].sort())
+  })
+
+  it('pioche ET défausse vides : la pioche s\'arrête proprement, la main reste courte', () => {
+    const m = freshMatch()
+    m.deck = []
+    m.discard = []
+    m.hand = ['massage']
+    expect(() => drawCards(m, 3)).not.toThrow()
+    expect(m.hand).toEqual(['massage']) // rien de plus à piocher
+  })
+
+  it("charger l'Ulti jusqu'au plein PAR LES DÉGÂTS DE COMBAT (pas la perte d'un round) déclenche aussi ultiReady", () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.enemy.nextActionAt = m.t + 1000 // seul le joueur attaque ce tick
+    m.player.nextActionAt = m.t
+    vi.spyOn(Math, 'random').mockReturnValue(0.99) // jamais d'esquive, jamais de crit, jamais de garde
+    m.enemy.ulti = 99 // à un coup du plein (encaisser charge à 46 % dmg/maxHp)
+    m.enemy.ultiUsed = false
+    tick(m, 0.001, quiet)
+    expect(m.enemy.ulti).toBe(ULTI_MAX)
+    expect(m.events.some(e => e.kind === 'ultiReady' && e.who === 'enemy')).toBe(true)
   })
 })
