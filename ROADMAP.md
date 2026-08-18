@@ -1332,6 +1332,28 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       Aucun test unitaire dédié (pas de harnais de test composant React
       dans ce projet ; ces 3 bugs touchent la boucle de jeu de
       `ArenaScreen.tsx`, pas la logique pure de `combat.ts`).
+- [x] Audit de code (skill code-review) sur `CharacterSelect.tsx` (622
+      lignes), le plus gros écran UI, revu pour la dernière fois au round 3
+      (2026-08-16) — depuis, Vie d'Écurie, Deck du Coach et Mode Histoire
+      s'y sont tous branchés sans nouveau passage. Tous les bugs
+      précédemment corrigés (état périmé, équipiers fantômes, collisions
+      d'id signature/pool, double-comptage du deck) re-vérifiés sains,
+      aucune régression. Un vrai trou d'accessibilité trouvé, de la MÊME
+      famille que celle déjà corrigée sur `CharCard` par le premier audit
+      a11y (`89001fc`) mais jamais étendue aux bascules ajoutées depuis :
+      le toggle guidé/expert, les 3 groupes de puces du mode guidé (style/
+      tempérament/univers), et les puces d'équipiers de relève ne
+      signalaient leur sélection que par une bordure colorée (CSS pur,
+      invisible en lecteur d'écran) — sans `aria-pressed`, chaque bouton
+      d'un groupe annonce le même texte qu'il soit sélectionné ou non.
+      Ajouté `aria-pressed` sur ces 6 groupes de boutons (les boutons
+      `chip(false)` restants — reset du deck, -/+ de copies — sont de
+      vrais boutons d'action sans état persistant, à raison non touchés).
+      Vérifié : `tsc --noEmit` + `npm run build` + suite complète (287
+      tests) verts, ET capture Chromium headless avec lecture directe des
+      attributs `aria-pressed` réellement posés sur les puces déjà
+      rendues (style/tempérament/univers + CharCard), zéro régression
+      visuelle.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2252,6 +2274,18 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Audit de code (skill code-review) sur
+  `CharacterSelect.tsx` (622 lignes, revu pour la dernière fois au round 3,
+  bien avant Vie d'Écurie/Deck du Coach/Mode Histoire). Tous les anciens
+  bugs corrigés re-vérifiés sains. Un vrai trou d'a11y trouvé : le toggle
+  guidé/expert, les 3 groupes de puces guidées (style/tempérament/univers)
+  et les puces d'équipiers de relève signalaient leur sélection UNIQUEMENT
+  par une bordure colorée (CSS pur) — même famille que le bug déjà corrigé
+  sur `CharCard` (89001fc) mais jamais étendue à ces bascules ajoutées
+  depuis. `aria-pressed` ajouté sur les 6 groupes concernés. Vérifié :
+  suite complète (287 tests) + `tsc --noEmit` + `npm run build` verts,
+  capture Chromium headless avec lecture directe des attributs
+  `aria-pressed` réellement posés, zéro régression visuelle.
 - 2026-08-18 (routine) : **3 vrais bugs trouvés** — audit de code (skill
   code-review) sur `ArenaScreen.tsx` (918 lignes), jamais ciblée par un
   round d'audit dédié (les rounds précédents couvraient les autres écrans

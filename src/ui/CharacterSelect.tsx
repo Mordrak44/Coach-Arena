@@ -269,12 +269,14 @@ export default function CharacterSelect({
         <button
           style={{ ...chip(creationMode === 'guided'), flex: 1 }}
           onClick={() => setCreationMode('guided')}
+          aria-pressed={creationMode === 'guided'}
         >
           ✨ Créer en 3 questions
         </button>
         <button
           style={{ ...chip(creationMode === 'expert'), flex: 1 }}
           onClick={() => setCreationMode('expert')}
+          aria-pressed={creationMode === 'expert'}
         >
           ✍️ Mode expert
         </button>
@@ -285,7 +287,12 @@ export default function CharacterSelect({
           <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)' }}>1. SON STYLE ?</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {GUIDED.style.map(o => (
-              <button key={o.label} style={chip(gStyle === o.words)} onClick={() => setGStyle(o.words)}>
+              <button
+                key={o.label}
+                style={chip(gStyle === o.words)}
+                onClick={() => setGStyle(o.words)}
+                aria-pressed={gStyle === o.words}
+              >
                 {o.label}
               </button>
             ))}
@@ -293,7 +300,12 @@ export default function CharacterSelect({
           <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)' }}>2. SON TEMPÉRAMENT ?</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {GUIDED.temper.map(o => (
-              <button key={o.label} style={chip(gTemper === o.words)} onClick={() => setGTemper(o.words)}>
+              <button
+                key={o.label}
+                style={chip(gTemper === o.words)}
+                onClick={() => setGTemper(o.words)}
+                aria-pressed={gTemper === o.words}
+              >
                 {o.label}
               </button>
             ))}
@@ -301,7 +313,12 @@ export default function CharacterSelect({
           <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)' }}>3. SON UNIVERS ?</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {GUIDED.world.map(o => (
-              <button key={o.label} style={chip(gWorld === o.words)} onClick={() => setGWorld(o.words)}>
+              <button
+                key={o.label}
+                style={chip(gWorld === o.words)}
+                onClick={() => setGWorld(o.words)}
+                aria-pressed={gWorld === o.words}
+              >
                 {o.label}
               </button>
             ))}
@@ -370,6 +387,7 @@ export default function CharacterSelect({
                   <button
                     key={c.id}
                     style={chip(inTeam)}
+                    aria-pressed={inTeam}
                     disabled={!inTeam && teammates.length >= 2}
                     onClick={() =>
                       setTeammates(prev =>
