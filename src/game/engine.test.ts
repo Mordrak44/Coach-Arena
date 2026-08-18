@@ -3383,6 +3383,22 @@ describe('KO naturel → endRound, Initiative (auto-spécial après silence), De
     expect(m.events.some(e => e.kind === 'ultiReady' && e.who === 'player')).toBe(true)
   })
 
+  it("bug trouvé en audit coverage : la Hype qui atteint le plein PAR LE SEUL trickle passif (coach silencieux) ne déclenchait jamais hypeFull — aucun retour audio/visuel alors que le compte à rebours de l'Initiative démarre quand même", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    // Juste sous le plein : le trickle passif (auto-motivation, ~0,013/tick
+    // ici) suffit À LUI SEUL à franchir le seuil sur ce tick, sans aucune
+    // énergie de coaching (quiet = silence total).
+    m.player.hype = HYPE_MAX - 0.005
+    m.player.hypeFullSince = 0
+    expect(m.events.some(e => e.kind === 'hypeFull')).toBe(false)
+    tick(m, 0.01, quiet)
+    expect(m.player.hype).toBe(HYPE_MAX) // bien plein...
+    expect(m.player.hypeFullSince).toBeGreaterThan(0) // ...et le minuteur a bien démarré...
+    expect(m.events.some(e => e.kind === 'hypeFull' && e.who === 'player')).toBe(true) // ...mais l'événement doit prévenir le joueur
+  })
+
   it("Initiative : Hype pleine + coach silencieux plus de 6s → le perso tire seul son spécial", () => {
     const m = freshMatch()
     toFighting(m)
@@ -3574,5 +3590,28 @@ describe('enemyCardValue (grille de valeur du coach fantôme adverse) : 9 cases 
     expect(m.enemyMods.provokedUntil).toBe(-1) // armé pour le round suivant (voir combat.ts)
     expect(m.player.hype).toBe(30) // coldShower jamais achetée cette fois : Hype joueur intacte
     expect(m.enemyMods.armedFrenzyMul).toBe(0) // sigFang évaluée mais jamais achetée
+  })
+
+  it('les 4 dernières cases jamais évaluées : hype (branche <75), armCheerHype, blockEnemyCard, drainSouffle', () => {
+    const m = freshMatch()
+    m.enemy.hype = 20 // < 75 : branche haute du ternaire de 'hype'
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = [
+      'focus', // hype +15 (branche <75) : v = 15/15 = 1.0 (la plus forte)
+      'warCry', // armCheerHype : v = 0.5 (jamais achetée, Souffle épuisé après cornerSilence)
+      'cornerSilence', // blockEnemyCard : v = 0.8 (2e plus forte)
+      'breathTheft', // drainSouffle : v = 0.7 (jamais achetée non plus)
+    ]
+    enemyCornerPlay(m)
+    expect(m.enemyDiscard).toEqual(['focus', 'cornerSilence'])
+    expect(m.enemySouffle).toBe(0) // 3 - 1 (focus) - 2 (cornerSilence)
+    expect(m.enemy.hype).toBe(35) // 20 + 15 : l'effet 'hype' cible bien SOI-MÊME (pas l'adversaire)
+    expect(m.enemyMods.blockNextEnemyCard).toBe(true)
+    // warCry et breathTheft ont été ÉVALUÉES (leur case du switch a
+    // tourné) tant que le Souffle le permettait encore, mais jamais
+    // achetées : leurs mods restent à leur valeur par défaut.
+    expect(m.enemyMods.armedCheerHype).toBe(0)
+    expect(m.enemyMods.drainEnemySouffle).toBe(0)
   })
 })

@@ -1065,6 +1065,29 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       consécutives avant de commiter. Couverture `combat.ts` 95,31 % (stmts,
       92,97 % → 95,31 %), branches 82,49 % → 86,81 %. `tsc --noEmit` +
       `npm run build` verts.
+- [x] **Vrai bug trouvé** en poursuivant l'audit coverage sur le trickle de
+      Hype passif du joueur (`combat.ts`, fonction d'auto-motivation) :
+      `wasFull` (le flag « la Hype était-elle déjà pleine avant ce tick ? »)
+      était calculé APRÈS que le trickle passif (auto-motivation, même
+      coach silencieux) ait déjà rempli la jauge — donc si la Hype
+      atteignait 100 % par ce seul trickle (aucune énergie de coaching ce
+      tick précis), l'événement `hypeFull` ne partait JAMAIS : ni le son
+      (`sys.sound.hypeFull()`), ni le flash visuel du renderer, alors que
+      le minuteur de l'Initiative démarrait bel et bien en silence — un
+      joueur pouvait donc atteindre la Hype pleine sans jamais en être
+      prévenu. Confirmé par un test qui échouait avant correctif (Hype à
+      99,995 avant un tick silencieux, seul le trickle passif la fait
+      déborder à 100). Corrigé en capturant `wasFull` AVANT le trickle
+      passif et en déplaçant la vérification de franchissement après les
+      DEUX incréments (passif + actif), qu'ils aient eu lieu ensemble ou
+      séparément. Repéré en creusant plus loin les mêmes lignes déjà visées
+      par l'audit `enemyCardValue` ci-dessus (891-892 → 940 après
+      l'édition). Second test ajouté pour les 4 dernières cases jamais
+      évaluées d'`enemyCardValue` (hype branche <75, armCheerHype,
+      blockEnemyCard, drainSouffle). 2 nouveaux tests, engine.test.ts
+      262 → 264, suite complète vérifiée sur 15 exécutions consécutives
+      (discipline `tick()` habituelle). Couverture `combat.ts` 95,31 % →
+      95,65 % (stmts). `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1985,6 +2008,20 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : **Vrai bug trouvé** en poursuivant l'audit coverage
+  sur le trickle de Hype passif du joueur (`combat.ts`) : `wasFull` était
+  calculé APRÈS que l'auto-motivation silencieuse ait déjà rempli la jauge
+  — un joueur atteignant 100 % de Hype par ce seul trickle (coach
+  totalement silencieux ce tick) ne recevait JAMAIS l'événement `hypeFull`,
+  donc ni le son ni le flash visuel, alors que le minuteur de l'Initiative
+  démarrait quand même en silence. Confirmé par un test qui échouait avant
+  correctif. Corrigé en capturant `wasFull` avant le trickle passif et en
+  vérifiant le franchissement après les deux incréments (passif + actif)
+  au lieu du seul actif. Un 2e test ferme les 4 dernières cases jamais
+  évaluées d'`enemyCardValue` (hype branche <75, armCheerHype,
+  blockEnemyCard, drainSouffle). engine.test.ts 262 → 264, suite complète
+  vérifiée sur 15 exécutions consécutives. Couverture `combat.ts` 95,31 % →
+  95,65 % (stmts). `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Coverage-driven bug hunt sur `enemyCardValue`
   (`combat.ts`, la grille de valeur du coach fantôme adverse) : 9 de ses 15
   cases de switch (enemyHype, immuneConfusion, armCounterMul,

@@ -928,17 +928,22 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
   } else if (p.char.trait === 'sanguin' && input.voiceEnergy > 0.55) {
     voiceW = 0.9
   }
+  const wasFull = p.hype >= HYPE_MAX
   // Auto-motivation de base : même sans coach, un combattant se bat
   // (symétrique du trickle du coach fantôme adverse).
   p.hype = Math.min(HYPE_MAX, p.hype + 1.2 * dt * hrtScale)
 
   const energy = input.voiceEnergy * voiceW + input.faceEnergy * faceW
   if (energy > 0.15) {
-    const wasFull = p.hype >= HYPE_MAX
     // Une énergie soutenue (~0,65) remplit la jauge en ~35 s (auto-motivation incluse).
     p.hype = Math.min(HYPE_MAX, p.hype + energy * 4 * hrtScale * dt)
-    if (!wasFull && p.hype >= HYPE_MAX) m.events.push({ kind: 'hypeFull', t: m.t, who: 'player' })
   }
+  // `wasFull` capturé AVANT le trickle passif ci-dessus : sinon, un plein
+  // atteint par le seul trickle (coach totalement silencieux ce tick)
+  // passait inaperçu — la jauge ET le minuteur de l'Initiative démarraient
+  // bien, mais sans jamais prévenir le joueur (ni son (sound.hypeFull), ni
+  // le flash visuel du renderer) — bug trouvé en audit coverage.
+  if (!wasFull && p.hype >= HYPE_MAX) m.events.push({ kind: 'hypeFull', t: m.t, who: 'player' })
 
   // Initiative : jauge pleine et coach silencieux → le perso tire seul.
   // Le skill du coach, c'est de crier « SPÉCIAL ! » au meilleur moment avant ça.
