@@ -3463,3 +3463,47 @@ describe('drawCards : la défausse remélangée, et ultiReady via les dégâts d
     expect(m.events.some(e => e.kind === 'ultiReady' && e.who === 'enemy')).toBe(true)
   })
 })
+
+describe('story.ts : 4 branches défensives jamais exercées (fallbacks id inconnu + hasStorage=false)', () => {
+  it("chapterOpponent avec un opponentId absent du roster ET pas le boss final retombe sur ROSTER[0], jamais un crash", async () => {
+    const { STORY_CHAPTERS, chapterOpponent } = await import('./story')
+    const fake = { ...STORY_CHAPTERS[0], opponentId: 'perso-inexistant' }
+    expect(() => chapterOpponent(fake)).not.toThrow()
+    const { ROSTER } = await import('./characters')
+    expect(chapterOpponent(fake).name).toBe(ROSTER[0].name)
+  })
+
+  it('chapterEnemyDeck avec un id de chapitre inconnu retombe sur un deck vide, jamais un crash', async () => {
+    const { STORY_CHAPTERS, chapterEnemyDeck } = await import('./story')
+    const fake = { ...STORY_CHAPTERS[0], id: 'ch-inconnu' }
+    expect(() => chapterEnemyDeck(fake)).not.toThrow()
+    expect(chapterEnemyDeck(fake)).toEqual([])
+  })
+
+  describe('localStorage totalement bloqué (accès à la propriété elle-même jette)', () => {
+    beforeEach(() => {
+      vi.resetModules() // sinon un import déjà mis en cache plus haut ne se ré-évaluerait pas
+      Object.defineProperty(globalThis, 'localStorage', {
+        configurable: true,
+        get() {
+          throw new Error('SecurityError: localStorage access is blocked')
+        },
+      })
+    })
+
+    afterEach(() => {
+      delete (globalThis as any).localStorage
+    })
+
+    it('loadCleared : hasStorage=false renvoie un Set vide sans jamais toucher localStorage', async () => {
+      const { loadCleared } = await import('./story')
+      expect(() => loadCleared()).not.toThrow()
+      expect(loadCleared().size).toBe(0)
+    })
+
+    it('markCleared : hasStorage=false ne tente jamais l\'écriture, ne plante pas', async () => {
+      const { markCleared } = await import('./story')
+      expect(() => markCleared('ch1')).not.toThrow()
+    })
+  })
+})

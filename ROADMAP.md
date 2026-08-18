@@ -1025,6 +1025,24 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       commiter. Aucun bug trouvé. engine.test.ts 253 → 256. Couverture
       `combat.ts` 92,1 % → 93,14 % (stmts), fonctions 97,5 %. `tsc --noEmit`
       + `npm run build` verts.
+- [x] Coverage-driven bug hunt sur `story.ts` (Mode Histoire) : 4 dernières
+      branches défensives jamais exercées, trouvées en isolant les
+      instructions non couvertes via le rapport JSON brut (`coverage-final.
+      json`) plutôt que le résumé texte, qui indiquait à tort « Lignes
+      100 % » alors que 4 branches précises restaient mortes. (1)
+      `baseChar` : le fallback `?? ROSTER[0]` quand un `opponentId` n'est
+      ni le boss final ni dans le roster ; (2) `chapterEnemyDeck` : le
+      fallback `?? []` quand un id de chapitre est absent de
+      `CHAPTER_DECKS` — même famille défensive que `isUnlocked` avec un
+      chapitre inconnu, déjà testée ; (3)-(4) `loadCleared`/`markCleared` :
+      le chemin `hasStorage === false` lui-même — le bloc de résilience
+      « localStorage totalement bloqué » existant importait déjà `story.ts`
+      dans cet état mais n'appelait jamais ces deux fonctions ensuite, donc
+      le early-return n'était jamais exercé. Aucun bug trouvé. 4 nouveaux
+      tests, suite complète (260 tests) vérifiée sur 8 exécutions
+      consécutives avant de commiter. `story.ts` disparaît du rapport de
+      coverage (100 % sur toutes les métriques). `tsc --noEmit` +
+      `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1945,6 +1963,21 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Coverage-driven bug hunt sur `story.ts` (Mode
+  Histoire) : le résumé texte de `npm run coverage` affichait « Lignes
+  100 % » pour ce fichier alors que 4 branches précises restaient mortes —
+  trouvées en lisant directement `coverage-final.json` plutôt que le
+  résumé, qui masque les branches partielles sur des lignes par ailleurs
+  couvertes. `baseChar` avait un fallback `?? ROSTER[0]` jamais exercé
+  (opponentId inconnu du roster) ; `chapterEnemyDeck` un fallback `?? []`
+  jamais exercé (id de chapitre inconnu, même famille qu'`isUnlocked` déjà
+  testée) ; `loadCleared`/`markCleared` avaient leur chemin
+  `hasStorage === false` jamais réellement appelé (le test de résilience
+  « localStorage bloqué » importait déjà le module dans cet état mais
+  n'appelait jamais ces deux fonctions ensuite). Aucun bug trouvé. 4
+  tests, engine.test.ts 256 → 260, suite complète vérifiée sur 8
+  exécutions consécutives. `story.ts` à 100 % sur toutes les métriques
+  désormais. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Nouvelle passe de coverage-driven bug hunt sur
   `combat.ts` : `chargeUlti` déclenche `ultiReady` par deux chemins (perte
   de round, déjà testé ; dégâts de combat normaux, jamais testé) ; `drawCards`
