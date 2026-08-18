@@ -1354,6 +1354,24 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       attributs `aria-pressed` réellement posés sur les puces déjà
       rendues (style/tempérament/univers + CharCard), zéro régression
       visuelle.
+- [x] Audit de code (skill code-review, effort élevé) sur `ReadyScreen.tsx`
+      (écran Vestiaire, permissions média) et `PrivacyScreen.tsx` — les 2
+      seuls écrans UI jamais touchés par la 4e passe d'accessibilité du
+      2026-08-17. Aucun bug trouvé sur les deux (ReadyScreen : logique
+      `speechOk`, imbrication try/catch de `requestCoachStream()`, cession
+      du `MediaStream` à `ArenaScreen` — tout vérifié sain ; PrivacyScreen :
+      composant purement statique, rien à trouver). Vérification manuelle
+      complémentaire (le composant chip/toggle n'existe dans aucun des
+      deux) : pas de bascule sans `aria-pressed` non plus. Retour au
+      coverage-driven bug hunt : `onboarding.ts` (89,28 %, dernier module
+      `localStorage` du dossier `game/` encore incomplet) — l'idempotence
+      de `markCornerHintSeen()` (rappelée une 2e fois) et le chemin
+      `hasStorage === false` (même angle mort déjà trouvé sur story.ts et
+      deckBuilder.ts : le bloc de résilience important déjà le module dans
+      cet état mais n'appelait jamais ses fonctions ensuite) n'avaient
+      jamais été exercés. Aucun bug trouvé. 2 nouveaux tests,
+      engine.test.ts 287 → 288. Couverture `onboarding.ts` → **100 %**
+      (toutes métriques). `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2274,6 +2292,15 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Audit de code (skill code-review) sur
+  `ReadyScreen.tsx` et `PrivacyScreen.tsx` — les 2 seuls écrans jamais
+  touchés par la 4e passe d'accessibilité. Aucun bug trouvé sur les deux ;
+  pas de bascule chip/toggle non plus (vérifié manuellement). Retour au
+  coverage-driven bug hunt : `onboarding.ts` (89,28 % → 100 %) —
+  l'idempotence de `markCornerHintSeen()` et le chemin `hasStorage=false`
+  n'avaient jamais été exercés (même angle mort que story.ts/
+  deckBuilder.ts). Aucun bug trouvé. 2 tests, engine.test.ts 287 → 288.
+  `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Audit de code (skill code-review) sur
   `CharacterSelect.tsx` (622 lignes, revu pour la dernière fois au round 3,
   bien avant Vie d'Écurie/Deck du Coach/Mode Histoire). Tous les anciens

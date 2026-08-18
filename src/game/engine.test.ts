@@ -1944,11 +1944,13 @@ describe('Onboarding (onboarding.ts) — dernier module localStorage jamais test
     expect(hasSeenCornerHint()).toBe(false) // pas affectée par l'autre bulle
   })
 
-  it('markCornerHintSeen ne touche pas au flag combat', async () => {
+  it('markCornerHintSeen ne touche pas au flag combat, et est idempotent (jamais rappelée 2 fois jusqu\'ici, contrairement à markCombatHintSeen ci-dessus)', async () => {
     const { hasSeenCombatHint, hasSeenCornerHint, markCornerHintSeen } = await import('./onboarding')
     markCornerHintSeen()
     expect(hasSeenCornerHint()).toBe(true)
     expect(hasSeenCombatHint()).toBe(false)
+    expect(() => markCornerHintSeen()).not.toThrow() // 2e appel : le garde-fou `if (s.corner) return` doit tourner
+    expect(hasSeenCornerHint()).toBe(true)
   })
 
   it("bug potentiel : un stockage JSON valide « null » ne doit pas planter hasSeenCombatHint (appelé SYNCHRONE au premier rendu d'ArenaScreen)", async () => {
@@ -3847,6 +3849,17 @@ describe('story.ts : 4 branches défensives jamais exercées (fallbacks id incon
       expect(() => loadTemplate()).not.toThrow()
       expect(loadTemplate()).toEqual(defaultTemplate())
       expect(() => saveTemplate(defaultTemplate())).not.toThrow()
+    })
+
+    it("onboarding.ts : hasSeenCombatHint/markCombatHintSeen avec hasStorage=false — même angle mort, jamais exercé au-delà du chargement du module", async () => {
+      const { hasSeenCombatHint, markCombatHintSeen, hasSeenCornerHint, markCornerHintSeen } = await import(
+        './onboarding'
+      )
+      expect(() => hasSeenCombatHint()).not.toThrow()
+      expect(hasSeenCombatHint()).toBe(false)
+      expect(() => markCombatHintSeen()).not.toThrow()
+      expect(() => hasSeenCornerHint()).not.toThrow()
+      expect(() => markCornerHintSeen()).not.toThrow()
     })
   })
 })
