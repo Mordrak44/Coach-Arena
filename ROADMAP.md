@@ -1291,6 +1291,47 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       dépasserait la valeur d'un réglage OS changé en plein match. 1
       nouveau test, engine.test.ts 286 → 287. `tsc --noEmit` +
       `npm run build` verts.
+- [x] **3 vrais bugs trouvés** — audit de code (skill code-review, effort
+      élevé) sur `ArenaScreen.tsx` (918 lignes), jamais ciblée par un round
+      d'audit dédié jusqu'ici (les rounds précédents couvraient les AUTRES
+      écrans UI et `App.tsx`/`arenaRenderer.ts`, jamais celui-ci — le plus
+      gros et le plus dense en logique de tous). (1) **Consigne mal
+      appliquée à la transition round→coin du ring** : le reset de
+      `lastFinalSeq` (« ignore les phrases dites pendant le round écoulé »)
+      tournait APRÈS le bloc qui lit `finalSeq` pour en faire une consigne,
+      sur le MÊME tick que la transition — un mot crié en plein combat
+      (« CONTRE ! », etc.) pouvait donc être lu comme la consigne de la
+      pause qui vient de commencer, avant même que le joueur n'ait parlé
+      au coin du ring, consommant pour rien son unique consigne par pause.
+      Corrigé en avançant ce reset avant le bloc de lecture. (2) **Le soin
+      d'urgence du coin adverse (temps mort sous 25 % PV) était attribué
+      au JOUEUR** : le switch de la « visio des coachs » ne reconnaissait
+      que le suffixe `(coin adverse)` sur les events `card`, pas `(temps
+      mort adverse)` (2e forme possible, voir combat.ts) — la bulle
+      d'humeur adverse ne s'affichait pas, et `procPulse()` déclenchait à
+      la place le badge « carte déclenchée » du JOUEUR, pile au moment où
+      le coin adverse se sauve in extremis. Corrigé en testant la présence
+      du mot « adverse » (commun aux deux suffixes, jamais présent côté
+      joueur — vérifié dans combat.ts). (3) **`useRef(createMatch(...))`
+      recréait un match complet (2 decks mélangés + mains piochées) à
+      CHAQUE rendu** — l'argument d'un appel `useRef()` est réévalué par
+      JS à chaque rendu même si `useRef` ne garde que le tout premier
+      résultat ; ce composant re-rend plusieurs fois par seconde (boucle
+      de jeu à base de `setState`), donc un match entier était construit
+      puis jeté en pure perte à chaque frame. Corrigé par le patron
+      d'initialisation paresseuse standard (`useRef(null)` + garde `if
+      (current === null)`). Écarté (refactor plus large, même prudence que
+      le précédent différé sur `arenaRenderer.ts`) : fusionner les 2
+      boucles `for`/`switch` séparées (humeur puis son) sur `m.events` —
+      la duplication a directement facilité le bug (2), mais un tel
+      refactor mérite sa propre vérification visuelle dédiée plutôt que
+      d'être fait à la hâte ici. Vérifié : suite complète (287 tests)
+      verte, `tsc --noEmit` + `npm run build` verts, ET funnel complet
+      capturé en Chromium headless (`scripts/shot.mjs`) — titre, vie
+      privée, sélection, arène ×2, résultats — aucune régression visuelle.
+      Aucun test unitaire dédié (pas de harnais de test composant React
+      dans ce projet ; ces 3 bugs touchent la boucle de jeu de
+      `ArenaScreen.tsx`, pas la logique pure de `combat.ts`).
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2211,6 +2252,29 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : **3 vrais bugs trouvés** — audit de code (skill
+  code-review) sur `ArenaScreen.tsx` (918 lignes), jamais ciblée par un
+  round d'audit dédié (les rounds précédents couvraient les autres écrans
+  et App.tsx/arenaRenderer.ts, jamais celui-ci). (1) Le reset de
+  `lastFinalSeq` à l'entrée en phase tactique tournait APRÈS le bloc qui
+  lit `finalSeq` pour en faire une consigne, sur le même tick — un mot
+  crié en plein combat pouvait être lu comme la consigne de la pause qui
+  vient de commencer, consommant l'unique consigne par pause pour rien.
+  (2) Le soin d'urgence du coin adverse (temps mort sous 25 % PV) n'était
+  pas reconnu par le switch de la « visio des coachs » (seul le suffixe
+  `(coin adverse)` était testé, pas `(temps mort adverse)`) : la bulle
+  d'humeur adverse ne s'affichait pas, et le badge « carte déclenchée » du
+  JOUEUR s'affichait à la place, pile au moment où l'adversaire se sauve
+  in extremis. (3) `useRef(createMatch(...))` recréait un match complet
+  (2 decks + mains piochées) à CHAQUE rendu — l'argument est réévalué par
+  JS à chaque rendu même si `useRef` ne garde que le premier résultat, et
+  ce composant re-rend plusieurs fois par seconde. Les 3 corrigés. Écarté
+  (refactor plus large, même prudence que sur arenaRenderer.ts) : fusionner
+  les 2 boucles séparées (humeur/son) sur `m.events`, qui a directement
+  facilité le bug (2). Vérifié : suite complète (287 tests) verte, `tsc
+  --noEmit` + `npm run build` verts, funnel complet capturé en Chromium
+  headless sans régression visuelle (pas de harnais de test composant
+  React dans ce projet pour ces 3 bugs côté boucle de jeu UI).
 - 2026-08-18 (routine) : Changement d'angle une fois `game/`/`systems/`
   quasi entièrement couverts : audit de code (skill code-review) sur
   `render/arenaRenderer.ts`, jamais audité pour des bugs (seulement les

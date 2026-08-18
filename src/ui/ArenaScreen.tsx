@@ -104,7 +104,17 @@ export default function ArenaScreen({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const camRef = useRef<HTMLVideoElement>(null)
   const cutVideoRef = useRef<HTMLVideoElement>(null)
-  const matchRef = useRef<MatchState>(createMatch(player, enemy, deck, matchOpts))
+  // Initialisation paresseuse : passer createMatch(...) directement en
+  // argument de useRef() le ferait ré-exécuter (mélange de 2 decks +
+  // Math.random()) à CHAQUE rendu — useRef ne garde que le résultat du
+  // premier appel, mais l'argument lui-même est réévalué à chaque rendu
+  // comme n'importe quel appel de fonction JS. Ce composant re-rend
+  // plusieurs fois par seconde (plusieurs setState par frame dans la
+  // boucle de jeu), donc un match complet était construit puis jeté à
+  // chaque rendu, pour rien (trouvé en audit).
+  const matchRef = useRef<MatchState | null>(null)
+  if (matchRef.current === null) matchRef.current = createMatch(player, enemy, deck, matchOpts)
+  const match = matchRef.current
   const pendingCmd = useRef<CoachCommand | null>(null)
 
   // Instances systèmes, stables pour toute la durée du composant.
@@ -142,7 +152,7 @@ export default function ArenaScreen({
     }
   }
 
-  const [phase, setPhase] = useState(matchRef.current.phase)
+  const [phase, setPhase] = useState(match.phase)
   const [heard, setHeard] = useState('')
   const [micOk, setMicOk] = useState<boolean | null>(null)
   const [camOk, setCamOk] = useState(false)
@@ -153,7 +163,7 @@ export default function ArenaScreen({
   const [mullSel, setMullSel] = useState<number[]>([])
   const [mullUsed, setMullUsed] = useState(false)
   const [tacticsLeft, setTacticsLeft] = useState(0)
-  const [timeoutsLeft, setTimeoutsLeft] = useState(matchRef.current.timeoutsLeft)
+  const [timeoutsLeft, setTimeoutsLeft] = useState(match.timeoutsLeft)
   const [timeoutLeftSec, setTimeoutLeftSec] = useState(0)
   const [speechEnergy, setSpeechEnergy] = useState(0)
   const [consigne, setConsigne] = useState<string | null>(null)
@@ -252,7 +262,7 @@ export default function ArenaScreen({
       if (disposed) return
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
-      const m = matchRef.current
+      const m = matchRef.current!
 
       const prevPhase = m.phase
       const cmd = pendingCmd.current ?? sys.voice.consumeCommand()
@@ -286,6 +296,18 @@ export default function ArenaScreen({
           // seul ce qui est dit PENDANT le gel doit pouvoir devenir une consigne.
           lastFinalSeq.current = sys.voice.state.finalSeq
         }
+      }
+
+      // Vient de rentrer en phase tactique : les phrases dites PENDANT le
+      // round qui vient de se terminer ne doivent jamais compter comme la
+      // consigne de la pause qui commence. Ce reset doit tourner AVANT le
+      // bloc juste en dessous (qui lit finalSeq dès que phase==='tactics',
+      // sur ce même tick) — sinon un mot prononcé en plein combat (crié
+      // pour attaquer/contrer) pouvait être lu comme la consigne du coin,
+      // avant même que le joueur n'ait parlé à la pause, consommant son
+      // unique consigne par pause pour rien (trouvé en audit).
+      if (m.phase === 'tactics' && prevPhase !== 'tactics') {
+        lastFinalSeq.current = sys.voice.state.finalSeq
       }
 
       // Pendant la phase tactique OU un temps mort, le discours du coach
@@ -327,8 +349,6 @@ export default function ArenaScreen({
               alive: b.hp > 0,
             })),
           )
-          // Ignore les phrases prononcées pendant le round écoulé.
-          lastFinalSeq.current = sys.voice.state.finalSeq
         }
       }
       setSpecialReady(m.player.hype >= HYPE_MAX)
@@ -360,9 +380,16 @@ export default function ArenaScreen({
         // …et alimente la visio des coachs.
         switch (ev.kind) {
           case 'card':
-            if (ev.name.includes('(coin adverse)'))
-              setMood('😤', ev.name.replace(' (coin adverse)', ''), 2600)
-            else procPulse()
+            // Le coin adverse annonce ses cartes avec 2 suffixes possibles
+            // (« (coin adverse) » en pause normale, « (temps mort adverse) »
+            // pour son soin d'urgence sous 25 % PV — voir combat.ts) : ne
+            // filtrer que sur le premier attribuait à tort la seconde au
+            // JOUEUR lui-même (procPulse), pile au moment dramatique où le
+            // coin adverse se sauve in extremis (trouvé en audit).
+            if (ev.name.includes('adverse')) {
+              const label = ev.name.replace(' (coin adverse)', '').replace(' (temps mort adverse)', '')
+              setMood('😤', label, 2600)
+            } else procPulse()
             break
           case 'cardProc':
             if (ev.text.includes('ADVERSE') || ev.text.includes('TON SOUFFLE')) setMood('⚡', ev.text, 2000)
@@ -564,7 +591,7 @@ export default function ArenaScreen({
   }
 
   const onCallTimeout = () => {
-    const m = matchRef.current
+    const m = matchRef.current!
     if (!callTimeout(m)) return
     // callTimeout mute m.phase HORS de la boucle de jeu : la détection
     // « changement de phase » de la boucle compare avant/après son PROPRE
@@ -593,11 +620,11 @@ export default function ArenaScreen({
 
   const pickPlan = (p: TacticPlan) => {
     setPlan(p)
-    chooseTacticPlan(matchRef.current, p)
+    chooseTacticPlan(matchRef.current!, p)
   }
 
   const onPlayCard = (id: CardId) => {
-    const m = matchRef.current
+    const m = matchRef.current!
     if (playCard(m, id)) {
       setHand([...m.hand])
       setSouffle(m.souffle)
@@ -609,7 +636,7 @@ export default function ArenaScreen({
   }
 
   const onSwitch = (i: number) => {
-    const m = matchRef.current
+    const m = matchRef.current!
     if (switchFighter(m, i)) {
       setSouffle(m.souffle)
       setSwitchDone(true)
@@ -624,7 +651,7 @@ export default function ArenaScreen({
   }
 
   const doMulligan = () => {
-    const m = matchRef.current
+    const m = matchRef.current!
     const ids = mullSel.map(i => hand[i]).filter(Boolean)
     if (mulligan(m, ids)) {
       setHand([...m.hand])
