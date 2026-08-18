@@ -1527,6 +1527,12 @@ describe("Vie d'Écurie (stable.ts) — jamais testée jusqu'ici (0 référence)
     expect(getStable('goro', 'tetu', DAY1 + 10_000).mood).toBeGreaterThanOrEqual(10)
   })
 
+  it("recordMatchMood sur un charId jamais vu (jamais passé par getStable/doStableAction avant) : son propre repli `?? freshState(now)` n'était jamais exercé, seul celui des autres fonctions l'était", async () => {
+    const { recordMatchMood, getStable } = await import('./stable')
+    expect(() => recordMatchMood('jamais-vu-non-plus', true, DAY1)).not.toThrow()
+    expect(getStable('jamais-vu-non-plus', 'sanguin', DAY1).mood).toBe(58) // 50 (frais) + 8 (victoire)
+  })
+
   it('consumeTraining : rendu une seule fois, puis null', async () => {
     const { doStableAction, consumeTraining } = await import('./stable')
     doStableAction('yuna', 'sanguin', 'train', 'spd', DAY1)
@@ -1545,6 +1551,27 @@ describe("Vie d'Écurie (stable.ts) — jamais testée jusqu'ici (0 référence)
     const expectedDrift = Math.min(5 * 4, Math.abs(startMood - 50))
     const expectedMood = startMood > 50 ? startMood - expectedDrift : startMood + expectedDrift
     expect(drifted.mood).toBe(expectedMood)
+  })
+
+  it("dérive douce vers 50 depuis EN DESSOUS (jamais exercée : le test précédent ne part que d'au-dessus, mood > 50)", async () => {
+    const { recordMatchMood, getStable } = await import('./stable')
+    getStable('goro', 'tetu', DAY1) // seed
+    for (let i = 0; i < 5; i++) recordMatchMood('goro', false, DAY1 + i * 1000) // fait chuter l'humeur sous 50
+    const before = getStable('goro', 'tetu', DAY1 + 5000)
+    expect(before.mood).toBeLessThan(50)
+    const fiveDaysLater = DAY1 + 5000 + 5 * 86_400_000
+    const drifted = getStable('goro', 'tetu', fiveDaysLater)
+    expect(drifted.mood).toBeGreaterThan(before.mood) // remonte vers 50, pas l'inverse
+    expect(drifted.mood).toBeLessThanOrEqual(50)
+  })
+
+  it("nouveau jour avec une envie DÉJÀ comblée la veille : une nouvelle envie doit naître (jamais exercé, le test 'nouveau jour' existant ne touche pas aux envies)", async () => {
+    const { getStable, doStableAction } = await import('./stable')
+    const s = getStable('yuna', 'sanguin', DAY1)
+    doStableAction('yuna', 'sanguin', s.desire!, 'atk', DAY1) // comble l'envie du jour -> desire = null
+    expect(getStable('yuna', 'sanguin', DAY1).desire).toBeNull()
+    const nextDay = getStable('yuna', 'sanguin', DAY1 + 86_400_000)
+    expect(nextDay.desire).not.toBeNull() // une nouvelle envie est bien née au changement de jour
   })
 
   it('nouveau jour : les actions se rechargent à 3', async () => {
@@ -1592,6 +1619,10 @@ describe("Vie d'Écurie (stable.ts) — jamais testée jusqu'ici (0 référence)
     const text = desireText(ROSTER[0], s)
     expect(text).toContain(ROSTER[0].name)
     expect(desireText(ROSTER[0], { ...s, desire: null })).toBeNull()
+    // ROSTER[0] est 'fusionnel' (envies : leisure/rest seulement) — une
+    // envie 'train' (jamais dans ce pool) n'a jamais été exercée : le
+    // filtre doit retomber sur `pool.length === 0` -> null, pas planter.
+    expect(desireText(ROSTER[0], { ...s, desire: 'train' })).toBeNull()
   })
 
   it("readAll : une VRAIE erreur de syntaxe JSON (pas juste une mauvaise forme) retombe aussi sur un état neuf", async () => {
@@ -3895,6 +3926,15 @@ describe('story.ts : 4 branches défensives jamais exercées (fallbacks id incon
       expect(() => getProgress('kenta')).not.toThrow()
       expect(getProgress('kenta')).toEqual({ wins: 0, losses: 0 })
       expect(() => recordResult('kenta', true)).not.toThrow() // écriture silencieusement ignorée
+    })
+
+    it("stable.ts : getStable/doStableAction avec hasStorage=false — même angle mort, jamais exercé au-delà du chargement du module", async () => {
+      const { getStable, doStableAction } = await import('./stable')
+      const t = Date.UTC(2026, 0, 1, 12)
+      expect(() => getStable('kenta', 'sanguin', t)).not.toThrow()
+      const s = getStable('kenta', 'sanguin', t)
+      expect(s.mood).toBe(50) // repli sur un état frais à chaque appel, rien ne persiste
+      expect(() => doStableAction('kenta', 'sanguin', 'leisure', 'atk', t)).not.toThrow()
     })
   })
 })

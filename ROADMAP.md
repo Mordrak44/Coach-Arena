@@ -1399,6 +1399,24 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       test artificiel qui masquerait cette dépendance cachée. 3 nouveaux
       tests, engine.test.ts 288 → 292, suite complète vérifiée sur 6
       exécutions consécutives. `tsc --noEmit` + `npm run build` verts.
+- [x] Suite du coverage-driven bug hunt : `stable.ts` (Vie d'Écurie) →
+      **100 %**. Fermés : `hasStorage === false` ; `desireText` avec une
+      envie qui n'existe pas dans le pool du trait donné (`pool.length ===
+      0` → `null`, jamais exercé — seul le cas normal et le cas
+      `desire: null` l'étaient) ; la dérive douce vers 50 depuis EN
+      DESSOUS (le seul test existant part toujours d'une humeur AU-DESSUS
+      de 50, jamais en dessous — direction opposée du même calcul, jamais
+      vérifiée) ; le changement de jour avec une envie DÉJÀ comblée la
+      veille (doit en faire naître une nouvelle, jamais exercé — le test
+      « nouveau jour » existant ne touche qu'aux actions rechargées, pas
+      aux envies) ; et le repli `all[charId] ?? freshState(now)` PROPRE à
+      `recordMatchMood` (le test existant appelait toujours `getStable`
+      en premier pour « semer » l'état, jamais `recordMatchMood` sur un
+      charId totalement neuf). Aucun bug trouvé. 5 nouveaux tests,
+      engine.test.ts 292 → 296, suite complète vérifiée sur 6 exécutions
+      consécutives. Couverture `game/` globale 97,79 % → **98,14 %**
+      (stmts), branches 88,56 % → **90,47 %**. `tsc --noEmit` +
+      `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2319,6 +2337,16 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite du coverage-driven bug hunt : `stable.ts`
+  (Vie d'Écurie) → 100 %. Fermés : `hasStorage=false` ; `desireText` avec
+  une envie hors du pool du trait (jamais exercé) ; la dérive douce vers
+  50 depuis EN DESSOUS (le seul test existant partait toujours
+  d'au-dessus) ; le changement de jour avec une envie déjà comblée la
+  veille (doit en faire naître une nouvelle) ; et le repli propre à
+  `recordMatchMood` sur un charId totalement neuf. Aucun bug trouvé. 5
+  tests, engine.test.ts 292 → 296, suite vérifiée sur 6 exécutions
+  consécutives. `game/` global 97,79 % → 98,14 % (stmts). `tsc --noEmit`
+  + `npm run build` verts.
 - 2026-08-18 (routine) : Suite du coverage-driven bug hunt sur
   `progression.ts` (96,03 % → 99 %). Fermé : `hasStorage=false`, la
   branche `level <= claimed` de `claimReward` (jamais exercée
