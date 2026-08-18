@@ -920,6 +920,17 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       défensif) ; et le cas par défaut (pioche dans les 5 postures).
       engine.test.ts 227 → 235. Couverture `combat.ts` 83,3 % → 86,5 %
       (stmts). `tsc --noEmit` + `npm run build` verts.
+- [x] Deux dernières branches d'`enemyCoachAI` restées non couvertes après
+      la passe précédente : l'équivalent adverse de la Frénésie/Cri de
+      Guerre armés (le coin adverse consomme aussi ses propres cartes
+      armées, symétrique du joueur, déjà testé côté joueur mais jamais
+      côté IA). 1 test, calibré précisément pour forcer `pick(['neutral',
+      'aggressive'])` à choisir 'aggressive' (posture qui déclenche la
+      Frénésie) tout en restant sous le seuil probabiliste d'entrée dans
+      le bloc de décision — un seul `Math.random()` mocké satisfait les
+      deux contraintes à la fois. Aucun bug trouvé. engine.test.ts
+      235 → 236. Couverture `combat.ts` 86,5 % → 88,5 %. `tsc --noEmit` +
+      `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -1840,6 +1851,14 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-17 (routine) : Fini de couvrir `enemyCoachAI` : les deux
+  dernières branches restantes (Frénésie/Cri de Guerre armés côté coin
+  adverse, symétrique du joueur déjà testé). 1 test calibré pour forcer
+  `pick(['neutral', 'aggressive'])` vers 'aggressive' tout en restant
+  sous le seuil probabiliste d'entrée — un seul `Math.random()` mocké
+  satisfait les deux contraintes. Aucun bug trouvé. engine.test.ts
+  235 → 236. Couverture combat.ts 86,5 % → 88,5 %. `tsc --noEmit` + `npm
+  run build` verts.
 - 2026-08-17 (routine) : 4e passe de coverage-driven bug hunt sur
   `combat.ts` : `enemyCoachAI`, la logique de posture du coin adverse (le
   vrai « niveau de difficulté »), n'avait jamais tourné sous test — même

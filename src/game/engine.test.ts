@@ -3176,4 +3176,26 @@ describe("enemyCoachAI — la logique de posture du coin adverse, jamais exercé
     tick(m, 1, quiet)
     expect(['neutral', 'aggressive', 'defensive', 'evasive', 'counter']).toContain(m.enemy.stance)
   })
+
+  it("Frénésie et Cri de Guerre armés côté coin adverse (par ses propres cartes) se consomment aussi", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.player.stance = 'defensive' // ne laisse que pick(['neutral', 'aggressive']) — 2 options
+    m.enemyMods.armedFrenzyDuration = 8
+    m.enemyMods.armedCheerHype = 20
+    m.enemy.hype = 0
+    // r=0,6 : sous le seuil 0,9×dt (dt=1) pour entrer dans le bloc de décision,
+    // et floor(0,6×2)=1 → sélectionne 'aggressive' (le 2e élément), condition
+    // nécessaire pour que la Frénésie (gatée sur 'aggressive') se déclenche.
+    vi.spyOn(Math, 'random').mockReturnValue(0.6)
+    tick(m, 1, quiet)
+    expect(m.enemy.stance).toBe('aggressive')
+    expect(m.enemyMods.armedFrenzyDuration).toBe(0) // consommé
+    expect(m.enemyMods.frenzyUntil).toBeGreaterThan(m.t)
+    expect(m.enemyMods.armedCheerHype).toBe(0) // consommé
+    expect(m.enemy.hype).toBeGreaterThanOrEqual(20) // le bonus de Cri de Guerre a bien été versé
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('FRÉNÉSIE ADVERSE'))).toBe(true)
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('CRI DE GUERRE ADVERSE'))).toBe(true)
+  })
 })
