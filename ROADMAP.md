@@ -1109,6 +1109,31 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       fonctions — ne reste que `drawEnemyCards` (jumelle privée de
       `drawCards`, écartée délibérément, valeur marginale trop faible).
       `tsc --noEmit` + `npm run build` verts.
+- [x] `combat.ts` désormais essentiellement plafonné, passage au fichier
+      suivant le plus significatif : coverage-driven bug hunt sur
+      `deckBuilder.ts`. `buildDeckFromTemplate` n'avait jamais été appelée
+      sans signature (`signatureId=null`) ni avec de VRAIES cartes forgées
+      non vides (le test existant passait toujours `[]`) — corrigé. Piège
+      **de méthodologie** trouvé en écrivant ce test-ci : un premier essai
+      ajoutait un test `hasStorage=false` pour `loadTemplate`/`saveTemplate`
+      DIRECTEMENT dans le describe `deck-builder` (tôt dans le fichier),
+      avec son propre `vi.resetModules()` — casse la suite complète de
+      façon déterministe (pas un flake) : `hasStorage` de `story.ts` est
+      calculé UNE FOIS à l'évaluation du module et reste figé tant
+      qu'aucun autre `resetModules()` ne survient ; la toute PROCHAINE
+      ré-évaluation dynamique de `./story` (dans le describe « mode
+      Histoire », plus bas, qui n'a pas son propre `beforeEach` de
+      `localStorage`) capturait alors un `hasStorage=false` erroné et le
+      gardait pour tout le reste de la suite. Découvert en isolant le test
+      qui échouait (`round-trip markCleared/loadCleared`), confirmé en le
+      faisant passer seul puis échouer dans la suite complète. Corrigé en
+      déplaçant le test dans le bloc « localStorage totalement bloqué »
+      déjà existant en fin de fichier (reset + nettoyage à CHAQUE test,
+      position choisie précisément pour éviter cette classe de piège).
+      2 nouveaux tests, engine.test.ts 269 → 271, suite complète vérifiée
+      sur 15 exécutions consécutives. Couverture `deckBuilder.ts` 94 % →
+      **100 %** (stmts, lignes, fonctions). `tsc --noEmit` +
+      `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2029,6 +2054,23 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : `combat.ts` désormais essentiellement plafonné,
+  passage à `deckBuilder.ts` (94 % → 100 %) : `buildDeckFromTemplate`
+  jamais appelée sans signature ni avec de vraies cartes forgées non
+  vides. **Piège de méthodologie trouvé en cours de route** (pas un bug
+  produit, un piège de test) : un premier essai de test `hasStorage=false`
+  placé tôt dans le fichier avec son propre `vi.resetModules()` cassait la
+  suite complète de façon DÉTERMINISTE — `hasStorage` de `story.ts` est
+  figé à l'évaluation du module, et la prochaine ré-évaluation dynamique
+  (dans un describe plus bas sans son propre `beforeEach` de
+  `localStorage`) capturait un `hasStorage=false` erroné pour tout le
+  reste de la suite. Diagnostiqué en isolant le test qui échouait,
+  confirmé passant seul puis échouant dans la suite complète. Corrigé en
+  déplaçant le test dans le bloc de résilience déjà existant en fin de
+  fichier (reset + nettoyage à CHAQUE test). 2 tests, engine.test.ts
+  269 → 271, suite vérifiée sur 15 exécutions consécutives. Couverture
+  `deckBuilder.ts` → 100 % (stmts/lignes/fonctions). `tsc --noEmit` +
+  `npm run build` verts.
 - 2026-08-18 (routine) : Dernière ligne droite du coverage-driven bug hunt
   sur `combat.ts` — 5 derniers écarts fermés : `armCounterMul` jamais
   exercé par un vrai `playCard` (Contre Parfait joué par le joueur,

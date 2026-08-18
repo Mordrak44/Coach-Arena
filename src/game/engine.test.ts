@@ -123,6 +123,19 @@ describe('deck-builder', () => {
     expect(deck.length).toBe(templateSize(t) + 2 + 1)
   })
 
+  it("compose SANS signature (signatureId=null) ET avec de VRAIES cartes forgées — jamais exercé (le test ci-dessus passait toujours [] pour forged)", async () => {
+    const { buildDeckFromTemplate, defaultTemplate, templateSize } = await import('./deckBuilder')
+    const t = defaultTemplate()
+    const forged = [
+      { id: 'forge-abc123', name: 'Étincelle', timing: 'pause', cost: 1, icon: '🔥', desc: '', effects: [] },
+      { id: 'forge-def456', name: 'Regain', timing: 'pause', cost: 1, icon: '💊', desc: '', effects: [] },
+    ] as never
+    const deck = buildDeckFromTemplate(t, null, [], forged)
+    expect(deck.length).toBe(templateSize(t) + 2) // pas de signature, +0 ; +2 cartes forgées
+    expect(deck).toContain('forge-abc123')
+    expect(deck).toContain('forge-def456')
+  })
+
   it("bug potentiel : loadTemplate/saveTemplate — round-trip, sanitize sur relecture, jamais testés", async () => {
     const { loadTemplate, saveTemplate, defaultTemplate, sanitizeTemplate } = await import('./deckBuilder')
     // Rien en stockage : repli propre sur le modèle par défaut.
@@ -3521,6 +3534,13 @@ describe('story.ts : 4 branches défensives jamais exercées (fallbacks id incon
     it('markCleared : hasStorage=false ne tente jamais l\'écriture, ne plante pas', async () => {
       const { markCleared } = await import('./story')
       expect(() => markCleared('ch1')).not.toThrow()
+    })
+
+    it("deckBuilder.ts : loadTemplate/saveTemplate avec hasStorage=false — même angle mort que story.ts, jamais exercé au-delà du chargement du module", async () => {
+      const { loadTemplate, saveTemplate, defaultTemplate } = await import('./deckBuilder')
+      expect(() => loadTemplate()).not.toThrow()
+      expect(loadTemplate()).toEqual(defaultTemplate())
+      expect(() => saveTemplate(defaultTemplate())).not.toThrow()
     })
   })
 })
