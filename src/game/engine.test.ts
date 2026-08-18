@@ -2884,6 +2884,36 @@ describe('FaceCoach (systems/facecam.ts) — énergie de mouvement par diff d\'i
     ;(fc as any).sample()
     expect(fc.state.energy).toBe(0) // 1re frame de la nouvelle session : juste une initialisation
   })
+
+  it("start() câble VRAIMENT setInterval sur sample() — jusqu'ici le mock de setInterval n'appelait jamais son callback, donc cette ligne n'était jamais exécutée", async () => {
+    const { setFrame } = setup(new Uint8ClampedArray(FRAME_LEN).fill(0))
+    let capturedCallback: (() => void) | null = null
+    ;(globalThis as any).window.setInterval = (cb: () => void) => {
+      capturedCallback = cb
+      return 999
+    }
+    const { FaceCoach } = await import('../systems/facecam')
+    const fc = new FaceCoach()
+    await fc.start({} as any)
+    expect(capturedCallback).not.toBeNull()
+    capturedCallback!() // simule le premier tick du timer : doit appeler sample()
+    expect((fc as any).prev).not.toBeNull() // sample() a bien tourné (frame de référence posée)
+    setFrame(new Uint8ClampedArray(FRAME_LEN).fill(255))
+    capturedCallback!() // 2e tick : doit vraiment refaire tourner sample(), pas un no-op
+    expect(fc.state.energy).toBe(0.5)
+  })
+
+  it("start() : video.play() qui rejette ne fait pas planter start() (catch muet assumé)", async () => {
+    setup(new Uint8ClampedArray(FRAME_LEN).fill(0))
+    ;(globalThis as any).document.createElement = (tag: string) =>
+      tag === 'video'
+        ? { muted: false, playsInline: false, srcObject: null, readyState: 2, play: () => Promise.reject(new Error('NotAllowedError')) }
+        : { getContext: () => ({ drawImage: () => {}, getImageData: () => ({ data: new Uint8ClampedArray(FRAME_LEN) }) }) }
+    const { FaceCoach } = await import('../systems/facecam')
+    const fc = new FaceCoach()
+    await expect(fc.start({} as any)).resolves.toBeUndefined()
+    expect(fc.state.active).toBe(true) // le flux continue malgré le rejet de play()
+  })
 })
 
 describe('SoundSystem (systems/sound.ts) — bande-son synthétisée, jamais testée', () => {

@@ -1177,6 +1177,24 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       handler de rejet de `audioCtx.close()`, nécessiterait un mock
       d'AudioContext complet pour une valeur marginale trop faible).
       `tsc --noEmit` + `npm run build` verts.
+- [x] Coverage-driven bug hunt sur `systems/facecam.ts` (fonctions 66,66 %,
+      2 sur 3 seulement) : `start()` câble `window.setInterval(() =>
+      this.sample(), 180)` pour l'échantillonnage périodique de l'énergie
+      de mouvement — mais le mock de `setInterval` utilisé par TOUS les
+      tests existants (`() => 999`, un simple id factice) n'appelait
+      jamais réellement le callback. Résultat : `sample()` elle-même était
+      déjà bien testée (appelée directement dans les tests), mais le
+      CÂBLAGE de `start()` vers `sample()` — la vraie garantie que la
+      capture webcam alimente bien l'énergie du coach en jeu — n'avait
+      jamais tourné une seule fois. Corrigé en capturant le callback passé
+      à `setInterval` et en l'invoquant manuellement (2 ticks : le premier
+      pose la frame de référence, le second calcule un vrai delta
+      d'énergie, valeur exacte vérifiée). Complété par `video.play()` qui
+      rejette (catch muet assumé, `start()` continue quand même). Aucun
+      bug trouvé. 2 nouveaux tests, engine.test.ts 277 → 279. Couverture
+      `facecam.ts` fonctions 66,66 % → **100 %**, stmts/lignes déjà à
+      100 % désormais confirmées bout en bout (pas juste par appel
+      direct). `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2097,6 +2115,16 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Coverage-driven bug hunt sur `systems/facecam.ts`
+  (fonctions 66,66 % → 100 %) : `start()` câble `setInterval(() =>
+  this.sample(), 180)`, mais le mock `setInterval` de TOUS les tests
+  existants (`() => 999`) n'appelait jamais réellement le callback —
+  `sample()` était bien testée en isolation (appelée directement), mais le
+  CÂBLAGE réel de `start()` vers `sample()` n'avait jamais tourné.
+  Corrigé en capturant et invoquant le callback manuellement (2 ticks,
+  delta d'énergie vérifié à la valeur exacte). Complété par `video.play()`
+  qui rejette (catch muet assumé). Aucun bug trouvé. 2 tests,
+  engine.test.ts 277 → 279. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Coverage-driven bug hunt sur `systems/voice.ts`
   (93,4 % → 97,8 %, fonctions 75 % → 91,66 %) : `consumeCommand()`, la
   VRAIE API utilisée chaque frame par `ArenaScreen.tsx` pour lire ET vider
