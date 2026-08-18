@@ -18,6 +18,7 @@ import {
   enemyCornerPlay,
   forceRoundTimeout,
   mulligan,
+  planLabel,
   playCard,
   switchFighter,
   tick,
@@ -3613,5 +3614,87 @@ describe('enemyCardValue (grille de valeur du coach fantôme adverse) : 9 cases 
     // achetées : leurs mods restent à leur valeur par défaut.
     expect(m.enemyMods.armedCheerHype).toBe(0)
     expect(m.enemyMods.drainEnemySouffle).toBe(0)
+  })
+
+  it('dernière case jamais évaluée : dodgeBonus (via Forteresse, dodgeBonus + damageReduction)', () => {
+    const m = freshMatch()
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = ['fortress'] // v = (1-0.75)*4 + 0.05*10 = 1.5, largement au-dessus du seuil 0,75
+    enemyCornerPlay(m)
+    expect(m.enemyDiscard).toEqual(['fortress'])
+    expect(m.enemyMods.dodgeBonus).toBeCloseTo(0.05)
+    expect(m.enemyMods.damageReductionMul).toBeCloseTo(0.75)
+  })
+})
+
+describe('armCounterMul réellement JOUÉ (applyCardEffects) — jusqu\'ici seulement évalué par enemyCardValue, jamais appliqué', () => {
+  it("jouer Contre Parfait arme bien armedCounterMul côté joueur (pas juste un mod posé à la main dans les autres tests)", () => {
+    const m = freshMatch()
+    m.phase = 'tactics'
+    m.hand = ['perfectCounter']
+    expect(m.mods.armedCounterMul).toBe(0)
+    expect(playCard(m, 'perfectCounter')).toBe(true)
+    expect(m.mods.armedCounterMul).toBe(2) // le mul de la carte (cards.ts)
+    expect(m.souffle).toBe(SOUFFLE_PER_CORNER - getCard('perfectCounter').cost)
+  })
+})
+
+describe('trickle de Hype passif : trait Sanguin + voix forte (voiceW=0.9) — jamais exercé par aucun test tick()', () => {
+  it('Fang (sanguin) avec une énergie vocale > 0,55 gagne plus de Hype par trickle qu\'avec une énergie faible', () => {
+    const withLoudVoice = createMatch(ROSTER[4], ROSTER[1], []) // Fang = sanguin
+    toFighting(withLoudVoice)
+    withLoudVoice.player.nextActionAt = withLoudVoice.t + 1000
+    withLoudVoice.enemy.nextActionAt = withLoudVoice.t + 1000
+    const hypeBefore = withLoudVoice.player.hype
+    tick(withLoudVoice, 0.1, { command: null, voiceEnergy: 0.8, faceEnergy: 0 }) // > 0,55 : voiceW passe à 0.9
+    const gainLoud = withLoudVoice.player.hype - hypeBefore
+
+    const withQuietVoice = createMatch(ROSTER[4], ROSTER[1], [])
+    toFighting(withQuietVoice)
+    withQuietVoice.player.nextActionAt = withQuietVoice.t + 1000
+    withQuietVoice.enemy.nextActionAt = withQuietVoice.t + 1000
+    const hypeBefore2 = withQuietVoice.player.hype
+    tick(withQuietVoice, 0.1, { command: null, voiceEnergy: 0.3, faceEnergy: 0 }) // ≤ 0,55 : voiceW reste à 0.6
+    const gainQuiet = withQuietVoice.player.hype - hypeBefore2
+
+    // Même trait (sanguin), seule l'énergie vocale change : le gain de Hype
+    // doit être strictement supérieur avec une voix forte — sinon le trait
+    // Sanguin n'a aucun effet réel sur ce trickle.
+    expect(gainLoud).toBeGreaterThan(gainQuiet)
+  })
+})
+
+describe("tick() rappelé alors que le match est déjà terminé (phase 'matchEnd') : ne doit rien faire, jamais exercé", () => {
+  it("un tick supplémentaire après matchEnd est un no-op silencieux (pas de crash, aucun état ne bouge)", () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.player.nextActionAt = m.t + 1000
+    m.enemy.nextActionAt = m.t + 1000
+    m.playerWins = 1
+    m.enemy.hp = 0
+    tick(m, 0.01, quiet) // le KO clôt le round -> roundEnd -> (au prochain tick) matchEnd
+    m.phaseUntil = m.t // force la transition immédiate au tick suivant
+    tick(m, 0.01, quiet)
+    expect(m.phase).toBe('matchEnd')
+    // `m.t` avance TOUJOURS (`tick()` fait `m.t += dt` avant même le switch
+    // de phase) : on snapshote donc tout SAUF `t`, qui est censé être la
+    // seule chose à bouger sur un tick post-matchEnd.
+    const tBefore = m.t
+    const { t: _t, ...rest } = m
+    const snapshot = JSON.stringify(rest)
+    expect(() => tick(m, 0.5, { command: 'attack', voiceEnergy: 1, faceEnergy: 1 })).not.toThrow()
+    expect(m.t).toBeCloseTo(tBefore + 0.5) // seul `t` a bougé...
+    const { t: _t2, ...restAfter } = m
+    expect(JSON.stringify(restAfter)).toBe(snapshot) // ...tout le reste est figé : le match ne bouge plus
+  })
+})
+
+describe('planLabel (combat.ts) — fonction exportée jamais appelée par un test', () => {
+  it('traduit chaque plan tactique en son libellé HUD', () => {
+    expect(planLabel('pressure')).toBe('PRESSION')
+    expect(planLabel('concrete')).toBe('BÉTON')
+    expect(planLabel('counterplay')).toBe('CONTRE-JEU')
+    expect(planLabel('coldblood')).toBe('SANG-FROID')
   })
 })

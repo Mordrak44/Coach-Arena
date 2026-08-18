@@ -1088,6 +1088,27 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       262 → 264, suite complète vérifiée sur 15 exécutions consécutives
       (discipline `tick()` habituelle). Couverture `combat.ts` 95,31 % →
       95,65 % (stmts). `tsc --noEmit` + `npm run build` verts.
+- [x] Dernière ligne droite du coverage-driven bug hunt sur `combat.ts` —
+      les 5 derniers écarts réels : (1) `armCounterMul` dans
+      `applyCardEffects` n'avait JAMAIS été exercé par un vrai `playCard`
+      (seulement évalué côté IA, ou posé à la main dans les tests de
+      consommation) — `Contre Parfait` joué par le joueur arme maintenant
+      vérifié bout en bout ; (2) le trait Sanguin (`voiceW = 0.9` sur voix
+      forte >0,55) dans le trickle de Hype n'était exercé par AUCUN test
+      `tick()` — vérifié en comparant le gain de Hype de Fang (sanguin)
+      entre une voix forte et une voix faible, à trait égal ; (3)
+      `enemyCardValue` : la dernière case jamais évaluée, `dodgeBonus` (via
+      Forteresse) ; (4) `tick()` rappelé alors que `phase === 'matchEnd'`
+      — jamais exercé, vérifié comme un no-op silencieux (seul `m.t`
+      avance, tout le reste de l'état reste figé, snapshot JSON complet
+      hors `t`) ; (5) `planLabel()`, fonction exportée jamais appelée par
+      un test, qui traduit chaque plan tactique en libellé HUD. Aucun bug
+      trouvé sur ces 5 derniers points. 5 nouveaux tests, engine.test.ts
+      264 → 269, suite complète vérifiée sur 15 exécutions consécutives.
+      Couverture `combat.ts` 95,65 % → **97,49 %** (stmts), **100 %**
+      fonctions — ne reste que `drawEnemyCards` (jumelle privée de
+      `drawCards`, écartée délibérément, valeur marginale trop faible).
+      `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2008,6 +2029,20 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Dernière ligne droite du coverage-driven bug hunt
+  sur `combat.ts` — 5 derniers écarts fermés : `armCounterMul` jamais
+  exercé par un vrai `playCard` (Contre Parfait joué par le joueur,
+  vérifié bout en bout, pas juste posé à la main) ; le trait Sanguin
+  (`voiceW=0.9` sur voix forte) jamais exercé par aucun test `tick()`
+  (Fang, comparaison voix forte vs faible à trait égal) ; la dernière case
+  jamais évaluée d'`enemyCardValue` (`dodgeBonus`, via Forteresse) ;
+  `tick()` rappelé après `matchEnd` — vérifié comme no-op silencieux
+  (snapshot JSON complet hors `t`, qui seul avance) ; `planLabel()`,
+  fonction exportée jamais appelée par un test. Aucun bug trouvé. 5 tests,
+  engine.test.ts 264 → 269, suite complète vérifiée sur 15 exécutions
+  consécutives. Couverture `combat.ts` 95,65 % → **97,49 %** (stmts),
+  **100 %** fonctions — ne reste que `drawEnemyCards` (jumelle privée,
+  écartée délibérément). `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : **Vrai bug trouvé** en poursuivant l'audit coverage
   sur le trickle de Hype passif du joueur (`combat.ts`) : `wasFull` était
   calculé APRÈS que l'auto-motivation silencieuse ait déjà rempli la jauge
