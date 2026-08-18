@@ -1248,6 +1248,20 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       bug trouvé. 2 nouveaux tests, engine.test.ts 283 → 285. Couverture
       `sound.ts` fonctions 95,45 % → **100 %**, lignes → **100 %**, stmts
       94,48 % → 96,85 %. `tsc --noEmit` + `npm run build` verts.
+- [x] `systems/pitch.ts` (97,5 % stmts) : le garde-fou `maxLag >= n`
+      (buffer trop court pour couvrir la période la plus grave mesurable,
+      MIN_HZ = 70 Hz) n'avait jamais été exercé — distinct du rejet par
+      énergie faible (silence/bruit), déjà testé. Un signal fort mais trop
+      COURT (500 échantillons à 48 kHz, sous les 685 requis) est
+      maintenant vérifié rejeté. Écarté (valeur nulle, pas un vrai
+      scénario audio) : la branche `den === 0` de la corrélation — ne peut
+      arriver que si un unique échantillon non-nul tombe pile dans l'angle
+      mort structurel d'un lag précis (`[n-lag, lag)` quand `lag > n/2`),
+      un signal qui n'existe jamais en pratique (un vrai micro ne produit
+      jamais un buffer presque entièrement à zéro avec un seul pic isolé
+      à une position aussi spécifique). Aucun bug trouvé. 1 nouveau test,
+      engine.test.ts 285 → 286. Couverture `pitch.ts` → **100 %**
+      (stmts/lignes/fonctions). `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2168,6 +2182,14 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : `systems/pitch.ts` (97,5 % → 100 %) : le
+  garde-fou « buffer trop court pour le lag le plus grave » (MIN_HZ =
+  70 Hz) n'avait jamais été exercé, distinct du rejet par énergie faible
+  déjà testé. Écarté délibérément (valeur nulle) : la branche `den === 0`
+  de la corrélation, qui ne peut arriver que dans un angle mort structurel
+  très spécifique jamais produit par un vrai signal micro. Aucun bug
+  trouvé. 1 test, engine.test.ts 285 → 286. `tsc --noEmit` +
+  `npm run build` verts.
 - 2026-08-18 (routine) : Dernier passage de la série sur `systems/` :
   `sound.ts` (fonctions 95,45 % → 100 %). Le catch muet de
   `stop()`/`ctx.close()` fermé (même point laissé de côté sur voice.ts 2

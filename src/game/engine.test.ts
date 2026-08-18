@@ -638,6 +638,18 @@ describe('prosodie (pitch local)', () => {
     expect(Math.abs(hz! - 220)).toBeLessThan(11)
   })
 
+  it("rejette un buffer trop COURT pour couvrir le lag le plus grave (MIN_HZ) — jamais exercé, même un signal fort ne suffit pas", async () => {
+    // maxLag = floor(sampleRate / MIN_HZ) = floor(48000/70) = 685 : un
+    // buffer plus court ne peut physiquement pas mesurer une période aussi
+    // grave, quelle que soit l'intensité du signal (garde-fou distinct du
+    // rejet par énergie faible, jamais exercé jusqu'ici).
+    const { detectPitch } = await import('../systems/pitch')
+    const sr = 48000
+    const buf = new Float32Array(500) // < 685
+    for (let i = 0; i < buf.length; i++) buf[i] = Math.sin((2 * Math.PI * 220 * i) / sr) * 0.3
+    expect(detectPitch(buf, sr)).toBeNull()
+  })
+
   it('rejette le silence et le bruit', async () => {
     const { detectPitch } = await import('../systems/pitch')
     const silence = new Float32Array(2048)
