@@ -1281,6 +1281,55 @@ describe('création par prompt & réalisateur', () => {
     expect(colorWord('#8000ff')).toBe('purple')
     expect(colorWord('#ff00cc')).toBe('pink')
   })
+
+  it("bug potentiel : sur 3 rounds à moments forts, le TRI par score (garder les 2 meilleurs) PUIS le re-tri chronologique n'avaient jamais tourné — tous les tests précédents n'avaient jamais qu'un seul candidat, donc Array.sort() n'appelait jamais son comparateur", () => {
+    // Round 1 : le plus FAIBLE (score 3, un crit) — doit être ÉLIMINÉ.
+    // Round 2 : score moyen (6, un spécial adverse).
+    // Round 3 : le plus FORT (score 10, un ulti joueur).
+    // Le tri par score classe donc [round3, round2] (round1 éliminé) —
+    // PUIS le re-tri chronologique doit les remettre dans l'ordre
+    // [round2, round3] : si ce second tri ne tournait pas vraiment, les
+    // plans sortiraient dans le mauvais ordre (round3 avant round2).
+    const m = freshMatch()
+    m.events.push(
+      { kind: 'roundStart', t: 0, round: 1 },
+      { kind: 'hit', t: 5, target: 'player', dmg: 20, crit: true, onoma: 'BAM!' },
+      { kind: 'roundEnd', t: 10, winner: 'enemy' },
+      { kind: 'roundStart', t: 10, round: 2 },
+      { kind: 'special', t: 20, by: 'enemy', name: ROSTER[1].special.name, onoma: 'ZUKYUN!', dmg: 30 },
+      { kind: 'roundEnd', t: 25, winner: 'enemy' },
+      { kind: 'roundStart', t: 25, round: 3 },
+      { kind: 'ulti', t: 35, by: 'player', name: ROSTER[0].ulti.name, onoma: 'ZAN!', dmg: 80 },
+      { kind: 'roundEnd', t: 40, winner: 'player' },
+      { kind: 'matchEnd', t: 40, winner: 'enemy' },
+    )
+    const plans = buildScenePlans(m, ROSTER[0], ROSTER[1], 2)
+    const highlightIds = plans.filter(p => p.id.endsWith('-highlight')).map(p => p.id)
+    expect(highlightIds).toEqual(['round2-highlight', 'round3-highlight']) // round1 éliminé, ordre chronologique respecté
+    expect(plans.map(p => p.id)).toEqual(['entrance', 'round2-highlight', 'round3-highlight', 'finale'])
+  })
+
+  it("dernier round SANS roundEnd explicite avant matchEnd (fin abrupte) : le candidat en cours doit quand même être retenu, jamais exercé", () => {
+    const m = freshMatch()
+    m.events.push(
+      { kind: 'roundStart', t: 0, round: 1 },
+      { kind: 'ulti', t: 10, by: 'player', name: ROSTER[0].ulti.name, onoma: 'ZAN!', dmg: 80 },
+      { kind: 'matchEnd', t: 10, winner: 'player' }, // pas de roundEnd avant matchEnd cette fois
+    )
+    m.playerWins = 2
+    const plans = buildScenePlans(m, ROSTER[0], ROSTER[1])
+    expect(plans.some(p => p.id === 'round1-highlight')).toBe(true)
+  })
+
+  it('colorWord : hex invalide, black, grey, orange, yellow, green (max===g), teal — branches jamais exercées', () => {
+    expect(colorWord('pas-un-hex')).toBe('vivid') // regex ne matche pas
+    expect(colorWord('#050505')).toBe('black')
+    expect(colorWord('#808080')).toBe('grey')
+    expect(colorWord('#ff8000')).toBe('orange')
+    expect(colorWord('#ffc800')).toBe('yellow')
+    expect(colorWord('#00ff00')).toBe('green') // aussi la branche max===g du calcul de teinte
+    expect(colorWord('#00c8be')).toBe('teal')
+  })
 })
 
 describe('SceneJobQueue (file de génération asynchrone des scènes)', () => {

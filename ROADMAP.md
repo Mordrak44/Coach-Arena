@@ -1134,6 +1134,28 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       sur 15 exécutions consécutives. Couverture `deckBuilder.ts` 94 % →
       **100 %** (stmts, lignes, fonctions). `tsc --noEmit` +
       `npm run build` verts.
+- [x] Coverage-driven bug hunt sur `sceneDirector.ts` (le Réalisateur, 87,5 %
+      stmts, fonctions 80 %) : la fonction manquante était en fait DEUX
+      callbacks de comparateur `Array.sort()` (garder les 2 meilleurs
+      moments par score, puis les re-trier chronologiquement) — tous les
+      tests précédents n'avaient jamais qu'UN SEUL candidat de moment fort
+      en jeu, or `Array.sort()` n'appelle son comparateur QUE s'il y a ≥2
+      éléments à comparer : ce tri à deux étages (le cœur de la sélection
+      des moments forts d'un match) n'avait donc jamais réellement tourné.
+      Test à 3 rounds construit pour forcer un vrai réordonnancement (le
+      round le plus faible éliminé, les 2 meilleurs remis dans le bon
+      ordre chronologique après avoir été triés par score dans le
+      désordre) — confirme l'algorithme correct. Complété par : le
+      candidat en cours jamais flush si le dernier round se termine
+      directement sur `matchEnd` sans `roundEnd` explicite ; les branches
+      `colorWord` encore jamais exercées (hex invalide → `vivid`, `black`,
+      `grey`, `orange`, `yellow`, `green` — qui couvre aussi la branche
+      `max===g` du calcul de teinte —, `teal`). Aucun bug trouvé. 3
+      nouveaux tests, engine.test.ts 271 → 274. Couverture
+      `sceneDirector.ts` 87,5 % → **97,72 %** (stmts), fonctions
+      **100 %** — ne restent que 2 lignes de code défensif prouvablement
+      inatteignable (gardées par `eventScore`, jamais un vrai scénario de
+      jeu). `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2054,6 +2076,22 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Coverage-driven bug hunt sur `sceneDirector.ts`
+  (le Réalisateur, 87,5 % → 97,72 %) : la fonction manquante (fonctions à
+  80 %) était en fait deux callbacks de comparateur `Array.sort()` — garder
+  les 2 meilleurs moments forts par score puis les re-trier
+  chronologiquement — jamais réellement exécutés car tous les tests
+  précédents n'avaient qu'un seul candidat en jeu, et `sort()` n'appelle
+  son comparateur qu'à partir de 2 éléments. Test à 3 rounds construit pour
+  forcer un vrai réordonnancement (le plus faible éliminé, les 2 meilleurs
+  remis dans l'ordre chronologique après un tri par score qui les avait
+  inversés) — confirme l'algorithme correct. Complété par le flush du
+  candidat en cours quand le dernier round finit directement sur
+  `matchEnd` sans `roundEnd`, et les branches `colorWord` encore jamais
+  exercées (hex invalide, black, grey, orange, yellow, green, teal). Aucun
+  bug trouvé. 3 tests, engine.test.ts 271 → 274, fonctions à 100 % — ne
+  restent que 2 lignes de code défensif prouvablement inatteignable.
+  `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : `combat.ts` désormais essentiellement plafonné,
   passage à `deckBuilder.ts` (94 % → 100 %) : `buildDeckFromTemplate`
   jamais appelée sans signature ni avec de vraies cartes forgées non
