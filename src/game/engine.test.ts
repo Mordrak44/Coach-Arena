@@ -2486,6 +2486,50 @@ describe("HighlightRecorder — une panne transitoire du MediaRecorder à la rot
     expect(constructCount).toBe(3) // la 3e construction a bien été tentée
     expect((hr as any).current.state).toBe('recording') // et a réussi : un vrai segment tourne à nouveau
   })
+
+  it("start() câble VRAIMENT setInterval sur rotate() — jusqu'ici tous les tests appelaient rotate() directement, le mock de setInterval n'invoquait jamais son callback", async () => {
+    class SimpleRecorder {
+      static isTypeSupported(): boolean {
+        return false
+      }
+      state = 'recording'
+      mimeType = 'video/webm'
+      ondataavailable: ((e: { data: { size: number } }) => void) | null = null
+      onstop: (() => void) | null = null
+      start() {}
+      stop() {
+        this.state = 'inactive'
+        this.onstop?.()
+      }
+    }
+    ;(globalThis as any).MediaRecorder = SimpleRecorder
+    let capturedCallback: (() => void) | null = null
+    ;(globalThis as any).window = {
+      setInterval: (cb: () => void) => {
+        capturedCallback = cb
+        return 0
+      },
+      clearInterval: () => {},
+    }
+    const { HighlightRecorder } = await import('../systems/recorder')
+    const hr = new HighlightRecorder()
+    const fakeCanvas = {
+      captureStream: () => ({ getTracks: () => [], getAudioTracks: () => [], addTrack: () => {} }),
+    } as unknown as HTMLCanvasElement
+    expect(hr.start(fakeCanvas, null)).toBe(true)
+    expect(capturedCallback).not.toBeNull()
+    const rotateSpy = vi.spyOn(hr as any, 'rotate')
+    capturedCallback!() // simule le premier tick réel du timer de rotation
+    expect(rotateSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('startSegment() sans flux (jamais démarré, ou déjà relâché par stop()) est un no-op sûr — garde-fou jamais exercé', async () => {
+    ;(globalThis as any).window = { setInterval: () => 0, clearInterval: () => {} }
+    const { HighlightRecorder } = await import('../systems/recorder')
+    const hr = new HighlightRecorder()
+    expect(() => (hr as any).startSegment()).not.toThrow()
+    expect((hr as any).current).toBeNull() // rien n'a été construit
+  })
 })
 
 describe('matchCommand (voice.ts) — reconnaissance des consignes parlées, jamais testée jusqu\'ici', () => {
@@ -2636,6 +2680,26 @@ describe('recorder.ts — fileExt/pickMimeType/shareOrDownload, jamais testés j
     const result = await shareOrDownload(new Blob(['x'], { type: 'video/webm' }), 'match', 'texte')
     expect(result).toBe('downloaded')
     expect(clicked).toContain('clicked')
+  })
+
+  it("MatchRecorder.download() programme bien la révocation du blob URL 5s plus tard — jusqu'ici revokeObjectURL était juste un stub jamais réellement invoqué (le setTimeout n'avait jamais le temps de s'écouler)", () => {
+    vi.useFakeTimers()
+    try {
+      const revoked: string[] = []
+      ;(globalThis as any).document = {
+        createElement: () => ({ href: '', download: '', click: () => {} }),
+      }
+      ;(URL as any).createObjectURL = () => 'blob:fake-url'
+      ;(URL as any).revokeObjectURL = (u: string) => revoked.push(u)
+      MatchRecorder.download(new Blob(['x'], { type: 'video/webm' }), 'test.webm')
+      expect(revoked).toEqual([]) // pas encore révoqué : le téléchargement doit avoir le temps de démarrer
+      vi.advanceTimersByTime(4999)
+      expect(revoked).toEqual([])
+      vi.advanceTimersByTime(1)
+      expect(revoked).toEqual(['blob:fake-url'])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

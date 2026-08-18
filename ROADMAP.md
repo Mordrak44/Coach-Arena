@@ -1211,6 +1211,24 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       fonctions 80 % → **100 %**, stmts/lignes déjà à 100 % désormais
       confirmées par le vrai chemin de préchargement. `tsc --noEmit` +
       `npm run build` verts.
+- [x] Même famille de bug de méthodologie trouvée 2 fois de suite
+      (facecam.ts, liveCutPlayer.ts), traquée maintenant dans
+      `systems/recorder.ts` (fonctions 91,66 %) : (1)
+      `HighlightRecorder.start()` câble `setInterval(() => this.rotate(),
+      segmentMs)` pour la rotation automatique des segments, mais TOUS les
+      tests existants appelaient `rotate()` directement et mockaient
+      `setInterval` en `() => 0` — le vrai câblage timer → rotation
+      n'avait jamais tourné une seule fois ; (2) `MatchRecorder.download()`
+      programme `setTimeout(() => URL.revokeObjectURL(url), 5000)`, mais
+      `revokeObjectURL` n'était qu'un stub jamais réellement invoqué (le
+      délai n'avait jamais le temps de s'écouler dans les tests) —
+      vérifié avec `vi.useFakeTimers()` : rien avant 4999 ms, révocation
+      exacte à 5000 ms pile ; (3) `startSegment()` appelée sans flux actif
+      (jamais démarré, ou déjà relâché) est un garde-fou jamais exercé,
+      confirmé no-op sûr. Aucun bug trouvé. 3 nouveaux tests,
+      engine.test.ts 280 → 283. Couverture `recorder.ts` fonctions
+      91,66 % → **100 %**, stmts/lignes déjà à 100 % désormais confirmées
+      par le vrai câblage. `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2131,6 +2149,18 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Même famille de bug de méthodologie trouvée déjà
+  2 fois (facecam.ts, liveCutPlayer.ts) traquée dans `systems/recorder.ts`
+  (fonctions 91,66 % → 100 %) : `HighlightRecorder.start()` câble
+  `setInterval(() => this.rotate(), segmentMs)`, mais tous les tests
+  appelaient `rotate()` directement en mockant `setInterval` en `() => 0`
+  — le vrai câblage timer → rotation n'avait jamais tourné. Idem pour
+  `MatchRecorder.download()` : `setTimeout(() => URL.revokeObjectURL(url),
+  5000)` n'avait jamais le temps de s'écouler dans les tests existants —
+  vérifié avec `vi.useFakeTimers()` (rien avant 4999 ms, révocation exacte
+  à 5000 ms). Complété par le garde-fou `startSegment()` sans flux actif.
+  Aucun bug trouvé. 3 tests, engine.test.ts 280 → 283. `tsc --noEmit` +
+  `npm run build` verts.
 - 2026-08-18 (routine) : Coverage-driven bug hunt sur `liveCutPlayer.ts`
   (fonctions 80 % → 100 %) : `setLibrary()`, la VRAIE API appelée par
   `ArenaScreen.tsx` une fois le préchargement async des clips terminé,
