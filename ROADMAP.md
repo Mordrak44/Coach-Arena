@@ -2584,11 +2584,83 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       ajouter un nouveau kind scorant sans son cas dans `momentPrompt`
       reproduirait silencieusement le bug déjà corrigé sur `hypeFull`).
       2 nouveaux tests. Aucun bug trouvé.
+- [x] Audit de code (fichier entier) sur `ArenaScreen.tsx` (2026-08-18),
+      `game/` étant proche de la saturation en couverture. **Vrai bug
+      trouvé et corrigé, confirmé en Chromium headless (caméra factice,
+      A/B avant/après)** : la facecam du joueur (« 🔴 Toi, coach ») ne
+      s'affichait JAMAIS — le `<video>` n'existe dans le DOM que quand
+      `camOk` est vrai (rendu conditionnel), mais `setCamOk(true)` ne
+      committe pas synchronement, donc `camRef.current` était encore
+      `null` au moment où `setup()` tentait d'y attacher le flux, dans
+      la continuation synchrone de la même fonction async. Corrigé avec
+      un `useEffect` dédié à `[camOk]`, qui se redéclenche APRÈS le
+      commit qui monte le `<video>`. Vérifié : le bug reproduit à coup
+      sûr sur le code d'avant-fix (`hasSrcObject: false`), corrigé après
+      (`hasSrcObject: true, readyState: 4, videoWidth: 640`). 2 autres
+      bugs mineurs corrigés au passage : `combatHintDismissedRef`
+      rappelait `hasSeenCombatHint()` (lecture localStorage) à CHAQUE
+      rendu au lieu d'une seule fois (même classe déjà fixée sur
+      `matchRef`/`sysRef` dans ce même fichier — dérivé de
+      `showCombatHint`, déjà calculé, au lieu de rappeler la fonction) ;
+      et `moodTimer`/`procTimer` (jusqu'à 3000 ms/1600 ms) n'étaient
+      jamais annulés au démontage, contrairement à `rafId` juste
+      au-dessus — une fermeture entière (sys, refs, props) restait
+      vivante après la sortie de l'arène jusqu'à leur déclenchement.
+      Simplification en bonus : mapping du banc (`benchViewOf`) dédupliqué
+      entre le changement de phase et `onSwitch`. 360 tests inchangés
+      (aucun test unitaire sur les composants UI). `tsc --noEmit` +
+      `npm run build` verts, funnel visuel vérifié sans régression.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : `game/` étant désormais proche de la saturation
+  en couverture (99,65 % stmts, 98,54 % branches), retour à un audit de
+  code full-file (skill code-review) — cette fois sur `ArenaScreen.tsx`
+  (l'écran de jeu central, ~900 lignes), pas ciblé depuis un moment.
+  **Vrai bug trouvé** : la facecam du joueur (tuile « 🔴 Toi, coach »)
+  ne s'affichait JAMAIS, sur AUCUN match avec caméra accordée — un bug
+  sérieux passé inaperçu jusqu'ici. Cause : `<video ref={camRef}>` n'est
+  rendu dans le JSX QUE si `camOk` est vrai (`{camOk && <video .../>}`),
+  mais dans `setup()` (une fonction async), l'attache `camRef.current.
+  srcObject = stream` tournait dans la MÊME continuation synchrone que
+  `setCamOk(true)` juste au-dessus — React n'avait pas encore committé
+  le nouveau rendu, donc `camRef.current` était encore `null`, le `if`
+  était silencieusement sauté, et RIEN ne retentait l'attache ensuite
+  (un seul `useEffect` existait dans tout le fichier, à deps `[]`,
+  jamais rejoué). Corrigé avec un second `useEffect` dédié, dépendant de
+  `[camOk]` : React le redéclenche APRÈS le commit qui monte le
+  `<video>`, où `camRef.current` est enfin défini. Vérifié avec la
+  discipline habituelle mais adaptée au visuel plutôt qu'à un test
+  unitaire (ArenaScreen n'a aucune couverture unitaire) : Chromium
+  headless avec `--use-fake-device-for-media-stream` (caméra factice
+  Chromium) + permissions accordées, funnel complet jusqu'à l'arène,
+  lecture de l'état DOM du `<video class="facecam">`. `git stash` sur
+  `ArenaScreen.tsx` seul, A/B confirmé : `hasSrcObject: false` avant le
+  fix, `hasSrcObject: true, readyState: 4 (HAVE_ENOUGH_DATA), paused:
+  false, videoWidth: 640` après. 2 bugs mineurs corrigés au passage,
+  trouvés par le même audit : `combatHintDismissedRef = useRef(
+  hasSeenCombatHint())` rappelait `hasSeenCombatHint()` (localStorage +
+  JSON.parse) à CHAQUE rendu — le composant re-rend plusieurs fois par
+  seconde (documenté dans son propre commentaire, et déjà le patron
+  fixé sur `matchRef`/`sysRef` dans ce même fichier) — corrigé en
+  dérivant de `showCombatHint`, déjà calculé une seule fois via
+  l'initialiseur paresseux de `useState` ; et `moodTimer`/`procTimer`
+  (setTimeout de 1600-3000 ms pour les effets de mood/proc du coach)
+  n'étaient jamais annulés à la sortie de l'arène (contrairement à
+  `rafId`, juste au-dessus dans le même cleanup) — la fermeture entière
+  restait vivante en mémoire jusqu'à leur déclenchement tardif après
+  démontage. Simplification en bonus (pas un bug) : le mapping du banc
+  vers la vue HUD était dupliqué verbatim entre le changement de phase
+  et `onSwitch` — extrait en `benchViewOf()`. 2 findings du même audit
+  jugés mineurs et non actionnés : `pendingCmd.current ?? consumeCommand()`
+  saute la consommation vocale un frame de plus en cas de collision
+  bouton/voix (auto-guéri au frame suivant, sans conséquence observée).
+  360 tests inchangés (composants UI non couverts par les tests
+  unitaires, seule la logique `game/` l'est). `tsc --noEmit` +
+  `npm run build` verts, funnel visuel standard (`scripts/shot.mjs`)
+  vérifié sans régression.
 - 2026-08-18 (routine) : Coverage-driven bug hunt sur `sceneDirector.ts`
   (branches 89,61 % → 93,5 %), le prochain plus bas dossier `game/`
   après la clôture de `combat.ts`. Fermé : un spécial lancé par le

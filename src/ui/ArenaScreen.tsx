@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { CardId, Character, CoachCommand, MatchState, TacticPlan } from '../game/types'
+import type { CardId, Character, CoachCommand, FighterState, MatchState, TacticPlan } from '../game/types'
 import {
   type MatchOpts,
   ROUND_TIME_LIMIT,
@@ -76,6 +76,15 @@ const KEYMAP: Record<string, CoachCommand> = {
   s: 'special',
   u: 'ulti',
   ' ': 'cheer',
+}
+
+/** Vue banc affichée dans le HUD — dérivée du banc réel après une relève. */
+function benchViewOf(bench: FighterState[]) {
+  return bench.map(b => ({
+    name: b.char.name,
+    hpPct: Math.round((b.hp / b.maxHp) * 100),
+    alive: b.hp > 0,
+  }))
 }
 
 export default function ArenaScreen({
@@ -184,7 +193,14 @@ export default function ArenaScreen({
   const [showCornerHint, setShowCornerHint] = useState(false)
   // La boucle de jeu (useEffect à deps []) capture un closure figé : on lit
   // l'état « déjà vu » via une ref pour rester à jour à l'intérieur.
-  const combatHintDismissedRef = useRef(hasSeenCombatHint())
+  // Dérivé de `showCombatHint` (déjà calculé juste au-dessus) plutôt que de
+  // rappeler hasSeenCombatHint() : l'argument de useRef() est réévalué à
+  // CHAQUE rendu (contrairement à l'initialiseur paresseux de useState),
+  // et ArenaScreen re-rend plusieurs fois par seconde (voir plus bas) — un
+  // 2e appel localStorage.getItem()+JSON.parse() par frame pour rien
+  // (trouvé en audit, 2026-08-18, même classe que le fix déjà appliqué à
+  // matchRef/sysRef).
+  const combatHintDismissedRef = useRef(!showCombatHint)
   const enemyMoodRef = useRef(enemyMood)
   const moodTimer = useRef(0)
   const procTimer = useRef(0)
@@ -238,13 +254,10 @@ export default function ArenaScreen({
       setMicOk(hasAudio)
       setCamOk(hasVideo)
       if (stream && hasAudio) sys.voice.start(stream)
-      if (stream && hasVideo) {
-        sys.face.start(stream)
-        if (camRef.current) {
-          camRef.current.srcObject = stream
-          camRef.current.play().catch(() => {})
-        }
-      }
+      // L'attache du flux au <video> de la facecam se fait dans l'effet dédié
+      // à `camOk` plus bas — le <video> n'existe pas encore dans le DOM ici
+      // (rendu conditionnel sur camOk, pas encore commité à ce point).
+      if (stream && hasVideo) sys.face.start(stream)
       sys.recorder.start(sys.composite, hasAudio ? stream : null)
       sys.highlight.start(sys.composite, hasAudio ? stream : null)
     }
@@ -342,13 +355,7 @@ export default function ArenaScreen({
           setMullUsed(false)
           setConsigne(null)
           setSwitchDone(false)
-          setBenchView(
-            m.bench.map(b => ({
-              name: b.char.name,
-              hpPct: Math.round((b.hp / b.maxHp) * 100),
-              alive: b.hp > 0,
-            })),
-          )
+          setBenchView(benchViewOf(m.bench))
         }
       }
       setSpecialReady(m.player.hype >= HYPE_MAX)
@@ -582,9 +589,32 @@ export default function ArenaScreen({
       sys.highlight.stop()
       sys.sound.stop()
       sys.stream?.getTracks().forEach(t => t.stop())
+      // Sans ça, un mood/proc encore en vol au démontage (jusqu'à 3000 ms
+      // pour moodTimer, 1600 ms pour procTimer) déclenche son setState
+      // longtemps après coup — no-op React 18, mais toute la fermeture
+      // (sys, refs, props capturés) reste vivante jusqu'à ce que le timer
+      // se déclenche au lieu d'être libérée au démontage (trouvé en audit,
+      // 2026-08-18).
+      window.clearTimeout(moodTimer.current)
+      window.clearTimeout(procTimer.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Le <video> de la facecam n'existe dans le DOM QUE quand camOk est vrai
+  // (rendu conditionnel plus bas) — au moment où setup() l'a posé à true,
+  // React n'a pas encore commité ce rendu, donc camRef.current était
+  // encore null et le flux ne s'attachait jamais : l'aperçu facecam du
+  // joueur restait une vidéo vide pour tout le match (trouvé en audit,
+  // 2026-08-18). Cet effet se redéclenche APRÈS le commit qui monte le
+  // <video>, quand camRef.current est enfin défini.
+  useEffect(() => {
+    const sys = sysRef.current!
+    if (camOk && camRef.current && sys.stream) {
+      camRef.current.srcObject = sys.stream
+      camRef.current.play().catch(() => {})
+    }
+  }, [camOk])
 
   const sendCmd = (cmd: CoachCommand) => {
     pendingCmd.current = cmd
@@ -640,13 +670,7 @@ export default function ArenaScreen({
     if (switchFighter(m, i)) {
       setSouffle(m.souffle)
       setSwitchDone(true)
-      setBenchView(
-        m.bench.map(b => ({
-          name: b.char.name,
-          hpPct: Math.round((b.hp / b.maxHp) * 100),
-          alive: b.hp > 0,
-        })),
-      )
+      setBenchView(benchViewOf(m.bench))
     }
   }
 
