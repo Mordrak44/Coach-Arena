@@ -511,6 +511,34 @@ describe('Le Temps Mort — geler le combat pour parler et jouer une carte', () 
     expect(m.enemyTimeoutsLeft).toBe(timeoutsBefore - 1)
     expect(m.events.some(e => e.kind === 'timeout' && e.side === 'enemy')).toBe(true)
   })
+
+  it("le coin adverse en PV critiques SANS aucune carte de soin/Dernière Chance en main ne prend PAS de temps mort — jamais exercé, la main avait toujours une carte exploitable jusqu'ici", () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.enemy.hp = Math.round(m.enemy.maxHp * 0.2) // sous le seuil critique
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = ['ironGuard'] // ni heal, ni lowHpHypeFull
+    const timeoutsBefore = m.enemyTimeoutsLeft
+    tick(m, 0.05, quiet)
+    expect(m.enemyTimeoutsLeft).toBe(timeoutsBefore) // pas consommé
+    expect(m.events.some(e => e.kind === 'timeout' && e.side === 'enemy')).toBe(false)
+  })
+
+  it("un tick trop court pendant 'roundEnd'/'tactics' ne fait PAS avancer la phase — jamais exercé, tous les autres tests dépassaient toujours `phaseUntil` d'un coup", () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.player.hp = m.player.maxHp
+    m.enemy.hp = 0
+    tick(m, 0.05, quiet) // -> roundEnd
+    expect(m.phase).toBe('roundEnd')
+    tick(m, 0.001, quiet) // largement sous ROUND_END_DURATION
+    expect(m.phase).toBe('roundEnd') // encore là, rien n'a bougé
+    tick(m, ROUND_END_DURATION + 0.1, quiet) // -> tactics, cette fois
+    expect(m.phase).toBe('tactics')
+    tick(m, 0.001, quiet) // largement sous TACTICS_DURATION
+    expect(m.phase).toBe('tactics') // encore là
+  })
 })
 
 describe('consignes parlées', () => {
@@ -730,6 +758,21 @@ describe('resolveAttack/fireSpecial : branches à issue rare (RNG ou fenêtre é
       return crits / n
     }
     expect(critRate('aggressive', 400)).toBeGreaterThan(critRate('neutral', 400))
+  })
+
+  it("posture DÉFENSIVE : l'attaque automatique est parfois carrément SAUTÉE (45 % de chance), pas juste amortie — jamais exercé, tous les autres tests en posture défensive laissaient le coup partir puis testaient son atténuation", () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.1) // < 0,45 : la frappe est sautée
+    const m = freshMatch()
+    toFighting(m)
+    m.player.stance = 'defensive'
+    m.player.nextActionAt = m.t // prêt à agir
+    m.enemy.nextActionAt = m.t + 1000
+    const enemyHpBefore = m.enemy.hp
+    const nextActionBefore = m.player.nextActionAt
+    tick(m, 0.001, quiet)
+    expect(m.enemy.hp).toBe(enemyHpBefore) // aucun coup n'est parti
+    expect(m.events.some(e => ['hit', 'blocked', 'dodged'].includes(e.kind))).toBe(false)
+    expect(m.player.nextActionAt).toBeGreaterThan(nextActionBefore) // le timer a quand même avancé
   })
 
   it("Cœur Vaillant : un coup encaissé qui n'atteint PAS encore le seuil incrémente le compteur SANS déclencher le bonus (seul le cas 'atteint pile' était testé)", () => {
@@ -4386,6 +4429,20 @@ describe("enemyCoachAI — la logique de posture du coin adverse, jamais exercé
     expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('FRÉNÉSIE ADVERSE'))).toBe(true)
     expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('CRI DE GUERRE ADVERSE'))).toBe(true)
   })
+
+  it("Contre Parfait armé côté coin adverse : quand son coach fantôme choisit LUI-MÊME la posture 'counter', la fenêtre de contre s'arme aussi — jamais exercé, les autres tests de posture retombaient toujours sur 'defensive' avec leur mock constant", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.player.stance = 'aggressive' // ne laisse que pick(['counter', 'defensive', 'evasive'])
+    m.enemyMods.armedCounterMul = 1.8
+    // r=0,1 : sous le seuil 0,9×dt (entre dans le bloc), et floor(0,1×3)=0
+    // → sélectionne 'counter' (le 1er élément de la liste).
+    vi.spyOn(Math, 'random').mockReturnValue(0.1)
+    tick(m, 1, quiet)
+    expect(m.enemy.stance).toBe('counter')
+    expect(m.enemy.counterUntil).toBeCloseTo(m.t + 2.5, 1)
+  })
 })
 
 describe('forceRoundTimeout / chooseTacticPlan / addSpeechHype — API publique jamais exercée', () => {
@@ -4607,6 +4664,41 @@ describe('KO naturel → endRound, Initiative (auto-spécial après silence), De
     tick(m, 0.01, quiet)
     expect(m.player.ulti).toBe(ULTI_MAX)
     expect(m.events.some(e => e.kind === 'ultiReady' && e.who === 'player')).toBe(true)
+  })
+
+  it("même chose côté ENNEMI : perdre un round fait aussi déborder SON Ulti et déclenche ultiReady('enemy') — jamais exercé, seule la perte de round côté joueur l'était", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.enemy.ulti = 90
+    m.enemy.ultiUsed = false
+    m.enemy.hp = 0 // l'ennemi perd ce round
+    tick(m, 0.01, quiet)
+    expect(m.enemy.ulti).toBe(ULTI_MAX)
+    expect(m.events.some(e => e.kind === 'ultiReady' && e.who === 'enemy')).toBe(true)
+  })
+
+  it("perdre un round avec l'Ulti DÉJÀ UTILISÉE ne la recharge pas — jamais exercé, `ultiUsed` restait toujours à `false` dans les autres tests de fin de round", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.player.ulti = 0
+    m.player.ultiUsed = true // déjà tirée ce match
+    m.player.hp = 0
+    tick(m, 0.01, quiet)
+    expect(m.player.ulti).toBe(0) // aucun gain
+    expect(m.events.some(e => e.kind === 'ultiReady')).toBe(false)
+  })
+
+  it('forceRoundTimeout : le round va aussi au camp adverse quand SON ratio de PV est meilleur — jamais exercé, seul le cas où le joueur gagne (ou une égalité) l\'était', () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.player.hp = Math.round(m.player.maxHp * 0.2)
+    m.enemy.hp = Math.round(m.enemy.maxHp * 0.7) // ratio adverse nettement meilleur
+    forceRoundTimeout(m)
+    expect(m.phase).toBe('roundEnd')
+    expect(m.enemyWins).toBe(1)
+    expect(m.playerWins).toBe(0)
   })
 
   it("bug trouvé en audit coverage : la Hype qui atteint le plein PAR LE SEUL trickle passif (coach silencieux) ne déclenchait jamais hypeFull — aucun retour audio/visuel alors que le compte à rebours de l'Initiative démarre quand même", () => {

@@ -908,6 +908,12 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
     // (elle se déclenchera d'elle-même juste plus bas, PV déjà critiques).
     const healId = m.enemyHand.find(id => getCard(id).effects.some(e => e.kind === 'heal'))
     const clutchId = healId ?? m.enemyHand.find(id => getCard(id).effects.some(e => e.kind === 'lowHpHypeFull'))
+    // `clutchId` structurellement toujours défini ici : le `.some()` du
+    // garde-fou englobant (ligne 905) a déjà confirmé qu'AU MOINS une carte
+    // de la main a un effet heal OU lowHpHypeFull — si `healId` ne la
+    // trouve pas, c'est forcément qu'elle est lowHpHypeFull, et le repli
+    // `?? .find(...)` la retrouve alors à coup sûr. Garde défensive non
+    // forcée par un test artificiel (2026-08-18).
     if (clutchId) {
       m.enemyTimeoutsLeft--
       m.enemyHand.splice(m.enemyHand.indexOf(clutchId), 1)

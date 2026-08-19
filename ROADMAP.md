@@ -2552,11 +2552,70 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       ne switch pas même avec un remplaçant en pleine forme, et un banc
       réduit à un seul remplaçant déjà KO ne switch pas non plus. 5
       nouveaux tests. Aucun bug trouvé.
+- [x] `game/combat.ts` CLÔTURÉ : branches 97,36 % → 99,52 % (100 %
+      statements/fonctions/lignes). Fermé : posture DÉFENSIVE, l'attaque
+      automatique est parfois carrément SAUTÉE (45 %), pas juste amortie
+      (seule l'atténuation était testée) ; perte de round côté ENNEMI
+      déclenche aussi `ultiReady` (seul le côté joueur l'était) ; une
+      Ulti DÉJÀ UTILISÉE ne se recharge pas à la perte d'un round ;
+      `forceRoundTimeout` tranche aussi en faveur du camp adverse quand
+      son ratio de PV est meilleur ; le coin adverse en PV critiques
+      SANS carte de soin/Dernière Chance ne prend pas de temps mort ; un
+      tick trop court en `roundEnd`/`tactics` ne fait pas avancer la
+      phase ; et Contre Parfait armé côté adverse s'arme vraiment quand
+      son coach fantôme choisit lui-même la posture `'counter'`. 2
+      dernières branches documentées comme structurellement
+      inatteignables plutôt que forcées (`if (clutchId)` : le garde-fou
+      englobant a déjà confirmé qu'une carte qualifiante existe, en plus
+      du `if (stance)` déjà documenté). 9 nouveaux tests. Aucun bug
+      trouvé sur l'ensemble du sweep `combat.ts` (5 itérations,
+      ~40 tests ajoutés en tout, 88,72 % → 99,52 %). `game/` global :
+      98,55 % → 99,65 % stmts, branches 92,82 % → 98,2 %.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : CLÔTURE du sweep de couverture sur `combat.ts`
+  (branches 97,36 % → 99,52 %, 100 % statements/fonctions/lignes),
+  commencé il y a 5 itérations à 88,72 %. Fermé cette fois : posture
+  DÉFENSIVE, l'attaque automatique n'est pas juste amortie — elle est
+  parfois carrément SAUTÉE (45 % de chance), un mécanisme distinct de
+  l'atténuation de dégâts déjà testée ; perte de round côté ENNEMI
+  déclenche aussi `ultiReady` (mirroir du test joueur déjà existant) ;
+  une Ulti DÉJÀ UTILISÉE (`ultiUsed=true`) ne se recharge pas à la
+  perte d'un round supplémentaire ; `forceRoundTimeout` tranche aussi
+  en faveur du camp ADVERSE quand son ratio de PV est meilleur (seul le
+  cas joueur-gagne, et l'égalité, l'étaient) ; le coin adverse en PV
+  critiques SANS carte de soin/Dernière Chance en main ne prend pas de
+  temps mort d'urgence ; un tick trop court pendant `'roundEnd'`/
+  `'tactics'` ne fait PAS avancer la phase (tous les autres tests
+  dépassaient toujours `phaseUntil` d'un coup) ; et Contre Parfait armé
+  côté adverse s'arme vraiment quand c'est le coach FANTÔME lui-même
+  qui choisit la posture `'counter'` (les tests de posture existants
+  retombaient toujours sur une autre posture avec leur mock constant).
+  2 dernières branches documentées en commentaire comme structurellement
+  inatteignables plutôt que forcées par un test artificiel : `if
+  (clutchId)` dans le temps mort d'urgence adverse (le garde-fou
+  englobant, un `.some()`, a déjà confirmé qu'une carte qualifiante
+  existe avant ce point — si `healId` ne la trouve pas, le repli `??`
+  la retrouve à coup sûr), en plus du `if (stance)` déjà documenté
+  l'itération précédente. 9 nouveaux tests, tous corrects du premier
+  coup. Aucun bug trouvé sur l'ENSEMBLE du sweep `combat.ts` (5
+  itérations consécutives, ~40 tests ajoutés au total, 88,72 % →
+  99,52 % de branches) — un résultat rassurant en soi : le cœur du
+  moteur de combat, déjà la cible de plusieurs audits de code manuels
+  passés, ne cachait aucun bug supplémentaire une fois chaque branche
+  logique exercée. engine.test.ts 351 → 358, suite vérifiée sur 3
+  exécutions consécutives (358/358). `game/` global : 98,55 % → 99,65 %
+  stmts, branches 92,82 % → 98,2 % — quasiment saturé. `tsc --noEmit` +
+  `npm run build` verts. Restent : `cardForge.ts` (97,29 %/94,11 %,
+  déjà partiellement documenté comme inatteignable), `deckBuilder.ts`
+  (95,65 %, 1 branche déjà documentée), `sceneDirector.ts` (89,61 %,
+  le plus bas dossier restant) et `progression.ts`/`liveCutPlayer.ts`/
+  `cards.ts` (déjà >97 %, gains marginaux). `render/arenaRenderer.ts`
+  reste hors périmètre des tests unitaires (canvas 2D, déjà couvert par
+  plusieurs audits de code manuels).
 - 2026-08-18 (routine) : Suite du sweep sur `combat.ts` (branches
   96,16 % → 97,36 %). Fermé le texte « Leçon d'Expérience » côté
   JOUEUR : le mod armé était sur `m.mods` (pas `m.enemyMods`) et le
