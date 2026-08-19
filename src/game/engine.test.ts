@@ -2343,6 +2343,10 @@ describe('Commentateur (commentator.ts) — jamais testé directement (0 référ
       [{ kind: 'ultiReady', t: 10, who: 'player' }, 3],
       [{ kind: 'confused', t: 10, who: 'player' }, 1],
       [{ kind: 'card', t: 10, name: 'X' }, 1],
+      [{ kind: 'cardProc', t: 10, text: 'X' }, 2],
+      [{ kind: 'trait', t: 10, text: 'X', color: '#fff' }, 1],
+      [{ kind: 'switch', t: 10, side: 'player', name: 'X' }, 2],
+      [{ kind: 'timeout', t: 10, side: 'player' }, 2],
       [{ kind: 'roundEnd', t: 10, winner: 'player' }, 3],
       [{ kind: 'matchEnd', t: 10, winner: 'player' }, 3],
     ]
@@ -2372,6 +2376,7 @@ describe('Commentateur (commentator.ts) — jamais testé directement (0 référ
       [{ kind: 'hypeFull', t: 10, who: 'enemy' }, 2],
       [{ kind: 'ultiReady', t: 10, who: 'enemy' }, 3],
       [{ kind: 'confused', t: 10, who: 'enemy' }, 1],
+      [{ kind: 'timeout', t: 10, side: 'enemy' }, 2],
       [{ kind: 'roundEnd', t: 10, winner: 'enemy' }, 3], // le joueur PERD ce round -> T.roundEndLose
       [{ kind: 'matchEnd', t: 10, winner: 'enemy' }, 3], // le joueur PERD le match -> T.matchEndLose
     ]
@@ -2427,16 +2432,88 @@ describe('Commentateur (commentator.ts) — jamais testé directement (0 référ
     expect(lineEnemy!.text).not.toBe(linePlayer!.text)
   })
 
-  it('les événements que le commentateur ne connaît pas (cardProc, switch, timeout…) sont ignorés sans erreur', async () => {
+  it("un kind d'événement futur/inconnu reste ignoré sans erreur (garde-fou `default`, jamais atteint par les kinds réels aujourd'hui)", async () => {
     const { Commentator } = await import('./commentator')
     const m = freshMatch()
     const c = new Commentator()
     c.ingest(m) // consomme le roundStart initial
     m.t = 10
-    m.events.push({ kind: 'cardProc', t: 10, text: 'BOOM' })
-    m.events.push({ kind: 'switch', t: 11, side: 'player', name: 'Rei' })
+    m.events.push({ kind: 'unePhaseFutureQuiNexistePasEncore' } as never)
     expect(c.ingest(m)).toBeNull()
     expect(c.lines.length).toBe(1) // seul le roundStart initial a produit une ligne
+  })
+
+  it("bug d'audit (2026-08-18) : cardProc/trait/switch/timeout n'avaient AUCUN case — chacun de ces coups de théâtre (Frénésie, Dernière Chance, ordre ignoré, relève, temps mort…) ne produisait jamais de commentaire, silencieusement", async () => {
+    const { Commentator } = await import('./commentator')
+    const m = freshMatch()
+    const c = new Commentator()
+    c.ingest(m) // consomme le roundStart initial
+
+    m.t = 10
+    m.events.push({ kind: 'cardProc', t: 10, text: 'DERNIÈRE CHANCE !!' })
+    const cardProcLine = c.ingest(m)
+    expect(cardProcLine?.text).toBe('DERNIÈRE CHANCE !!') // texte déjà écrit par combat.ts, pas de gabarit
+
+    m.t = 20
+    m.events.push({ kind: 'trait', t: 20, text: 'REI T\'IGNORE…', color: '#a29bfe' })
+    const traitLine = c.ingest(m)
+    expect(traitLine?.text).toBe('REI T\'IGNORE…')
+
+    m.t = 30
+    m.events.push({ kind: 'switch', t: 30, side: 'player', name: 'Yuna' })
+    const switchLine = c.ingest(m)
+    expect(switchLine?.text).toContain('Yuna')
+
+    m.t = 40
+    m.events.push({ kind: 'timeout', t: 40, side: 'enemy' })
+    const timeoutLine = c.ingest(m)
+    expect(timeoutLine?.text).toContain('Rei') // adversaire par défaut de freshMatch()
+  })
+
+  it("'trait' respecte AUSSI la fenêtre de silence de 3 s (mineur, comme 'dodged'/'blocked') — jamais exercé côté silencieux", async () => {
+    const { Commentator } = await import('./commentator')
+    const m = freshMatch()
+    const c = new Commentator()
+    c.ingest(m) // roundStart initial à t=0, parle -> lastCommentAt=0
+    m.t = 1 // < 3s depuis le dernier commentaire
+    m.events.push({ kind: 'trait', t: 1, text: 'REI BOUDE…', color: '#cc88ff' })
+    expect(c.ingest(m)).toBeNull()
+  })
+
+  it("bug d'audit (2026-08-18) : une carte jouée par le coin ADVERSE était narrée « Le coin de {P} joue » — créditant le JOUEUR d'un coup de l'IA, alors que le nom de la carte disait explicitement le contraire (« (coin adverse) »)", async () => {
+    const { Commentator } = await import('./commentator')
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const m = freshMatch()
+    const c = new Commentator()
+    c.ingest(m) // consomme le roundStart initial
+    m.t = 10
+    m.events.push({ kind: 'card', t: 10, name: 'Frappe Lourde (coin adverse)' })
+    const line = c.ingest(m)!
+    expect(line.text).not.toContain('Kenta') // le joueur (freshMatch) n'a RIEN joué
+    expect(line.text).toContain('Rei') // c'est l'adversaire qui a joué
+    expect(line.text).toContain('Frappe Lourde')
+    expect(line.text).not.toContain('adverse') // le suffixe technique est retiré du nom affiché
+
+    // Même vérification pour le 2e suffixe possible (temps mort adverse).
+    const m2 = freshMatch()
+    const c2 = new Commentator()
+    c2.ingest(m2)
+    m2.t = 10
+    m2.events.push({ kind: 'card', t: 10, name: 'Second Souffle (temps mort adverse)' })
+    const line2 = c2.ingest(m2)!
+    expect(line2.text).not.toContain('Kenta')
+    expect(line2.text).toContain('Rei')
+    expect(line2.text).not.toContain('adverse')
+
+    // Contrôle positif : une carte du JOUEUR (sans suffixe) reste narrée normalement.
+    const m3 = freshMatch()
+    const c3 = new Commentator()
+    c3.ingest(m3)
+    m3.t = 10
+    m3.events.push({ kind: 'card', t: 10, name: 'Massage Éclair' })
+    const line3 = c3.ingest(m3)!
+    expect(line3.text).toContain('Kenta')
+    expect(line3.text).not.toContain('Rei')
   })
 
   it('recent(n) : renvoie les n dernières lignes, dans l\'ordre', async () => {

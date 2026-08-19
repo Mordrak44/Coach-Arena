@@ -2681,11 +2681,101 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       inline `borderColor` redondant — remplacé par la classe partagée,
       pour rester synchronisé si `.selected` évolue ailleurs dans le
       jeu. 360 tests inchangés. `tsc --noEmit` + `npm run build` verts.
+- [x] Audit de code (fichier entier) sur `commentator.ts` (2026-08-18),
+      pas ciblé en profondeur depuis le round 5 (2026-08-16) alors que
+      `combat.ts` (sa source d'événements) a beaucoup changé depuis
+      (plans tactiques, garde défensive, frénésie, mods de contre…).
+      **6 vrais bugs corrigés** : le commentateur ne gérait QUE 12 des
+      17 `CombatEvent` possibles — `cardProc` (Frénésie, Dernière
+      Chance, Contre Parfait, Cœur Vaillant, Leçon d'Expérience, Cri de
+      Guerre, Souffle volé…), `trait` (ordre du coach ignoré : Provoqué,
+      Boude, T'ignore, Trop de bruit), `switch` (relève) et `timeout`
+      n'avaient AUCUN `case` — chacun de ces coups de théâtre ne
+      produisait jamais de commentaire, silencieusement (`default:
+      return null`). Pour `cardProc`/`trait`, le texte dramatique est
+      déjà entièrement écrit par `combat.ts` (ex. « DERNIÈRE CHANCE !! »)
+      — juste affiché tel quel, pas de gabarit à tirer. Pour `switch`/
+      `timeout`, nouveaux gabarits ajoutés. **Bug distinct, plus subtil** :
+      une carte jouée par le coin ADVERSE était narrée « Le coin de
+      {JOUEUR} joue… » — créditant systématiquement le joueur d'un coup
+      de l'IA, alors que le nom de la carte contenait déjà le suffixe
+      « (coin adverse) » qui dit l'exact contraire (l'event `'card'` n'a
+      pas de champ `side`, seulement `name` — même convention déjà
+      utilisée par `ArenaScreen.tsx` pour la visio des coachs, réutilisée
+      ici plutôt qu'une nouvelle mécanique parallèle). Corrigé en
+      détectant `.includes('adverse')` et en retirant le suffixe du nom
+      affiché, avec un pool de gabarits dédié au camp adverse. Vérifié
+      par un test dédié (3 sous-cas : suffixe « coin adverse », suffixe
+      « temps mort adverse », et contrôle positif sans suffixe = carte
+      du joueur, narration inchangée). `commentator.ts` fermé à 100 %
+      sur les 4 métriques. 363 tests (+3 nets : l'ancien test « ignoré
+      sans erreur » sur ces mêmes kinds, dont la prémisse était devenue
+      fausse, a été réécrit en test positif). `tsc --noEmit` +
+      `npm run build` verts, funnel visuel standard sans régression
+      (le commentateur écrit sur le canvas, hors inspection DOM directe
+      — vérification via la couverture de test exhaustive plutôt que
+      pixel par pixel, cohérent avec le traitement établi du rendu
+      canvas dans ce projet).
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Après avoir clos le sweep d'audits sur les 4
+  écrans UI centraux, retour côté `game/` avec un audit full-file sur
+  `commentator.ts` — la narration shōnen affichée en direct sur le
+  canvas de combat, pas ciblée en profondeur depuis le round 5
+  (2026-08-16) alors que `combat.ts` (sa source d'`events`) a
+  énormément changé depuis (plans tactiques, garde défensive, frénésie,
+  mods de contre, temps mort d'urgence adverse…). **6 vrais bugs
+  corrigés**, tous de la même famille structurelle : le `switch(ev.kind)`
+  du commentateur ne couvrait que 12 des 17 kinds de `CombatEvent`
+  aujourd'hui définis dans `types.ts` — `cardProc`, `trait`, `switch` et
+  `timeout` n'avaient AUCUN `case`, tombant silencieusement sur
+  `default: return null`. Concrètement : Frénésie, Dernière Chance,
+  Contre Parfait, Cœur Vaillant, Leçon d'Expérience, Cri de Guerre et le
+  vol de Souffle (tous des `cardProc`) ne produisaient jamais de
+  commentaire malgré des textes déjà écrits en toutes lettres par
+  `combat.ts` (ex. « DERNIÈRE CHANCE !! ») — juste jamais lus par le
+  commentateur. Même chose pour les moments où un ordre du coach est
+  silencieusement rejeté par la personnalité du perso (`trait` : Provoqué,
+  Boude, T'ignore, Trop de bruit), une relève de banc (`switch`), et un
+  temps mort (`timeout`, explicitement qualifié de « précieux, 1/match »
+  dans le commentaire de `combat.ts` lui-même). Corrigé en ajoutant les
+  4 `case` manquants — `cardProc`/`trait` réutilisent directement le
+  texte déjà écrit par `combat.ts` (pas de gabarit à tirer), `switch`/
+  `timeout` ont chacun un nouveau pool de gabarits. Un 6e bug, distinct
+  et plus subtil, trouvé sur le `case 'card'` déjà existant : une carte
+  jouée par le coin ADVERSE était narrée « Le coin de {JOUEUR} joue…
+  » — créditant systématiquement le JOUEUR d'un coup joué par l'IA. La
+  cause : l'event `'card'` (contrairement à `'switch'`/`'timeout'`) n'a
+  PAS de champ `side` dans `types.ts`, seulement `name` — et le coin
+  adverse encode ça en SUFFIXE du nom (« (coin adverse) » / « (temps
+  mort adverse) », voir `combat.ts`) plutôt qu'en champ structuré. Le
+  commentateur ignorait totalement ce suffixe et utilisait toujours les
+  gabarits « joueur ». Plutôt que d'introduire un champ `side` sur le
+  type (refactor plus large, plusieurs sites d'appel dans `combat.ts` à
+  toucher), réutilisé la MÊME convention de détection déjà établie et
+  déjà corrigée une fois pour ce exact problème dans `ArenaScreen.tsx`
+  (`ev.name.includes('adverse')` + retrait du suffixe pour l'affichage)
+  — cohérence avec le patron existant plutôt qu'un nouveau mécanisme
+  parallèle. Nouveau pool de gabarits `T.cardAdverse` dédié. Vérifié par
+  un test à 3 sous-cas (suffixe « coin adverse », suffixe « temps mort
+  adverse », et contrôle positif : une carte du joueur sans suffixe
+  reste narrée normalement, aucune régression). L'ancien test qui
+  documentait « ces kinds sont ignorés sans erreur » avait sa prémisse
+  devenue fausse par ce fix — réécrit en test positif (chaque nouveau
+  `case` produit bien le texte attendu), en gardant un test résiduel
+  minimal pour le garde-fou `default` avec un kind synthétique inconnu
+  (`as never`), toujours pertinent pour une future extension du type.
+  `commentator.ts` fermé à 100 % sur les 4 métriques (branches 98,38 %
+  → 100 % après un dernier test sur la fenêtre de silence de `trait`).
+  363 tests (net +3). `tsc --noEmit` + `npm run build` verts, funnel
+  visuel standard sans régression — le commentateur écrit directement
+  sur le canvas (pas de DOM inspectable), vérification portée
+  entièrement par la couverture de test exhaustive plutôt que par une
+  lecture de pixels, cohérent avec le traitement établi du rendu canvas
+  dans ce projet.
 - 2026-08-18 (routine) : Suite (et clôture pour l'instant) du sweep
   d'audits full-file sur les écrans UI, après `ArenaScreen.tsx`,
   `CharacterSelect.tsx` et `ResultsScreen.tsx` — cette fois

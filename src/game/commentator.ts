@@ -65,6 +65,12 @@ const T = {
     'Trop d’ordres ! {W} est perdu(e) !',
   ],
   card: ['Le coin de {P} joue « {S} » !', 'Carte sur le ring : « {S} » !'],
+  cardAdverse: ['Le coin de {E} riposte avec « {S} » !', 'Carte adverse sur le ring : « {S} » !'],
+  switch: ['{N} monte sur le ring !', 'Relève ! {N} entre dans la bataille !'],
+  timeout: [
+    "TEMPS MORT ! Le coin de {W} s'arrête pour réfléchir…",
+    '{W} appelle le temps mort — moment stratégique !',
+  ],
   roundEndWin: [
     'Le round est pour {P} !! Le coaching paie !',
     '{P} prend le round — quelle gestion du coin !',
@@ -157,8 +163,38 @@ export class Commentator {
         })
       case 'confused':
         return this.emit(m, this.pick(T.confused), 1, { ...base, W: ev.who === 'player' ? P : E })
-      case 'card':
-        return this.emit(m, this.pick(T.card), 1, { ...base, S: ev.name })
+      case 'card': {
+        // L'event 'card' n'a PAS de champ `side` (types.ts) — le coin
+        // adverse encode ça dans `name` lui-même, en suffixe (« (coin
+        // adverse) » / « (temps mort adverse) », voir combat.ts), même
+        // convention déjà utilisée par ArenaScreen.tsx pour la visio des
+        // coachs. Sans cette détection, TOUTE carte adverse était narrée
+        // « Le coin de {P} joue… » — créditant le joueur d'un coup de
+        // l'IA, alors que `name` disait explicitement le contraire
+        // (trouvé en audit, 2026-08-18).
+        const adverse = ev.name.includes('adverse')
+        const label = adverse
+          ? ev.name.replace(' (coin adverse)', '').replace(' (temps mort adverse)', '')
+          : ev.name
+        return this.emit(m, this.pick(adverse ? T.cardAdverse : T.card), 1, { ...base, S: label })
+      }
+      case 'cardProc':
+        // Texte déjà entièrement écrit par combat.ts (FRÉNÉSIE, CONTRE
+        // PARFAIT, CŒUR VAILLANT, DERNIÈRE CHANCE, LEÇON D'EXPÉRIENCE,
+        // CRI DE GUERRE, Souffle volé…) — pas de gabarit à tirer, ce
+        // `case` manquait entièrement et chacun de ces coups de théâtre
+        // ne produisait aucun commentaire (trouvé en audit, 2026-08-18).
+        return this.emit(m, ev.text, 2, base)
+      case 'trait':
+        // Idem : « X T'IGNORE… », « X BOUDE… », « X EST PROVOQUÉ·E ! »,
+        // « TROP DE BRUIT… » — le moment où un ordre du coach est
+        // silencieusement rejeté par la personnalité du perso méritait
+        // justement une explication à l'écran, jamais donnée jusqu'ici.
+        return quiet ? null : this.emit(m, ev.text, 1, base)
+      case 'switch':
+        return this.emit(m, this.pick(T.switch), 2, { ...base, N: ev.name })
+      case 'timeout':
+        return this.emit(m, this.pick(T.timeout), 2, { ...base, W: ev.side === 'player' ? P : E })
       case 'roundEnd':
         return this.emit(
           m,
