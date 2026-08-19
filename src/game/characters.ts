@@ -251,9 +251,17 @@ export const TRAIT_INFO: Record<ListenTrait, { label: string; icon: string; hint
   fusionnel: { label: 'Fusionnel', icon: '💞', hint: 'Vis le match à la caméra : il le sent.' },
 }
 
-/** Adversaire IA choisi aléatoirement (différent du perso joueur si possible). */
-export function pickOpponent(playerId: string): Character {
-  const pool = ROSTER.filter(c => c.id !== playerId)
+/**
+ * Adversaire principal IA choisi aléatoirement, EXCLUANT tous les ids
+ * passés — pas seulement le perso du joueur. `pickOpponentTeam` (banc
+ * adverse) excluait déjà le joueur ET ses équipiers, mais ce fix
+ * (2026-08-16) n'avait jamais été répercuté ici : l'adversaire PRINCIPAL
+ * pouvait être une copie exacte d'un équipier du joueur — un miroir face
+ * à son propre banc (trouvé en audit, 2026-08-18).
+ */
+export function pickOpponent(excludeIds: string[]): Character {
+  const excluded = new Set(excludeIds)
+  const pool = ROSTER.filter(c => !excluded.has(c.id))
   return pool[Math.floor(Math.random() * pool.length)]
 }
 

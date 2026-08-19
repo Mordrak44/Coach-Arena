@@ -2421,11 +2421,48 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       armée — le signal que l'adversaire humain verra en PvP. Les deux
       tuiles sont aussi incrustées dans les clips. En PvP, la tuile
       adverse devient la cam du joueur d'en face.
+- [x] Audit de code (fichier entier) sur `App.tsx` (2026-08-18) : 2 vrais
+      bugs corrigés — `pickOpponent` n'excluait que l'id du joueur, pas
+      son équipe (miroir possible contre son propre équipier de banc,
+      même défaut déjà corrigé sur `pickOpponentTeam` le 2026-08-16 mais
+      jamais répercuté ici) ; et le bouton « Revanche » (mode Rapide)
+      re-tirait un adversaire complètement aléatoire au lieu de refaire
+      le même combat, contredisant son propre nom (le mode Histoire avait
+      déjà le bon comportement, déterministe via `chapterOpponent`).
+      3e trouvaille notée mais NON corrigée (décision produit, pas un
+      bug) : `ReadyScreen` (le Vestiaire) n'a aucun bouton retour vers la
+      sélection de perso.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite de l'audit de code (fichier entier) sur
+  `App.tsx`, après `StoryScreen.tsx`/`ResultsScreen.tsx`/`TitleScreen.tsx`.
+  **2 vrais bugs trouvés et corrigés**, tous deux confirmés réels par
+  `git stash` A/B (test échoue sur le code d'avant-fix, passe après) :
+  (1) `pickOpponent(char.id)` n'excluait que le joueur, pas son équipe —
+  l'adversaire principal du mode Rapide pouvait être une copie exacte
+  d'un équipier du banc, un miroir face à soi-même. Le même défaut avait
+  déjà été corrigé sur `pickOpponentTeam` (banc adverse) le 2026-08-16
+  mais jamais répercuté sur l'adversaire principal. Signature changée en
+  `pickOpponent(excludeIds: string[])`, alignée sur le patron de
+  `pickOpponentTeam`. (2) Le bouton « ⚡ Revanche » en mode Rapide
+  appelait `startMatch` sans jamais réutiliser l'adversaire du match
+  précédent : nouveau tirage aléatoire à chaque clic, contredisant le nom
+  même du bouton (le mode Histoire, lui, était déjà correct — adversaire
+  déterministe via `chapterOpponent`). Ajout d'un 4e paramètre optionnel
+  `opponentOverride` à `startMatch`, câblé sur `enemy` à l'appel
+  `onReplay`. **3e trouvaille notée mais délibérément non corrigée** :
+  `ReadyScreen` (le Vestiaire) n'offre aucun bouton retour vers la
+  sélection de perso — jugé être une décision produit/UX plutôt qu'un
+  bug de pure restauration de comportement ; à traiter séparément si
+  demandé. 2 nouveaux tests (dont un test de non-régression à 200 tirages
+  couvrant joueur + équipiers simulés exclus). Suite complète vérifiée
+  sur 3 exécutions consécutives (304/304), plus vérification visuelle en
+  Chromium headless (`?demo=fast`) : après clic sur Revanche, le
+  Vestiaire réaffiche bien le MÊME adversaire (Fang) qu'avant, confirmant
+  le fix en conditions réelles. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Audit de code (fichier entier, pas juste le
   dernier diff) sur `StoryScreen.tsx`/`ResultsScreen.tsx` (rien trouvé) puis
   `TitleScreen.tsx`. **Vrai bug trouvé** : `overflow: 'hidden'` en ligne

@@ -2322,7 +2322,15 @@ describe('pickOpponent (characters.ts) — adversaire du mode Rapide, jamais tes
   it("n'est jamais le perso du joueur, sur de nombreux tirages", async () => {
     const { pickOpponent } = await import('./characters')
     for (let i = 0; i < 200; i++) {
-      expect(pickOpponent(ROSTER[0].id).id).not.toBe(ROSTER[0].id)
+      expect(pickOpponent([ROSTER[0].id]).id).not.toBe(ROSTER[0].id)
+    }
+  })
+
+  it("bug d'audit (2026-08-18) : n'est non plus JAMAIS un équipier du joueur — le fix analogue sur pickOpponentTeam (2026-08-16) n'avait jamais été répercuté ici, un adversaire principal pouvait être une copie exacte du banc du joueur", async () => {
+    const { pickOpponent } = await import('./characters')
+    const excluded = [ROSTER[0].id, ROSTER[2].id, ROSTER[3].id]
+    for (let i = 0; i < 200; i++) {
+      expect(excluded).not.toContain(pickOpponent(excluded).id)
     }
   })
 })

@@ -56,7 +56,17 @@ export default function App() {
   /** chapitre d'Histoire en cours (null = match rapide) */
   const storyRef = useRef<StoryChapter | null>(null)
 
-  const startMatch = (char: Character, chosenDeck?: CardId[], team: Character[] = baseTeamRef.current) => {
+  const startMatch = (
+    char: Character,
+    chosenDeck?: CardId[],
+    team: Character[] = baseTeamRef.current,
+    // Revanche (mode Rapide) : redonne EXACTEMENT le même adversaire que le
+    // dernier match, sinon le bouton « Revanche » retirait un adversaire
+    // totalement différent — contradiction avec son propre nom, l'Histoire
+    // restant déjà correcte puisque chapterOpponent(story) est déterministe
+    // (trouvé en audit, 2026-08-18).
+    opponentOverride?: Character,
+  ) => {
     if (chosenDeck) setDeck(chosenDeck)
     baseCharRef.current = char
     baseTeamRef.current = team
@@ -75,7 +85,9 @@ export default function App() {
     // aligne une équipe de même taille que la tienne (roster, sans doublons).
     const teamFighters = team.map(t => applyBond(t))
     const story = storyRef.current
-    const opponent = story ? chapterOpponent(story) : pickOpponent(char.id)
+    const opponent = story
+      ? chapterOpponent(story)
+      : (opponentOverride ?? pickOpponent([char.id, ...team.map(t => t.id)]))
     const enemyTeam = story
       ? chapterOpponentTeam(story)
       : pickOpponentTeam([char.id, opponent.id, ...team.map(t => t.id)], teamFighters.length)
@@ -150,7 +162,7 @@ export default function App() {
             storyOutro={
               storyRef.current && outcome.winner === 'player' ? storyRef.current.outro : null
             }
-            onReplay={() => startMatch(baseCharRef.current ?? player)}
+            onReplay={() => startMatch(baseCharRef.current ?? player, undefined, undefined, enemy ?? undefined)}
             onNewChar={() => setScreen(storyRef.current ? 'story' : 'select')}
           />
         )}
