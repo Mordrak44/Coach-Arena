@@ -48,7 +48,23 @@ function readAll(): Record<string, StableState> {
     // migration passé) — le catch ne l'attrape pas, et `charId in all`
     // planterait alors en aval, synchrone dans le rendu de CharacterSelect
     // (trouvé en audit, 2026-08-16).
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    // Le contrôle ci-dessus ne valide que le CONTENEUR — une entrée
+    // individuelle corrompue (ex. { kenta: 5 }, une valeur non-objet pour
+    // UN SEUL perso) passait ce filtre et plantait plus tard dans
+    // getStable() : `charId in all` la comptait comme « déjà rencontré »
+    // (donc jamais d'envie assignée), et l'écriture `s.dayKey = ...`
+    // plantait carrément (assignation sur un nombre primitif, mode strict
+    // des modules ES) — un crash synchrone dans le rendu de
+    // CharacterSelect (trouvé en audit, 2026-08-18). On écarte chaque
+    // entrée invalide individuellement plutôt que tout le magasin :
+    // `getStable` la retraite alors comme « jamais rencontré », le repli
+    // le plus sûr (assigne une envie fraîche, jamais punitif).
+    const clean: Record<string, StableState> = {}
+    for (const [id, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (v && typeof v === 'object' && !Array.isArray(v)) clean[id] = v as StableState
+    }
+    return clean
   } catch {
     return {}
   }
@@ -64,7 +80,17 @@ function writeAll(map: Record<string, StableState>) {
 }
 
 function dayKeyOf(now: number): string {
-  return new Date(now).toISOString().slice(0, 10)
+  // Calendrier LOCAL du joueur, pas UTC : `toISOString()` bascule le
+  // « jour » à minuit UTC, un instant fixe qui ne correspond au minuit
+  // réel d'AUCUN joueur hors UTC+0 — contredisant directement l'intention
+  // documentée en tête de fichier (« 3 par jour RÉEL »). Un joueur en
+  // UTC-8 (Pacifique US) verrait ses actions se recharger à 16h locales,
+  // pas à minuit (trouvé en audit, 2026-08-18).
+  const d = new Date(now)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function freshState(now: number): StableState {
@@ -221,7 +247,14 @@ export function consumeTraining(charId: string): 'atk' | 'def' | 'spd' | null {
   const stat = s.trainedStat
   s.trainedStat = null
   writeAll(all)
-  return stat
+  // Validé APRÈS avoir de toute façon consommé/effacé la valeur ci-dessus
+  // (corrompue ou pas, on ne veut jamais la laisser en place pour
+  // re-planter au prochain appel) : une clé invalide (stockage trafiqué,
+  // migration passée) ne doit jamais être RENVOYÉE telle quelle —
+  // `fighter.stats[trained]` (App.tsx) sur une clé invalide vaudrait
+  // `undefined`, propageant un NaN silencieux dans toutes les stats de
+  // combat du match (trouvé en audit, 2026-08-18).
+  return stat === 'atk' || stat === 'def' || stat === 'spd' ? stat : null
 }
 
 /** Nombre total d'envies comblées (lu par la progression : soin → Lien). */

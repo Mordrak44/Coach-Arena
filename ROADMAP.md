@@ -2716,11 +2716,107 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       — vérification via la couverture de test exhaustive plutôt que
       pixel par pixel, cohérent avec le traitement établi du rendu
       canvas dans ce projet).
+- [x] Audit de code (fichier entier) sur `stable.ts` (Vie d'Écurie,
+      2026-08-18), pas ciblé en profondeur depuis le round 6
+      (2026-08-16). **3 vrais bugs corrigés**, tous confirmés par
+      exécution directe du module (`git stash` A/B, les 4 nouveaux tests
+      échouent bien sur le code d'avant-fix) : (1) une entrée
+      INDIVIDUELLE corrompue dans le stockage (ex. `{"kenta": 5}` — un
+      perso avec une valeur non-objet, contrôle déjà existant sur le
+      CONTENEUR entier mais pas sur chaque entrée) faisait planter
+      `getStable()` en plein rendu de `CharacterSelect` : `charId in
+      all` comptait la clé comme « déjà rencontré » (donc jamais
+      d'envie assignée pour ce perso, à vie), PUIS l'écriture `s.dayKey
+      = ...` plantait carrément (assignation de propriété sur un nombre
+      primitif, mode strict des modules ES). Corrigé en validant chaque
+      entrée individuellement dans `readAll()`, pas seulement le
+      conteneur — une entrée invalide est écartée séparément et
+      retraitée comme « jamais rencontré », le repli le plus sûr,
+      cohérent avec la règle d'or du fichier (« JAMAIS punitif »). (2)
+      `dayKeyOf()` dérivait le jour via `toISOString()` (UTC), pas le
+      calendrier LOCAL du joueur — un joueur en UTC-8 voyait ses 3
+      actions quotidiennes et sa nouvelle envie se recharger à 16h
+      locales, jamais à minuit réel, contredisant directement
+      l'intention documentée en tête de fichier (« 3 par jour RÉEL »).
+      Corrigé en dérivant `dayKeyOf` des accesseurs LOCAUX de `Date`.
+      (3) `consumeTraining()` renvoyait `trainedStat` sans valider qu'il
+      vaut bien `'atk'`/`'def'`/`'spd'`/`null` — une valeur corrompue se
+      serait propagée jusqu'à `fighter.stats[trained]` (App.tsx),
+      `undefined + 1 = NaN`, corrompant silencieusement toutes les stats
+      de combat du perso pour le match entier. Corrigé en validant la
+      valeur juste avant de la renvoyer (mais toujours consommée/effacée
+      du stockage, corrompue ou pas). `stable.ts` fermé à 100 % sur les
+      4 métriques. 4 nouveaux tests. `tsc --noEmit` + `npm run build`
+      verts.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite des audits full-file côté `game/`, après
+  `commentator.ts` — cette fois `stable.ts` (Vie d'Écurie : humeur,
+  envies, entraînement, persisté en `localStorage`), pas ciblé en
+  profondeur depuis le round 6 (2026-08-16), un fichier qui touche
+  exactement la classe de bugs déjà trouvée cette session sur des
+  fichiers voisins (`pickOpponent` d'App.tsx, la sanitization de
+  `deckBuilder.ts`, la gestion de corruption `localStorage` de
+  `StoryScreen.tsx`). **3 vrais bugs trouvés et corrigés**, tous
+  confirmés par exécution DIRECTE du module réel contre un
+  `localStorage` fabriqué à la main (pas juste des assertions —
+  `getStable()` appelée pour de vrai, l'erreur observée telle qu'elle se
+  produirait en jeu), puis reconfirmés par `git stash` A/B sur les 4
+  nouveaux tests (tous échouent bien sur le code d'avant-fix). (1) Le
+  fichier avait déjà un garde-fou (2026-08-16) validant que le
+  CONTENEUR entier du stockage est bien un objet — mais pas que CHAQUE
+  ENTRÉE l'est. Une entrée individuelle corrompue (`{"kenta": 5}`, un
+  perso avec une valeur non-objet — plausible après une extension de
+  navigateur, un bug de migration, ou simplement un joueur qui trafique
+  son `localStorage`) faisait planter `getStable()` : d'abord
+  silencieusement (`charId in all` la comptait comme « déjà rencontré »,
+  donc AUCUNE envie n'était plus jamais assignée à ce perso — vérifié en
+  exécutant le module : `desire` restait `null` pour toujours), PUIS
+  franchement (`s.dayKey = dayKeyOf(now)` plantait avec `TypeError:
+  Cannot create property 'dayKey' on number '5'` — l'assignation d'une
+  propriété sur un nombre primitif est une erreur en mode strict, et les
+  modules ES SONT toujours strict). Ce `getStable()` est appelé
+  SYNCHRONE dans le corps de rendu de `CharacterSelect` : un crash de
+  tout l'écran de sélection, pour un seul perso avec une entrée
+  corrompue. Corrigé en validant CHAQUE entrée individuellement dans
+  `readAll()` (pas seulement le conteneur), en écartant juste celle qui
+  est invalide plutôt que tout le magasin — retraitée alors comme
+  « jamais rencontrée », le repli le plus sûr, cohérent avec la règle
+  d'or documentée en tête de fichier (« JAMAIS punitif »). (2)
+  `dayKeyOf()` dérivait le jour via `toISOString()` — c'est-à-dire le
+  calendrier UTC, un instant FIXE qui ne correspond au minuit réel
+  d'AUCUN joueur hors UTC+0. Un joueur en UTC-8 (Pacifique US) verrait
+  ses 3 actions quotidiennes et sa nouvelle envie se recharger à 16h
+  locales, pas à minuit — contredisant directement l'intention
+  documentée en tête de fichier (« actions limitées à 3 par jour RÉEL »).
+  Corrigé en dérivant `dayKeyOf` des accesseurs LOCAUX de `Date`
+  (`getFullYear`/`getMonth`/`getDate`, pas leurs équivalents `getUTC*`).
+  Vérifié par un test qui bascule `process.env.TZ` en cours d'exécution
+  (Node relit la variable dynamiquement pour les accesseurs locaux de
+  `Date`, pas seulement au démarrage — vérifié directement avant
+  d'écrire le test) : à 2h du matin UTC le 1er janvier, un joueur
+  Pacifique doit recevoir la clé du 31 décembre, pas du 1er janvier.
+  (3) `consumeTraining()` renvoyait `trainedStat` sans valider qu'il
+  vaut bien `'atk'`/`'def'`/`'spd'`/`null` — la même classe de
+  corruption que (1) mais sur un CHAMP plutôt que l'entrée entière (ex.
+  `trainedStat: "banana"`). Une valeur corrompue se serait propagée
+  jusqu'à `fighter.stats[trained]` (App.tsx), où l'indexation par une
+  clé invalide vaut `undefined`, donnant `undefined + 1 = NaN` :
+  toutes les stats de combat du perso deviennent silencieusement `NaN`
+  pour le match entier — dégâts, seuils, tout. Corrigé en validant la
+  valeur juste avant de la renvoyer (mais toujours consommée/effacée du
+  stockage en premier, corrompue ou pas — sinon elle re-planterait au
+  prochain appel). `stable.ts` fermé à 100 % sur les 4 métriques (déjà
+  proche avant ce passage). 4 nouveaux tests, tous corrects du premier
+  coup après vérification manuelle du bug via exécution directe du
+  module. engine.test.ts 363 → 367, suite vérifiée sur 3 exécutions
+  consécutives (367/367). `tsc --noEmit` + `npm run build` verts —
+  `process.env` accédé via `globalThis` dans le nouveau test (pas de
+  `@types/node` dans ce projet 100 % navigateur, cohérent avec le reste
+  du fichier qui caste déjà d'autres globals via `(globalThis as any)`).
 - 2026-08-18 (routine) : Après avoir clos le sweep d'audits sur les 4
   écrans UI centraux, retour côté `game/` avec un audit full-file sur
   `commentator.ts` — la narration shōnen affichée en direct sur le

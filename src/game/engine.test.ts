@@ -2015,6 +2015,61 @@ describe("Vie d'Écurie (stable.ts) — jamais testée jusqu'ici (0 référence)
     }
   })
 
+  it("bug d'audit (2026-08-18) : une entrée INDIVIDUELLE corrompue (pas tout le magasin) ne fait plus planter getStable — `charId in all` la comptait à tort comme « déjà rencontré » (donc jamais d'envie assignée), et l'écriture `s.dayKey = ...` plantait carrément sur un nombre primitif (assignation de propriété en mode strict)", async () => {
+    localStorage.setItem('coach-arena-stable-v1', JSON.stringify({ kenta: 5 }))
+    const { getStable } = await import('./stable')
+    expect(() => getStable('kenta', 'sanguin', DAY1)).not.toThrow()
+    const s = getStable('kenta', 'sanguin', DAY1)
+    expect(s.mood).toBe(50) // repart d'un état neuf
+    expect(['train', 'leisure']).toContain(s.desire) // ET reçoit bien une envie (pas null pour toujours)
+  })
+
+  it("bug d'audit (2026-08-18) : idem avec une entrée `null` (JSON.stringify d'un objet contenant explicitement `null`, distinct du cas « stockage entier = null » déjà testé)", async () => {
+    localStorage.setItem('coach-arena-stable-v1', JSON.stringify({ kenta: null }))
+    const { getStable } = await import('./stable')
+    const s = getStable('kenta', 'sanguin', DAY1)
+    expect(s.mood).toBe(50)
+    expect(['train', 'leisure']).toContain(s.desire)
+  })
+
+  it("bug d'audit (2026-08-18) : consumeTraining() avec un `trainedStat` corrompu (ni 'atk'/'def'/'spd'/null) renvoie null plutôt que la valeur invalide — sinon `fighter.stats[trained]` (App.tsx) vaudrait `undefined`, propageant un NaN silencieux dans tout le combat", async () => {
+    localStorage.setItem(
+      'coach-arena-stable-v1',
+      JSON.stringify({
+        kenta: {
+          mood: 50,
+          actionsToday: 0,
+          dayKey: '2000-01-01',
+          updatedAt: 0,
+          desire: null,
+          trainedStat: 'banana',
+          desiresFulfilled: 0,
+        },
+      }),
+    )
+    const { consumeTraining } = await import('./stable')
+    expect(consumeTraining('kenta')).toBeNull()
+  })
+
+  it("bug d'audit (2026-08-18) : le jour se recharge au calendrier LOCAL du joueur, pas à un instant UTC fixe — un joueur hors UTC+0 verrait sinon ses actions se recharger à une heure locale arbitraire, jamais à minuit réel", async () => {
+    // process.env n'est pas typé dans ce projet 100 % navigateur (pas de
+    // @types/node) — accès via globalThis, comme les autres globals de ce
+    // fichier (localStorage, etc.), plutôt qu'ajouter une dépendance rien
+    // que pour ce test.
+    const proc = (globalThis as any).process
+    const originalTZ = proc.env.TZ
+    proc.env.TZ = 'America/Los_Angeles' // UTC-8, sans heure d'été à cette date
+    try {
+      const { getStable } = await import('./stable')
+      // 2h du matin UTC le 1er janvier 2026 = 18h locale le 31 décembre 2025 (Pacifique).
+      const now = Date.UTC(2026, 0, 1, 2)
+      const s = getStable('kenta', 'sanguin', now)
+      expect(s.dayKey).toBe('2025-12-31') // calendrier LOCAL, pas '2026-01-01' (UTC)
+    } finally {
+      proc.env.TZ = originalTZ
+    }
+  })
+
   it('desireText (jamais testé) : le texte suit le trait, null si aucune envie active', async () => {
     const { desireText, getStable } = await import('./stable')
     // ROSTER[0] (Kenta) a le trait 'fusionnel' dans le roster réel — passer
