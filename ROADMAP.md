@@ -2629,11 +2629,110 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       gardaient un curseur `pointer` — le style inline de `chip()`
       ignorait l'état `disabled` du bouton. 360 tests inchangés. `tsc
       --noEmit` + `npm run build` verts, funnel visuel sans régression.
+- [x] Audit de code (fichier entier) sur `ResultsScreen.tsx` (2026-08-18)
+      — seulement survolé superficiellement avant, jamais le passage
+      approfondi qui a trouvé les bugs d'`ArenaScreen.tsx`/
+      `CharacterSelect.tsx` cette même itération de sweep. **4 vrais
+      bugs corrigés**, tous de la même famille (cycle de vie des blob
+      URL + réactivité React), 3 vérifiés en Chromium headless (clip du
+      moment fort lu sans erreur console, démontage propre) : (1)
+      `URL.createObjectURL` posé en effet de bord DANS un `useMemo` — un
+      `useMemo` n'est censé être QUE pur ; sous `React.StrictMode`
+      (actif dans `main.tsx`), l'usine est appelée 2 fois avant le
+      commit, la 1re URL créée n'est jamais gardée ni révoquée : fuite
+      d'un blob URL par montage en dev, exactement ce que le commentaire
+      d'origine prétendait éviter. Corrigé en le déplaçant dans un
+      `useEffect` (même patron que sa propre révocation, juste
+      en-dessous). (2) Le bouton « Partager le KO » n'avait aucun
+      garde-fou anti-double-clic : un 2e clic pendant que la feuille de
+      partage native est ouverte fait rejeter `navigator.share()`, et le
+      catch de `shareOrDownload()` retombe sur un TÉLÉCHARGEMENT
+      silencieux en arrière-plan. Corrigé avec un état `sharing`. (3)
+      Les `clipUrl` des scènes du Réalisateur (même convention que le
+      highlight) n'étaient jamais révoqués — dormant tant qu'aucun vrai
+      pipeline Kling n'est branché (`STUB_SCENE_SUBMITTER` actuel), mais
+      latent : le jour où un vrai submitter est câblé, chaque passage
+      sur cet écran fuirait un blob par scène. Corrigé proactivement,
+      avant que le bug puisse jamais se manifester en prod. (4) Le
+      `<details open={sceneJobs.some(...)}>` contrôlé par l'état
+      rouvrait le panneau des scènes même si le joueur venait de le
+      refermer à la main, dès qu'un job passait à 'ready' — React ne
+      réapplique l'attribut natif que si la prop CALCULÉE change, sans
+      lire l'état DOM réel. Corrigé en `<details>` non contrôlé +
+      ouverture impérative une seule fois (ref + flag), sans plus jamais
+      y retoucher ensuite. 360 tests inchangés. `tsc --noEmit` +
+      `npm run build` verts, funnel visuel + lecture DOM du clip
+      vérifiés sans régression ni erreur console.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite du sweep d'audits full-file (skill
+  code-review) sur les écrans UI, après `ArenaScreen.tsx` et
+  `CharacterSelect.tsx` — cette fois `ResultsScreen.tsx` (écran de fin
+  de match : clip du KO, prompts du Réalisateur, Revanche), qui n'avait
+  reçu qu'un passage superficiel « ça a l'air propre » lors d'une
+  session antérieure, jamais l'audit approfondi qui vient de trouver de
+  vrais bugs sur les 2 autres écrans. **4 vrais bugs trouvés et
+  corrigés**, tous de la même famille (cycle de vie des blob URL +
+  réactivité React contrôlée vs non contrôlée) : (1) `URL.
+  createObjectURL(outcome.highlight)` posé comme effet de bord DANS un
+  `useMemo` — un `useMemo` n'est censé être QUE pur selon React
+  lui-même. Sous `React.StrictMode` (actif dans `main.tsx`, confirmé
+  avant de considérer ce finding sérieusement), React appelle l'usine
+  du `useMemo` 2 fois avant de committer le rendu : la 1re URL créée
+  n'est jamais gardée dans l'état ni révoquée nulle part, seule la 2e
+  l'est — une fuite d'un blob URL par montage en dev, exactement la
+  classe de bug que le commentaire d'origine (juste au-dessus) disait
+  vouloir éviter. Corrigé en déplaçant la création dans un `useEffect`,
+  au même patron que sa propre révocation juste en-dessous (`useState` +
+  `useEffect` qui crée ET révoque). (2) Le bouton « Partager le KO »
+  n'avait aucun garde-fou anti-double-clic : un 2e clic pendant que la
+  feuille de partage native (Web Share API) est déjà ouverte fait
+  rejeter le 2e `navigator.share()` avec `InvalidStateError`, et le
+  `catch` de `shareOrDownload()` (déjà écrit pour gérer un refus
+  utilisateur légitime) retombe alors sur un TÉLÉCHARGEMENT silencieux
+  en arrière-plan pendant que la feuille native est encore affichée à
+  l'écran — un effet de bord surprenant d'un simple double-clic. Corrigé
+  avec un état `sharing` (bouton désactivé pendant l'appel). (3) Les
+  `clipUrl` des scènes du Réalisateur (`sceneQueue.ts`, même convention
+  `URL.createObjectURL` que le highlight) n'étaient jamais révoqués nulle
+  part — actuellement dormant puisqu'aucun vrai pipeline Kling n'est
+  branché (`STUB_SCENE_SUBMITTER` par défaut ne produit jamais 'ready'),
+  mais un défaut latent bien réel dans le code : le jour où un vrai
+  submitter est câblé (backend prévu au ROADMAP), chaque passage sur cet
+  écran fuirait un blob par scène affichée, sans qu'aucun signal
+  n'alerte avant que la mémoire du navigateur en pâtisse sur une session
+  longue. Corrigé proactivement (même patron `useRef<Set>` + révocation
+  au démontage), AVANT que le bug puisse jamais se manifester en
+  production — un choix délibéré de corriger le code latent plutôt que
+  d'attendre que la fonctionnalité soit branchée pour découvrir le bug
+  a posteriori. (4) `<details open={sceneJobs.some(j => j.status ===
+  'ready')}>` : React ne réapplique un attribut natif comme `open` que
+  quand la prop CALCULÉE change de valeur d'un rendu à l'autre — il ne
+  lit jamais l'état DOM réel (potentiellement modifié par l'utilisateur
+  entre-temps). Donc si le joueur referme le panneau des scènes à la
+  main pendant que tous les jobs sont encore 'pending' (l'état calculé
+  reste `false`, React ne touche à rien), puis qu'un job passe à
+  'ready' (l'état calculé bascule `false→true`), React réapplique
+  `open=true` et rouvre de force le panneau que le joueur venait
+  justement de fermer. Également dormant aujourd'hui (même raison que
+  (3)), corrigé aussi proactivement : `<details>` non contrôlé (aucune
+  prop `open`) + une ouverture IMPÉRATIVE unique au premier job prêt via
+  une ref + un flag « déjà auto-ouvert », sans plus jamais y retoucher
+  ensuite — le joueur reste maître du panneau une fois l'auto-ouverture
+  initiale passée. Les 3 premiers bugs vérifiés en Chromium headless
+  (funnel `?demo=fast` jusqu'aux résultats, lecture DOM du `<video>` du
+  highlight — `hasSrc: true, readyState: 4` — et zéro erreur console au
+  clic sur Revanche, qui déclenche le démontage/la révocation). Le 4e
+  (details) n'a pas pu être vérifié visuellement puisque dormant sur ce
+  build (aucun job ne passe jamais à 'ready' avec le stub actuel) — la
+  correction repose sur la lecture du code React (comportement
+  documenté des attributs natifs contrôlés) plutôt que sur une
+  observation empirique. 360 tests inchangés (composants UI non
+  couverts par les tests unitaires). `tsc --noEmit` + `npm run build`
+  verts, funnel visuel standard sans régression.
 - 2026-08-18 (routine) : Suite des audits de code full-file (skill
   code-review) sur les écrans UI, après `ArenaScreen.tsx` plus tôt cette
   itération de sweep — cette fois `CharacterSelect.tsx`, l'écran de
