@@ -2522,11 +2522,64 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       esquive/critique qui faisait flipper le signe du résultat d'une
       exécution à l'autre en tirage libre, sans neutraliser
       artificiellement le hasard du combat. Aucun bug trouvé.
+- [x] `game/combat.ts` : suite du sweep, branches 93,76 % → 96,16 %.
+      Fermé : l'Ulti exige AUSSI sa jauge pleine (seul le cas « prêt »
+      l'était, contrairement au spécial dont les 2 cas le sont) ; Cœur
+      Vaillant incrémente son compteur SANS déclencher le bonus tant que
+      le seuil n'est pas atteint (seul le cas « atteint pile » l'était) ;
+      un attaquant confus inflige ×0,7 de dégâts (distinct du garde-fou
+      anti-spam des ORDRES confus, déjà testé) ; un défenseur confus
+      esquive moins bien (`-0,08` sur sa chance) ; la Frénésie (Fang)
+      amplifie VRAIMENT les dégâts une fois active (les tests existants
+      ne vérifiaient que son armement, jamais sa consommation) ; un
+      contre SANS bonus armé frappe quand même, juste sans les procs de
+      carte ; et un Cérébral en ordre de POSTURE (pas seulement `'cheer'`,
+      qui a sa PROPRE branche cérébrale distincte) est stressé s'il est
+      hurlé et transcendé s'il est calme. 8 nouveaux tests. Documenté en
+      commentaire plutôt que forcé : le garde-fou `if (stance)` est
+      structurellement toujours vrai (cheer/special/ulti déjà retournés
+      plus haut, les 4 commandes restantes couvrent exactement les clés
+      de `COMMAND_STANCE`). Aucun bug trouvé. Reste ~15 branches
+      ouvertes, concentrées sur `fireSpecial`/`endRound`/`startNextRound`
+      — prochaine itération.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite du sweep sur `combat.ts` (branches
+  93,76 % → 96,16 %), en resserrant sur les gaps encore accessibles
+  sans machinerie lourde (après le détour statistique de l'itération
+  précédente sur le plan tactique). Fermé côté ORDRES : l'Ulti exige
+  AUSSI sa jauge pleine, jamais exercé côté « pas prêt » alors que le
+  spécial (le même patron) l'était des deux côtés depuis longtemps ;
+  et un Cérébral en ordre de POSTURE (`'attack'` etc.) a sa PROPRE
+  branche de stress/transcendance dans `applyCommand`, distincte de
+  celle qui gère la commande `'cheer'` — seule cette dernière avait un
+  test. Fermé côté RÉSOLUTION DE COUP : Cœur Vaillant incrémente son
+  compteur sans déclencher le bonus tant que le seuil n'est pas atteint
+  (seul « atteint pile » l'était) ; un attaquant confus inflige ×0,7 de
+  dégâts — distinct du garde-fou anti-spam des ORDRES confus (le coach
+  qui spamme), lui déjà testé, mais jamais l'effet sur les dégâts d'un
+  perso RESTÉ confus qui attaque quand même automatiquement ; un
+  défenseur confus esquive moins bien, isolé via un `random()` figé à
+  une valeur calculée à la main entre les deux seuils de dodgeChance
+  (0,096 confus / 0,176 normal, Rei spd 8) ; la Frénésie (Fang)
+  amplifie VRAIMENT les dégâts une fois active — les 2 tests existants
+  ne vérifiaient que son armement (`frenzyUntil` posé), jamais sa
+  consommation par un coup réel ; et un contre SANS bonus de carte armé
+  frappe quand même (mul de base 1.3), le seul test posait toujours les
+  deux mods ensemble. Documenté plutôt que forcé : le garde-fou
+  `if (stance)` est structurellement toujours vrai à ce point du code
+  (cheer/special/ulti déjà retournés plus haut, les 4 commandes
+  restantes couvrent exactement les clés de `COMMAND_STANCE`) — commenté
+  dans la source plutôt que testé artificiellement, même discipline que
+  le `?? 0` de `deckBuilder.ts`. 8 nouveaux tests, tous corrects du
+  premier coup. Aucun bug trouvé. engine.test.ts 337 → 345, suite
+  vérifiée sur 3 exécutions consécutives (345/345). `tsc --noEmit` +
+  `npm run build` verts. Reste ~15 branches ouvertes sur `combat.ts`,
+  concentrées sur `fireSpecial`/`endRound`/`startNextRound` (fin de
+  round, changement de manche) — prochaine itération naturelle.
 - 2026-08-18 (routine) : Suite du sweep sur `combat.ts` (branches
   92,32 % → 93,76 %). Fermé : `chargeUlti` déclenchait déjà `ultiReady`
   côté 'enemy' par les dégâts de combat, mais côté 'player' UNIQUEMENT

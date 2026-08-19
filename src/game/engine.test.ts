@@ -206,6 +206,18 @@ describe('moteur de combat', () => {
     expect(m.player.ulti).toBe(0)
   })
 
+  it("l'Ulti exige AUSSI sa jauge pleine — jamais exercé, seul le cas 'prêt' l'était (contrairement au spécial dont les 2 cas sont testés)", () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.player.nextActionAt = m.t + 1000
+    m.enemy.nextActionAt = m.t + 1000
+    m.player.ulti = ULTI_MAX - 1 // presque plein, pas encore prêt
+    const hpBefore = m.enemy.hp
+    tick(m, 0.05, { command: 'ulti', voiceEnergy: 0.6, faceEnergy: 0 })
+    expect(m.enemy.hp).toBe(hpBefore) // rien ne part
+    expect(m.player.ultiUsed).toBe(false)
+  })
+
   it('le spécial exige la jauge de Hype pleine', () => {
     const m = freshMatch()
     toFighting(m)
@@ -678,6 +690,124 @@ describe('resolveAttack/fireSpecial : branches à issue rare (RNG ou fenêtre é
     expect(m.enemyMods.hitsTakenTarget).toBe(0) // désarmé après déclenchement
     expect(m.enemy.hype).toBeCloseTo(28, 0) // +3 (encaisser) + 25 (Cœur Vaillant)
     expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('CŒUR VAILLANT'))).toBe(true)
+  })
+
+  it("Cœur Vaillant : un coup encaissé qui n'atteint PAS encore le seuil incrémente le compteur SANS déclencher le bonus (seul le cas 'atteint pile' était testé)", () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99) // jamais d'esquive, jamais de crit, jamais de garde
+    const m = freshMatch()
+    toFighting(m)
+    m.player.nextActionAt = m.t
+    m.enemy.nextActionAt = m.t + 1000
+    m.enemyMods.hitsTakenTarget = 2 // il faudra 2 coups, pas 1
+    m.enemyMods.hitsTakenHype = 25
+    m.enemyMods.hitsTakenCount = 0
+    m.enemy.hype = 0
+    tick(m, 0.001, quiet)
+    expect(m.enemyMods.hitsTakenCount).toBe(1) // incrémenté…
+    expect(m.enemyMods.hitsTakenTarget).toBe(2) // …mais pas encore désarmé
+    expect(m.enemy.hype).toBeCloseTo(3, 0) // seulement le +3 d'encaisser, pas le bonus
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('CŒUR VAILLANT'))).toBe(false)
+  })
+
+  it('un attaquant confus inflige des dégâts réduits (×0,7) — jamais exercé, seul le garde-fou anti-spam des ORDRES confus l\'était, pas son effet sur les DÉGÂTS eux-mêmes', () => {
+    function playerDamage(confused: boolean) {
+      vi.spyOn(Math, 'random').mockReturnValue(0.99) // jamais d'esquive, jamais de crit, jamais de garde
+      const m = freshMatch()
+      toFighting(m)
+      m.player.nextActionAt = m.t
+      m.enemy.nextActionAt = m.t + 1000
+      if (confused) m.player.confusedUntil = m.t + 10
+      const before = m.enemy.hp
+      tick(m, 0.001, quiet)
+      vi.restoreAllMocks()
+      return before - m.enemy.hp
+    }
+    expect(playerDamage(true)).toBeLessThan(playerDamage(false))
+  })
+
+  it('un défenseur confus esquive MOINS bien (`-0.08` sur sa chance d\'esquive) — jamais exercé', () => {
+    // Écart de dodgeChance calculé (Rei, spd 8, posture neutre) : 0,176 sans
+    // confusion, 0,096 confus. Un random() figé À 0,13 (entre les deux, et
+    // sous le seuil de critique 0,12 côté attaquant neutre : ne déclenche
+    // JAMAIS le critique par accident) tranche net entre les deux cas.
+    vi.spyOn(Math, 'random').mockReturnValue(0.13)
+    const baseline = freshMatch()
+    toFighting(baseline)
+    baseline.player.nextActionAt = baseline.t
+    baseline.enemy.nextActionAt = baseline.t + 1000
+    tick(baseline, 0.001, quiet)
+    expect(baseline.events.some(e => e.kind === 'dodged')).toBe(true) // esquive : chance suffisante
+
+    const confused = freshMatch()
+    toFighting(confused)
+    confused.player.nextActionAt = confused.t
+    confused.enemy.nextActionAt = confused.t + 1000
+    confused.enemy.confusedUntil = confused.t + 10
+    tick(confused, 0.001, quiet)
+    expect(confused.events.some(e => e.kind === 'dodged')).toBe(false) // confus : plus assez de marge
+    expect(confused.events.some(e => e.kind === 'hit')).toBe(true) // le coup passe
+  })
+
+  it('la Frénésie armée (Fang) amplifie VRAIMENT les dégâts une fois active — les tests existants ne vérifiaient que son armement (`frenzyUntil` posé), jamais sa consommation par un coup', () => {
+    function playerDamage(frenzied: boolean) {
+      vi.spyOn(Math, 'random').mockReturnValue(0.99) // jamais d'esquive, jamais de crit, jamais de garde
+      const m = freshMatch()
+      toFighting(m)
+      m.player.nextActionAt = m.t
+      m.enemy.nextActionAt = m.t + 1000
+      if (frenzied) {
+        m.mods.frenzyUntil = m.t + 5
+        m.mods.armedFrenzyMul = 1.5
+      }
+      const before = m.enemy.hp
+      tick(m, 0.001, quiet)
+      vi.restoreAllMocks()
+      return before - m.enemy.hp
+    }
+    expect(playerDamage(true)).toBeGreaterThan(playerDamage(false))
+  })
+
+  it("un Cérébral hurlé sur un ordre de POSTURE ('attack') est stressé (0 gain, -4 Hype) — jamais exercé : seule la commande 'cheer' testait ce trait, pas les ordres de posture qui ont leur PROPRE branche cérébrale dans applyCommand", () => {
+    const m = createMatch(ROSTER[2], ROSTER[1], []) // Yuna, cérébrale
+    toFighting(m)
+    m.player.nextActionAt = m.t + 1000
+    m.enemy.nextActionAt = m.t + 1000
+    m.player.hype = 50
+    tick(m, 0.05, { command: 'attack', voiceEnergy: 0.8, faceEnergy: 0 }) // hurlé
+    expect(m.player.hype).toBeLessThan(50) // -4, pas de gain d'ordre
+    expect(m.events.some(e => e.kind === 'trait' && e.text.includes('BRUIT'))).toBe(true)
+  })
+
+  it("un Cérébral CALME sur un ordre de POSTURE transcende (×2,5 le gain de base) — jamais exercé", () => {
+    function orderGain(voiceEnergy: number, voiceTone: number) {
+      const m = createMatch(ROSTER[2], ROSTER[1], []) // Yuna, cérébrale
+      toFighting(m)
+      m.player.nextActionAt = m.t + 1000
+      m.enemy.nextActionAt = m.t + 1000
+      const before = m.player.hype
+      tick(m, 0.05, { command: 'attack', voiceEnergy, faceEnergy: 0, voiceTone })
+      return m.player.hype - before
+    }
+    // calme : volume posé (< 0,45) ET ton posé (< 1,1) → orderHype = 5×hrtScale
+    // neutre : volume/ton qui ne remplissent ni 'shouting' ni 'calm' → 2×hrtScale
+    expect(orderGain(0.2, 1.0)).toBeGreaterThan(orderGain(0.5, 1.0))
+  })
+
+  it('un contre SANS bonus armé (armedCounterMul/counterHypeAmount à 0) frappe quand même, juste sans les procs de carte — jamais exercé isolément, le seul test posait toujours les deux mods', () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.enemy.nextActionAt = m.t
+    m.player.nextActionAt = m.t + 1000
+    m.player.stance = 'counter'
+    m.player.counterUntil = m.t + 2.5
+    expect(m.mods.armedCounterMul).toBe(0)
+    expect(m.mods.counterHypeAmount).toBe(0)
+    const enemyHpBefore = m.enemy.hp
+    tick(m, 0.001, quiet)
+    expect(m.enemy.hp).toBeLessThan(enemyHpBefore) // le contre tape quand même, mul de base 1.3
+    expect(m.events.some(e => e.kind === 'countered' && e.by === 'player')).toBe(true)
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('CONTRE PARFAIT'))).toBe(false)
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('ORGUEIL DU RIVAL'))).toBe(false)
   })
 
   it("Leçon d'Expérience : le premier spécial adverse encaissé après armement est divisé par deux, une seule fois", () => {

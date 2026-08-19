@@ -467,6 +467,11 @@ function applyCommand(m: MatchState, cmd: CoachCommand, voiceEnergy: number, voi
   if (m.t < f.confusedUntil) return // confus : n'écoute plus
 
   const stance = COMMAND_STANCE[cmd]
+  // `stance` structurellement toujours vrai ici : cheer/special/ulti sont
+  // tous les 3 déjà retournés plus haut (lignes 428-455), donc cmd ne peut
+  // plus valoir qu'attack/defend/dodge/counter à ce point — les 4 SEULES
+  // clés que COMMAND_STANCE couvre. Garde défensive non forcée par un test
+  // artificiel (vérifiée par exhaustivité du type CoachCommand, 2026-08-18).
   if (stance) {
     // Provoqué par une carte adverse : verrouillé agressif, sourd au coach.
     if (m.t < m.enemyMods.provokedUntil) {
