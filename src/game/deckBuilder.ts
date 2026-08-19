@@ -95,6 +95,11 @@ export function buildDeckFromTemplate(
   const deck: CardId[] = []
   const t = sanitizeTemplate(template)
   for (const c of CARD_POOL) {
+    // `?? 0` structurellement inatteignable ici : sanitizeTemplate() itère
+    // sur CE MÊME CARD_POOL et pose systématiquement une entrée numérique
+    // pour chaque carte — t[c.id] n'est jamais undefined à ce point (garde
+    // défensive documentée après vérification, pas forcée par un test
+    // artificiel, 2026-08-18).
     for (let i = 0; i < (t[c.id] ?? 0); i++) deck.push(c.id)
   }
   if (signatureId) for (let i = 0; i < DECK_COPIES; i++) deck.push(signatureId)

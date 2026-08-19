@@ -108,6 +108,19 @@ describe('deck-builder', () => {
     expect('nimporte' in clean).toBe(false)
   })
 
+  it("assainit une copie NON NUMÉRIQUE (Number(...) → NaN) en 0 — branche `Number.isFinite(n) ? n : 0` jamais exercée côté faux, seuls des nombres hors bornes l'étaient", async () => {
+    const { sanitizeTemplate } = await import('./deckBuilder')
+    const dirty = { secondWind: 'beaucoup', focus: undefined } as never
+    const clean = sanitizeTemplate(dirty)
+    expect(clean.secondWind).toBe(0)
+    expect(clean.focus).toBe(0)
+  })
+
+  it("templateSize() compte une valeur explicitement undefined comme 0 (`n ?? 0` jamais exercé — sanitizeTemplate() ne produit jamais ce cas, mais templateSize() est exportée et peut recevoir un template brut)", async () => {
+    const { templateSize } = await import('./deckBuilder')
+    expect(templateSize({ secondWind: undefined, focus: 2 } as never)).toBe(2)
+  })
+
   it('valide les tailles de deck aux bornes', async () => {
     const { DECK_MAX, defaultTemplate, templateSize, templateValid } = await import('./deckBuilder')
     const t = defaultTemplate()

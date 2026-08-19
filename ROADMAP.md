@@ -2482,11 +2482,37 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       `pitch.ts` (branches 95,45 % → 100 %) : un lag dont la fenêtre de
       corrélation tombe entièrement à zéro (den=0, cas réel en bord de
       buffer) est bien ignoré sans produire de NaN. Aucun bug trouvé.
+- [x] `game/deckBuilder.ts` : branches 86,95 % → 95,65 %, dernière
+      branche (`t[c.id] ?? 0` dans `buildDeckFromTemplate`) documentée
+      comme structurellement inatteignable plutôt que forcée par un test
+      artificiel — `sanitizeTemplate()` pose toujours une entrée
+      numérique pour chaque carte du même `CARD_POOL` juste avant.
+      Fermé : copies non numériques (`Number(...)` → NaN, ex. une
+      valeur texte trafiquée) assainies en 0 (seuls des nombres hors
+      bornes étaient testés) ; et `templateSize()` face à une valeur
+      explicitement `undefined`. Aucun bug trouvé.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Reprise du coverage-driven bug hunt côté
+  `game/` (annoncé la fois précédente), en commençant par le plus bas :
+  `deckBuilder.ts` (branches 86,95 % → 95,65 %). Fermé : `sanitizeTemplate()`
+  face à une copie NON NUMÉRIQUE — `Number(t[c.id] ?? 0)` peut donner
+  NaN (ex. une valeur texte trafiquée dans le stockage), branche
+  `Number.isFinite(n) ? n : 0` jamais exercée côté faux, seuls des
+  nombres hors bornes (99, -3) l'étaient jusqu'ici ; et `templateSize()`
+  exportée face à une valeur explicitement `undefined` dans le template
+  (`n ?? 0`). Dernière branche restante (`t[c.id] ?? 0` dans
+  `buildDeckFromTemplate`) laissée non forcée : `sanitizeTemplate()`,
+  appelée juste avant sur le MÊME `CARD_POOL`, garantit toujours une
+  entrée numérique pour chaque carte à ce point — structurellement
+  inatteignable, documentée en commentaire plutôt que testée
+  artificiellement (même discipline que le garde-fou de collision de
+  `rewardOptionsFor`, 2026-08-17). 2 nouveaux tests. Aucun bug trouvé.
+  engine.test.ts 326 → 328, suite vérifiée sur 3 exécutions consécutives
+  (328/328). `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Clôture du coverage-driven bug hunt sur
   `systems/` : `facecam.ts` (branches 80 % → 100 %) et `pitch.ts`
   (branches 95,45 % → 100 %) — TOUT le dossier `systems/` (facecam,
