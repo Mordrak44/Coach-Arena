@@ -231,6 +231,17 @@ describe('moteur de combat', () => {
     expect(mulligan(m, [m.hand[0]])).toBe(false)
   })
 
+  it("mulligan avec un id absent de la main est ignoré sans planter (`idx !== -1` jamais exercé côté faux) — et un mulligan qui n'échange RIEN (aucun id trouvé) échoue proprement sans consommer l'unique essai", () => {
+    const m = freshMatch(buildStarterDeck(null))
+    m.phase = 'tactics'
+    const handBefore = [...m.hand]
+    expect(mulligan(m, ['carte-qui-nexiste-pas' as CardId])).toBe(false)
+    expect(m.hand).toEqual(handBefore) // rien n'a bougé
+    expect(m.mulliganUsed).toBe(false) // l'essai n'a PAS été consommé
+    // Toujours utilisable ensuite, avec un id valide cette fois.
+    expect(mulligan(m, [m.hand[0]])).toBe(true)
+  })
+
   it('playCard décompte le Souffle et applique les effets', () => {
     const m = freshMatch(buildStarterDeck(null))
     m.phase = 'tactics'
@@ -239,6 +250,28 @@ describe('moteur de combat', () => {
     expect(playCard(m, 'massage')).toBe(true)
     expect(m.souffle).toBe(SOUFFLE_PER_CORNER - getCard('massage').cost)
     expect(m.player.hp).toBeGreaterThan(10)
+  })
+
+  it("playCard refuse ses 3 garde-fous, jamais exercés individuellement (seul le chemin de succès l'était) : mauvaise phase, Souffle insuffisant, carte absente de la main", () => {
+    const m = freshMatch(buildStarterDeck(null))
+    m.hand = ['massage']
+
+    m.phase = 'fighting' // ni 'tactics' ni 'timeout'
+    expect(playCard(m, 'massage')).toBe(false)
+    expect(m.hand).toEqual(['massage']) // rien n'a bougé
+
+    m.phase = 'tactics'
+    m.souffle = 0 // 'massage' coûte forcément > 0
+    expect(playCard(m, 'massage')).toBe(false)
+    expect(m.hand).toEqual(['massage'])
+
+    m.souffle = SOUFFLE_PER_CORNER
+    expect(playCard(m, 'focus')).toBe(false) // pas dans la main
+    expect(m.hand).toEqual(['massage']) // toujours intacte
+    expect(m.souffle).toBe(SOUFFLE_PER_CORNER) // rien décompté
+
+    // Toujours jouable ensuite : aucun des refus n'a laissé d'état corrompu.
+    expect(playCard(m, 'massage')).toBe(true)
   })
 })
 
@@ -263,6 +296,18 @@ describe('coin adverse (deck symétrique)', () => {
     enemyCornerPlay(m)
     expect(m.enemyMods.damageReductionMul).toBeLessThan(1)
     expect(m.mods.damageReductionMul).toBe(1)
+  })
+
+  it("remélange SA défausse quand sa pioche est vide mais sa défausse ne l'est pas — jamais exercé, tous les autres tests vidaient les DEUX à la fois (repli direct sur le retour anticipé)", () => {
+    const m = freshMatch()
+    m.enemyDeck = []
+    m.enemyDiscard = ['ironGuard', 'focus', 'secondWind']
+    m.enemyHand = []
+    enemyCornerPlay(m)
+    // Aucune carte perdue ni dupliquée par le remélange + la pioche qui
+    // suit (peu importe où enemyCornerPlay les redistribue ensuite entre
+    // main/pioche/défausse en jouant depuis la main).
+    expect(m.enemyHand.length + m.enemyDeck.length + m.enemyDiscard.length).toBe(3)
   })
 })
 
@@ -2260,6 +2305,21 @@ describe('Bugs trouvés par audit (code-review, 2026-08-16) — verrouillés par
     tick(withCmd, 0.05, { command: 'cheer', voiceEnergy: 0.8, faceEnergy: 0 })
 
     expect(withCmd.player.hype).toBeGreaterThan(withoutCmd.player.hype)
+  })
+
+  it("un ordre de POSTURE ('attack') est aussi ignoré pendant la confusion, pas seulement 'cheer'/'special'/'ulti' — garde-fou dédié (`if (m.t < f.confusedUntil) return`, ligne distincte de celle de 'cheer') jamais exercé isolément", () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.player.nextActionAt = m.t + 1000
+    m.enemy.nextActionAt = m.t + 1000
+    const stanceBefore = m.player.stance
+    m.player.confusedUntil = m.t + 10
+    // lastOrderAt loin dans le passé : n'ARME pas une NOUVELLE confusion via
+    // le garde-fou anti-spam (ligne 459), on veut isoler CELUI de la ligne
+    // 467 (déjà confus → n'écoute plus).
+    m.player.lastOrderAt = m.t - 100
+    tick(m, 0.05, { command: 'attack', voiceEnergy: 0.5, faceEnergy: 0 })
+    expect(m.player.stance).toBe(stanceBefore) // la posture n'a pas bougé
   })
 
   it("le temps mort d'urgence adverse joue aussi une carte lowHpHypeFull, pas seulement heal", () => {
@@ -4627,6 +4687,34 @@ describe('trickle de Hype passif : trait Sanguin + voix forte (voiceW=0.9) — j
     // doit être strictement supérieur avec une voix forte — sinon le trait
     // Sanguin n'a aucun effet réel sur ce trickle.
     expect(gainLoud).toBeGreaterThan(gainQuiet)
+  })
+
+  it("un 'cheer' hurlé enflamme un Sanguin (×1,5) mais stresse un Cérébral (×0,4) — jamais exercé, seul le trickle passif (`voiceW`) testait ces traits ailleurs, pas la commande 'cheer' elle-même", () => {
+    function cheerGain(charIdx: number, shouting: boolean) {
+      const m = createMatch(ROSTER[charIdx], ROSTER[1], [])
+      toFighting(m)
+      m.player.nextActionAt = m.t + 1000
+      m.enemy.nextActionAt = m.t + 1000
+      const before = m.player.hype
+      tick(m, 0.001, { command: 'cheer', voiceEnergy: shouting ? 0.8 : 0.3, faceEnergy: 0 })
+      return m.player.hype - before
+    }
+    const fang = { shout: cheerGain(4, true), calm: cheerGain(4, false) } // Fang = sanguin
+    expect(fang.shout).toBeGreaterThan(fang.calm * 1.3) // ×1,5 attendu, marge pour l'arrondi Hype
+
+    const yuna = { shout: cheerGain(2, true), calm: cheerGain(2, false) } // Yuna = cérébrale
+    expect(yuna.shout).toBeLessThan(yuna.calm * 0.6) // ×0,4 attendu
+  })
+
+  it("un ordre 'counter' pose bien la posture ET arme la fenêtre de contre (`f.counterUntil`) — jamais exercé via tick(), seule l'écriture DIRECTE de l'état l'était ailleurs", () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.player.nextActionAt = m.t + 1000
+    m.enemy.nextActionAt = m.t + 1000
+    const before = m.t
+    tick(m, 0.05, { command: 'counter', voiceEnergy: 0.5, faceEnergy: 0 })
+    expect(m.player.stance).toBe('counter')
+    expect(m.player.counterUntil).toBeCloseTo(before + 2.5, 1)
   })
 })
 

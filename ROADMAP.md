@@ -2491,11 +2491,54 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       valeur texte trafiquée) assainies en 0 (seuls des nombres hors
       bornes étaient testés) ; et `templateSize()` face à une valeur
       explicitement `undefined`. Aucun bug trouvé.
+- [x] `game/combat.ts` : branches 88,72 % → 92,32 % (le cœur du moteur,
+      gros fichier — sweep partiel, pas encore fermé à 100 %). Fermé :
+      `drawEnemyCards()` remélange bien SA défausse quand sa pioche est
+      vide (tous les tests précédents vidaient les DEUX zones à la fois,
+      ne déclenchant que le retour anticipé, jamais le remélange) ;
+      `playCard()`'s 3 garde-fous testés individuellement (mauvaise
+      phase, Souffle insuffisant, carte absente de la main — seul le
+      chemin de succès l'était) ; un `'cheer'` hurlé module bien la
+      Hype selon le trait — ×1,5 pour un Sanguin, ×0,4 pour un Cérébral
+      — jamais exercé via la commande `'cheer'` elle-même (seul le
+      trickle passif testait ces traits ailleurs) ; un ordre `'counter'`
+      pose la posture ET arme `counterUntil` via `tick()` (seule
+      l'écriture directe de l'état l'était) ; et un ordre de POSTURE
+      (`'attack'`) pendant la confusion est ignoré par son propre
+      garde-fou, pas seulement celui de `'cheer'`. `mulligan()` avec un
+      id absent de la main : ignoré sans planter, sans consommer l'essai
+      unique. 7 nouveaux tests. Aucun bug trouvé.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite du coverage-driven bug hunt côté `game/` :
+  `combat.ts`, le cœur du moteur (branches 88,72 % → 92,32 %). Gros
+  fichier (417 branches) : sweep PARTIEL cette itération, pas fermé à
+  100 % — repris ciblé sur les gaps les plus clairs plutôt qu'exhaustif
+  d'un coup. Fermé : `drawEnemyCards()` (privée, appelée par
+  `enemyCornerPlay`) ne remélangeait jamais sa défausse dans les tests —
+  TOUS vidaient pioche ET défausse en même temps, ne déclenchant que le
+  retour anticipé, jamais le remélange réel (même angle mort que
+  `recorder.ts`/`sound.ts` plus tôt : un seul scénario partagé par tous
+  les tests). `playCard()` : ses 3 garde-fous (mauvaise phase, Souffle
+  insuffisant, carte absente de la main) testés individuellement — seul
+  le chemin de succès l'était jusqu'ici, chacun vérifié sans effet de
+  bord (main/Souffle intacts). Trait × commande `'cheer'` : Sanguin
+  ×1,5 et Cérébral ×0,4 quand on hurle, jamais exercés via la commande
+  elle-même (un test existant couvrait le trickle passif `voiceW` sur
+  ces traits, pas ce chemin précis dans le handler de commande).
+  `'counter'` posait déjà la posture/`counterUntil` par écriture directe
+  dans un test plus ancien, jamais via `tick()` réellement. Et le
+  garde-fou anti-confusion des ordres de POSTURE (ligne distincte de
+  celui de `'cheer'`) n'était jamais isolé (`mulligan()` avec un id
+  absent de la main, en bonus). 7 nouveaux tests, tous corrects du
+  premier coup. Aucun bug trouvé. engine.test.ts 328 → 334, suite
+  vérifiée sur 3 exécutions consécutives (334/334). `tsc --noEmit` +
+  `npm run build` verts. Reste à fermer sur `combat.ts` : ~30 branches
+  encore ouvertes (lignes 575-581, 822, 906-1047 environ) — prochaine
+  itération naturelle.
 - 2026-08-18 (routine) : Reprise du coverage-driven bug hunt côté
   `game/` (annoncé la fois précédente), en commençant par le plus bas :
   `deckBuilder.ts` (branches 86,95 % → 95,65 %). Fermé : `sanitizeTemplate()`
