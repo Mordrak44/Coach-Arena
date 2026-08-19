@@ -1436,6 +1436,26 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       ce soit. Aucun bug trouvé. 2 nouveaux tests, engine.test.ts
       296 → 298, suite complète vérifiée sur 6 exécutions consécutives.
       `tsc --noEmit` + `npm run build` verts.
+- [x] Suite du coverage-driven bug hunt : `commentator.ts` (96,07 % →
+      **100 %**, branches 72 % → 98 %). Trouvaille structurelle : le test
+      « poids cohérents par famille d'événement » (déjà existant) passait
+      SYSTÉMATIQUEMENT `'player'` comme camp (`by`/`target`/`who`/`winner`)
+      pour les 12 familles d'événements testées — jamais une seule fois
+      `'enemy'`. Or presque chaque case du switch calcule sa variable
+      (`{D}`/{W}`/`{A}`/`{C}`) via un ternaire `=== 'player' ? P : E`, et
+      choisit son pool de gabarits via un ternaire similaire pour
+      `roundEnd`/`matchEnd` (victoire vs défaite) : la moitié `: E` de
+      CHAQUE ternaire du fichier n'avait donc jamais tourné — un vrai
+      angle mort systémique, pas fichier par fichier. Nouveau test
+      miroir, symétrique du premier, avec `'enemy'` partout. Complété par
+      2 cas encore manquants : `'hit'` critique + silencieux (distinct du
+      crit=false déjà testé ET du silence déjà testé sans crit), et
+      `'blocked'` + silencieux (le test du silence de 3 s existant ne
+      testait `blocked` qu'EN DEHORS de la fenêtre). Aucun bug trouvé. 3
+      nouveaux tests, engine.test.ts 298 → 300, suite complète vérifiée
+      sur 8 exécutions consécutives. Couverture `game/` globale 98,07 %
+      (stmts), branches **92,15 %**. `tsc --noEmit` + `npm run build`
+      verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2356,6 +2376,17 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite du coverage-driven bug hunt : `commentator.ts`
+  (96,07 % → 100 %, branches 72 % → 98 %). Trouvaille structurelle : le
+  test « poids cohérents » existant passait SYSTÉMATIQUEMENT `'player'`
+  comme camp pour les 12 familles d'événements — jamais `'enemy'`. Or
+  presque chaque case calcule sa variable via un ternaire `=== 'player' ?
+  P : E` : la moitié `: E` de CHAQUE ternaire du fichier n'avait donc
+  jamais tourné, un angle mort systémique. Test miroir symétrique ajouté.
+  Complété par `'hit'` critique + silencieux et `'blocked'` + silencieux
+  (jamais testés). Aucun bug trouvé. 3 tests, engine.test.ts 298 → 300,
+  suite vérifiée sur 8 exécutions consécutives. `game/` global : branches
+  88,56 % → 92,15 %. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Suite du coverage-driven bug hunt : `cardForge.ts`
   (94,59 % → 97,29 %, fonctions → 100 %). Fermés : `loadForgedCards()` sur
   un stockage jamais écrit (son propre repli `?? '[]'` n'était jamais

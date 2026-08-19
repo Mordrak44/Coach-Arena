@@ -1951,6 +1951,76 @@ describe('Commentateur (commentator.ts) — jamais testé directement (0 référ
     }
   })
 
+  it("côté ADVERSE (enemy) de chaque ternaire `=== 'player' ? P : E` — jamais exercé : le test ci-dessus ne passait QUE 'player' à chaque cas, donc la moitié `: E` (substitution ET choix du pool gagnant/perdant) n'avait jamais tourné", async () => {
+    const { Commentator } = await import('./commentator')
+    // Chaque cas doit produire une ligne sans planter : le ternaire est
+    // évalué DANS la construction de `vars`/du pool choisi, indépendamment
+    // du gabarit ensuite tiré au hasard — peu importe s'il référence la
+    // variable, seule l'évaluation du ternaire lui-même compte ici.
+    const cases: Array<[import('./types').CombatEvent, 1 | 2 | 3]> = [
+      [{ kind: 'dodged', t: 10, target: 'enemy' }, 1],
+      [{ kind: 'blocked', t: 10, target: 'enemy', dmg: 1 }, 1],
+      [{ kind: 'countered', t: 10, by: 'enemy', dmg: 1 }, 2],
+      [{ kind: 'special', t: 10, by: 'enemy', name: 'X', onoma: 'X', dmg: 1 }, 3],
+      [{ kind: 'ulti', t: 10, by: 'enemy', name: 'X', onoma: 'X', dmg: 1 }, 3],
+      [{ kind: 'hypeFull', t: 10, who: 'enemy' }, 2],
+      [{ kind: 'ultiReady', t: 10, who: 'enemy' }, 3],
+      [{ kind: 'confused', t: 10, who: 'enemy' }, 1],
+      [{ kind: 'roundEnd', t: 10, winner: 'enemy' }, 3], // le joueur PERD ce round -> T.roundEndLose
+      [{ kind: 'matchEnd', t: 10, winner: 'enemy' }, 3], // le joueur PERD le match -> T.matchEndLose
+    ]
+    for (const [ev, weight] of cases) {
+      const m = freshMatch()
+      const c = new Commentator()
+      c.ingest(m)
+      m.t = 10
+      m.events.push(ev)
+      const line = c.ingest(m)
+      expect(() => c.ingest(m), ev.kind).not.toThrow()
+      expect(line?.weight, `weight for ${ev.kind}`).toBe(weight)
+      expect(line?.text, ev.kind).not.toContain('{')
+      expect(line?.text, ev.kind).not.toContain('}')
+    }
+  })
+
+  it("'hit' : les 4 combinaisons crit×quiet, jamais toutes exercées — seul crit=false (toujours null) et le silence de 3 s (mais jamais avec un crit) l'étaient", async () => {
+    const { Commentator } = await import('./commentator')
+    // crit + silencieux (< 3 s depuis le dernier commentaire) : doit rester null,
+    // distinct du cas crit=false déjà testé ET du cas silence déjà testé sans crit.
+    const mQuiet = freshMatch()
+    const cQuiet = new Commentator()
+    cQuiet.ingest(mQuiet) // roundStart initial à t=0, lastCommentAt=0
+    mQuiet.t = 1 // < 3s depuis le dernier commentaire
+    mQuiet.events.push({ kind: 'hit', t: 1, target: 'enemy', dmg: 5, crit: true, onoma: 'BAM' })
+    expect(cQuiet.ingest(mQuiet)).toBeNull()
+
+    // 'blocked' + silencieux : jamais exercé (le test du silence de 3s
+    // existant ne testait blocked qu'EN DEHORS de la fenêtre de silence).
+    mQuiet.t = 2
+    mQuiet.events.push({ kind: 'blocked', t: 2, target: 'enemy', dmg: 1 })
+    expect(cQuiet.ingest(mQuiet)).toBeNull()
+
+    // crit + pas silencieux + target enemy (le JOUEUR a frappé) -> T.crit
+    const mHitEnemy = freshMatch()
+    const cHitEnemy = new Commentator()
+    cHitEnemy.ingest(mHitEnemy)
+    mHitEnemy.t = 10
+    mHitEnemy.events.push({ kind: 'hit', t: 10, target: 'enemy', dmg: 5, crit: true, onoma: 'BAM' })
+    const lineEnemy = cHitEnemy.ingest(mHitEnemy)
+    expect(lineEnemy?.weight).toBe(2)
+
+    // crit + pas silencieux + target player (l'ADVERSE a frappé) -> T.critTaken
+    const mHitPlayer = freshMatch()
+    const cHitPlayer = new Commentator()
+    cHitPlayer.ingest(mHitPlayer)
+    mHitPlayer.t = 10
+    mHitPlayer.events.push({ kind: 'hit', t: 10, target: 'player', dmg: 5, crit: true, onoma: 'BAM' })
+    const linePlayer = cHitPlayer.ingest(mHitPlayer)
+    expect(linePlayer?.weight).toBe(2)
+    // Les deux pools (T.crit / T.critTaken) sont distincts : les textes ne se recoupent jamais.
+    expect(lineEnemy!.text).not.toBe(linePlayer!.text)
+  })
+
   it('les événements que le commentateur ne connaît pas (cardProc, switch, timeout…) sont ignorés sans erreur', async () => {
     const { Commentator } = await import('./commentator')
     const m = freshMatch()
