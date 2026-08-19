@@ -2539,14 +2539,50 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       commentaire plutôt que forcé : le garde-fou `if (stance)` est
       structurellement toujours vrai (cheer/special/ulti déjà retournés
       plus haut, les 4 commandes restantes couvrent exactement les clés
-      de `COMMAND_STANCE`). Aucun bug trouvé. Reste ~15 branches
-      ouvertes, concentrées sur `fireSpecial`/`endRound`/`startNextRound`
-      — prochaine itération.
+      de `COMMAND_STANCE`). Aucun bug trouvé.
+- [x] `game/combat.ts` : suite du sweep, branches 96,16 % → 97,36 %.
+      Fermé : le texte « Leçon d'Expérience » côté JOUEUR (sans suffixe
+      ADVERSE, seul le cas symétrique ennemi l'était) ; les paliers
+      manquants de `enemyCardValue` (`'heal'` intermédiaire 15-35 % PV,
+      `'hype'` déjà ≥ 75) ; une posture agressive booste VRAIMENT le
+      taux de critique (+0,08 — comparaison statistique sur 400 tirages,
+      aucun test existant ne mesurait l'EFFET malgré plusieurs qui
+      POSAIENT `stance='aggressive'`) ; et la relève adverse (banc) sur
+      ses 2 cas jamais couverts : l'actif encore assez frais (≥ 35 % PV)
+      ne switch pas même avec un remplaçant en pleine forme, et un banc
+      réduit à un seul remplaçant déjà KO ne switch pas non plus. 5
+      nouveaux tests. Aucun bug trouvé.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite du sweep sur `combat.ts` (branches
+  96,16 % → 97,36 %). Fermé le texte « Leçon d'Expérience » côté
+  JOUEUR : le mod armé était sur `m.mods` (pas `m.enemyMods`) et le
+  spécial qui l'encaisse est celui de l'ENNEMI, déclenché par
+  `enemyCoachAI` (probabiliste, pas par une commande du coach) — repris
+  le patron déjà établi (`vi.spyOn(Math,'random').mockReturnValue(0)`,
+  `freeze` implicite via Hype pleine) plutôt que d'inventer un nouveau
+  mécanisme. Fermé les 2 derniers paliers de `enemyCardValue` : `'heal'`
+  intermédiaire (15-35 % de PV manquants → multiplicateur ×1, entre les
+  deux extrêmes déjà testés) et `'hype'` quand la Hype adverse est déjà
+  ≥ 75 (carte sans valeur, jamais achetée). Fermé une posture agressive
+  qui booste VRAIMENT le taux de critique (+0,08) — plusieurs tests
+  posaient `stance='aggressive'` mais AUCUN ne mesurait son effet réel
+  sur les coups portés ; comparaison statistique sur 400 tirages,
+  fiable sur 3 exécutions consécutives sans avoir besoin de la
+  technique d'appariement par graine commune (l'effet est assez large
+  pour ressortir en tirage libre, contrairement au plan tactique
+  précédent). Fermé la relève adverse (banc) : l'actif encore assez
+  frais (≥ 35 % PV) ne switch pas même avec un remplaçant en pleine
+  forme sur le banc, et un banc réduit à un seul remplaçant déjà KO ne
+  switch pas non plus (`b.hp > 0` toujours vrai jusqu'ici). 5 nouveaux
+  tests, tous corrects du premier coup. Aucun bug trouvé. engine.test.ts
+  345 → 351, suite vérifiée sur 3 exécutions consécutives (351/351).
+  `tsc --noEmit` + `npm run build` verts. Il reste une poignée de
+  branches sur `endRound`/`startNextRound` (fin de round/changement de
+  manche, lignes ~1000-1050) — sweep quasiment clos sur ce fichier.
 - 2026-08-18 (routine) : Suite du sweep sur `combat.ts` (branches
   93,76 % → 96,16 %), en resserrant sur les gaps encore accessibles
   sans machinerie lourde (après le détour statistique de l'itération

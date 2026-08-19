@@ -362,6 +362,29 @@ describe("l'Écurie : la relève", () => {
     expect(m.enemyBench[0].char.id).toBe(ROSTER[1].id)
     expect(m.events.some(e => e.kind === 'switch' && e.side === 'enemy')).toBe(true)
   })
+
+  it("le coin adverse NE change PAS de perso si l'actif reste assez frais (≥ 35 % de PV), même avec un remplaçant en pleine forme sur le banc — jamais exercé, seul le cas 'assez blessé' l'était", () => {
+    const m = createMatch(ROSTER[0], ROSTER[1], [], { enemyTeam: [ROSTER[4]] })
+    m.enemy.hp = Math.round(m.enemy.maxHp * 0.5) // ≥ 35 % : pas encore la peine de switcher
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = []
+    enemyCornerPlay(m)
+    expect(m.enemy.char.id).toBe(ROSTER[1].id) // toujours le même actif
+    expect(m.events.some(e => e.kind === 'switch' && e.side === 'enemy')).toBe(false)
+  })
+
+  it("le coin adverse ne peut pas switcher si son SEUL remplaçant est déjà KO — jamais exercé, `b.hp > 0` toujours vrai jusqu'ici", () => {
+    const m = createMatch(ROSTER[0], ROSTER[1], [], { enemyTeam: [ROSTER[4]] })
+    m.enemy.hp = Math.round(m.enemy.maxHp * 0.1) // très entamé, switcherait normalement
+    m.enemyBench[0].hp = 0 // …mais le seul remplaçant est KO
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = []
+    expect(() => enemyCornerPlay(m)).not.toThrow()
+    expect(m.enemy.char.id).toBe(ROSTER[1].id) // pas de switch possible
+    expect(m.events.some(e => e.kind === 'switch' && e.side === 'enemy')).toBe(false)
+  })
 })
 
 describe('guerre des coins (vague 3)', () => {
@@ -692,6 +715,23 @@ describe('resolveAttack/fireSpecial : branches à issue rare (RNG ou fenêtre é
     expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('CŒUR VAILLANT'))).toBe(true)
   })
 
+  it("une posture agressive booste VRAIMENT le taux de critique (+0,08) — jamais exercé : plusieurs tests posent `stance='aggressive'` mais aucun ne mesurait son effet sur les coups portés (comparaison statistique sur 400 tirages, l'effet est large et se voit même en tirage libre)", () => {
+    function critRate(stance: 'neutral' | 'aggressive', n: number) {
+      let crits = 0
+      for (let i = 0; i < n; i++) {
+        const m = freshMatch()
+        toFighting(m)
+        m.player.stance = stance
+        m.player.nextActionAt = m.t
+        m.enemy.nextActionAt = m.t + 1000
+        tick(m, 0.001, quiet)
+        if (m.events.some(e => e.kind === 'hit' && e.crit)) crits++
+      }
+      return crits / n
+    }
+    expect(critRate('aggressive', 400)).toBeGreaterThan(critRate('neutral', 400))
+  })
+
   it("Cœur Vaillant : un coup encaissé qui n'atteint PAS encore le seuil incrémente le compteur SANS déclencher le bonus (seul le cas 'atteint pile' était testé)", () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99) // jamais d'esquive, jamais de crit, jamais de garde
     const m = freshMatch()
@@ -832,6 +872,20 @@ describe('resolveAttack/fireSpecial : branches à issue rare (RNG ou fenêtre é
     tick(m2, 0.05, { command: 'special', voiceEnergy: 0.6, faceEnergy: 0 })
     const fullDmg2 = enemyHpBefore2 - m2.enemy.hp
     expect(fullDmg).toBeLessThan(fullDmg2 * 0.6) // clairement divisé par ~2, pas juste réduit
+  })
+
+  it("Leçon d'Expérience CÔTÉ JOUEUR : quand c'est le JOUEUR (pas l'ennemi) qui a le mod armé et encaisse le spécial adverse, le texte de l'event n'a PAS le suffixe ADVERSE — seul le cas symétrique (joueur attaquant, ennemi défenseur) était exercé", () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.player.nextActionAt = m.t + 1000
+    m.enemy.nextActionAt = m.t + 1000
+    m.mods.halveEnemySpecial = true // armé côté JOUEUR : c'est LUI qui anticipe
+    m.enemy.hype = HYPE_MAX // le spécial ADVERSE (pas celui du joueur) va se déclencher
+    vi.spyOn(Math, 'random').mockReturnValue(0) // sous le seuil 1.2×dt (dt=1) d'enemyCoachAI
+    tick(m, 1, quiet)
+    expect(m.mods.halveEnemySpecial).toBe(false) // consommé
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text === "LEÇON D'EXPÉRIENCE !!")).toBe(true)
+    expect(m.events.some(e => e.kind === 'cardProc' && e.text.includes('ADVERSE'))).toBe(false)
   })
 })
 
@@ -4854,6 +4908,28 @@ describe('enemyCardValue (grille de valeur du coach fantôme adverse) : 9 cases 
     expect(m.enemyDiscard).toEqual(['fortress'])
     expect(m.enemyMods.dodgeBonus).toBeCloseTo(0.05)
     expect(m.enemyMods.damageReductionMul).toBeCloseTo(0.75)
+  })
+
+  it("case 'heal' : le palier INTERMÉDIAIRE du ternaire imbriqué (15 %-35 % de PV manquants → multiplicateur ×1) n'était jamais exercé — seuls les paliers extrêmes (>35 % ailleurs dans ce fichier, et implicitement ≤15 %) l'étaient", () => {
+    const m = freshMatch()
+    m.enemy.hp = Math.round(m.enemy.maxHp * 0.75) // 25 % manquants : entre 15 % et 35 %
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = ['secondWind'] // heal 0.2 : v = 0.2*10*1 = 2.0 (palier ×1, pas ×2 ni ×0)
+    enemyCornerPlay(m)
+    expect(m.enemyDiscard).toEqual(['secondWind']) // 2.0 > seuil 0.75 : achetée
+  })
+
+  it("case 'hype' : quand la Hype adverse est DÉJÀ ≥ 75, la carte devient sans valeur (v=0) — seul le cas < 75 (ailleurs dans ce fichier) était exercé", () => {
+    const m = freshMatch()
+    m.enemy.hype = 80 // ≥ 75
+    const hypeBefore = m.enemy.hype
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = ['focus'] // hype +15 : v = 0 à cette Hype, sous le seuil d'achat
+    enemyCornerPlay(m)
+    expect(m.enemyDiscard).toEqual([]) // jamais achetée, valeur nulle
+    expect(m.enemy.hype).toBe(hypeBefore) // effet jamais appliqué
   })
 })
 
