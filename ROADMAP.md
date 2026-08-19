@@ -1417,6 +1417,25 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       consécutives. Couverture `game/` globale 97,79 % → **98,14 %**
       (stmts), branches 88,56 % → **90,47 %**. `tsc --noEmit` +
       `npm run build` verts.
+- [x] Suite du coverage-driven bug hunt : `cardForge.ts` (94,59 % →
+      97,29 %, fonctions → **100 %**). Fermés : `loadForgedCards()` sur un
+      stockage jamais écrit (tous les autres tests appelaient toujours
+      `saveForgedCard` avant au moins une fois — son propre repli `?? '[]'`
+      n'était jamais exercé côté « rien n'a jamais été sauvegardé ») ; et
+      `hasStorage === false` pour `saveForgedCard`/`loadForgedCards`.
+      Écarté (code structurellement inatteignable, pas juste rare) : les
+      cases `blockEnemyCard`/`drainSouffle` du switch privé `describe()`
+      (lignes 165-167) — ce switch est exhaustif sur TOUT `EffectPrimitive`
+      par exigence TypeScript, mais aucune des 14 règles de la Forge
+      (`RULES`) ne produit jamais ces deux primitives ; `describe()` n'est
+      ni exportée ni appelée ailleurs que par `forgeCard()`, donc ces 2
+      cases ne peuvent être atteints par AUCUN chemin de code réel
+      actuellement — les forcer nécessiterait d'appeler une fonction
+      privée non exportée avec un effet qu'aucune règle ne produit
+      jamais, un test qui masquerait plutôt qu'il ne vérifierait quoi que
+      ce soit. Aucun bug trouvé. 2 nouveaux tests, engine.test.ts
+      296 → 298, suite complète vérifiée sur 6 exécutions consécutives.
+      `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2337,6 +2356,17 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite du coverage-driven bug hunt : `cardForge.ts`
+  (94,59 % → 97,29 %, fonctions → 100 %). Fermés : `loadForgedCards()` sur
+  un stockage jamais écrit (son propre repli `?? '[]'` n'était jamais
+  exercé) et `hasStorage=false`. Écarté (structurellement inatteignable) :
+  les cases `blockEnemyCard`/`drainSouffle` du switch privé `describe()` —
+  exhaustif sur `EffectPrimitive` par exigence TypeScript, mais aucune des
+  14 règles de la Forge ne produit jamais ces primitives, et `describe()`
+  n'est appelée que par `forgeCard()` — aucun chemin réel ne peut les
+  atteindre. Aucun bug trouvé. 2 tests, engine.test.ts 296 → 298, suite
+  vérifiée sur 6 exécutions consécutives. `tsc --noEmit` +
+  `npm run build` verts.
 - 2026-08-18 (routine) : Suite du coverage-driven bug hunt : `stable.ts`
   (Vie d'Écurie) → 100 %. Fermés : `hasStorage=false` ; `desireText` avec
   une envie hors du pool du trait (jamais exercé) ; la dérive douce vers

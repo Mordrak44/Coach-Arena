@@ -2309,6 +2309,16 @@ describe('Persistance de la Forge (cardForge.ts) — saveForgedCard/loadForgedCa
     expect(getCard(r.card.id)?.name).toBe('Regain')
   })
 
+  it("loadForgedCards sur un stockage jamais écrit (aucun saveForgedCard avant) : repli propre sur un tableau vide", async () => {
+    // Tous les autres tests appellent saveForgedCard AVANT loadForgedCards
+    // au moins une fois : le repli `getItem(...) ?? '[]'` de loadForgedCards
+    // elle-même (distinct de celui de saveForgedCard) n'était donc jamais
+    // exercé côté "rien n'a jamais été sauvegardé".
+    const { loadForgedCards } = await import('./cardForge')
+    expect(() => loadForgedCards()).not.toThrow()
+    expect(loadForgedCards()).toEqual([])
+  })
+
   it('ordre : la plus récente forgée arrive en tête', async () => {
     const { forgeCard, saveForgedCard, loadForgedCards } = await import('./cardForge')
     const a = forgeCard('un cri de guerre puissant, appelée Alpha')!
@@ -3935,6 +3945,14 @@ describe('story.ts : 4 branches défensives jamais exercées (fallbacks id incon
       const s = getStable('kenta', 'sanguin', t)
       expect(s.mood).toBe(50) // repli sur un état frais à chaque appel, rien ne persiste
       expect(() => doStableAction('kenta', 'sanguin', 'leisure', 'atk', t)).not.toThrow()
+    })
+
+    it("cardForge.ts : saveForgedCard/loadForgedCards avec hasStorage=false — même angle mort, jamais exercé au-delà du chargement du module", async () => {
+      const { forgeCard, saveForgedCard, loadForgedCards } = await import('./cardForge')
+      const r = forgeCard('un cri de guerre puissant')!
+      expect(() => saveForgedCard(r.card)).not.toThrow() // registerCustomCard tourne quand même, seule la persistance est sautée
+      expect(() => loadForgedCards()).not.toThrow()
+      expect(loadForgedCards()).toEqual([])
     })
   })
 })
