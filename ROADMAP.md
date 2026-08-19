@@ -2663,11 +2663,68 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       y retoucher ensuite. 360 tests inchangés. `tsc --noEmit` +
       `npm run build` verts, funnel visuel + lecture DOM du clip
       vérifiés sans régression ni erreur console.
+- [x] Audit de code (fichier entier) sur `StoryScreen.tsx` (2026-08-18)
+      — plus petit fichier, mais vrai bug de cohérence visuelle trouvé
+      et corrigé, confirmé en Chromium headless avec un localStorage
+      corrompu injecté à la main. L'emoji de statut d'un chapitre
+      (`done ? '✅' : unlocked ? '🥊' : '🔒'`) donnait priorité à `done`
+      sur `unlocked` : un chapitre « nettoyé » (`cleared`) mais dont le
+      PRÉCÉDENT ne l'est plus (localStorage trafiqué/corrompu — jamais
+      atteignable en jeu normal, où on ne peut rien « dé-nettoyer »)
+      affichait ✅ « réussi » sur une carte pourtant désactivée et grisée
+      à 0,45 d'opacité — contradiction visuelle directe. Corrigé en
+      testant `unlocked` en premier. Vérifié : chapitre 3 forcé
+      « nettoyé » sans le 2 dans `localStorage`, rechargé, affiche
+      désormais 🔒 (avant le fix, il aurait affiché ✅). Simplification
+      en bonus (pas un bug) : le surlignage « chapitre ouvert »
+      réimplémentait `.planCard.selected` (déjà en CSS) via un style
+      inline `borderColor` redondant — remplacé par la classe partagée,
+      pour rester synchronisé si `.selected` évolue ailleurs dans le
+      jeu. 360 tests inchangés. `tsc --noEmit` + `npm run build` verts.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite (et clôture pour l'instant) du sweep
+  d'audits full-file sur les écrans UI, après `ArenaScreen.tsx`,
+  `CharacterSelect.tsx` et `ResultsScreen.tsx` — cette fois
+  `StoryScreen.tsx` (liste des chapitres du mode Histoire), un fichier
+  bien plus petit et déjà passé par un audit accessibilité (`aria-
+  pressed`), donc attentes plus modestes que sur les 3 précédents. Un
+  seul vrai bug trouvé, de sévérité nettement plus faible que les
+  précédents (aucune race condition, aucun état non réinitialisé,
+  aucune fuite mémoire) : l'emoji de statut d'un chapitre
+  (`done ? '✅' : unlocked ? '🥊' : '🔒'`) donnait la priorité à `done`
+  sur `unlocked`. Sous jeu normal, `done && !unlocked` est
+  structurellement inatteignable — on ne peut jamais « dé-nettoyer » un
+  chapitre déjà nettoyé, et nettoyer un chapitre EXIGE d'abord qu'il
+  soit débloqué (donc que le précédent le soit aussi) — mais un
+  `localStorage` trafiqué à la main ou corrompu peut violer cet
+  invariant, et affichait alors un ✅ « réussi » sur une carte pourtant
+  désactivée et grisée à 0,45 d'opacité : une contradiction visuelle
+  directe entre l'emoji et l'état interactif réel du bouton. Corrigé en
+  testant `unlocked` en premier dans le ternaire, cohérent avec le
+  `disabled`/`opacity` calculés juste au-dessus. Vérifié en Chromium
+  headless en injectant directement un `localStorage` corrompu (chapitre
+  3 « cleared » sans le 2) : chapitre 3 affiche bien 🔒 (aurait affiché
+  ✅ avant le fix), chapitre 4 devient bien 🥊 (débloqué puisque le 3 —
+  quoique lui-même verrouillé — est dans `cleared`, comportement de
+  `isUnlocked()` inchangé et hors du périmètre de ce fix). Simplification
+  en bonus (pas un bug) : le surlignage du chapitre ouvert réimplémentait
+  `.planCard.selected` (déjà défini en CSS, `styles.css:506`) via un
+  style inline `borderColor` redondant — remplacé par la classe CSS
+  partagée pour rester synchronisé si `.selected` évolue ailleurs dans
+  le jeu (même risque de dérive que documenté pour ArenaScreen plus
+  tôt). Vérifié aussi en Chromium headless : la sélection applique bien
+  la bordure accent via la classe. 360 tests inchangés (composants UI
+  non couverts par les tests unitaires). `tsc --noEmit` +
+  `npm run build` verts. Les 4 écrans centraux du funnel de jeu
+  (ArenaScreen, CharacterSelect, ResultsScreen, StoryScreen) ont
+  maintenant tous reçu un audit full-file approfondi cette itération de
+  sweep ; restent `PrivacyScreen.tsx`, `ReadyScreen.tsx` (déjà touché
+  récemment pour le bouton Retour), `TitleScreen.tsx` (déjà audité) et
+  `ErrorBoundary.tsx` — tous plus petits, gains attendus plus modestes.
 - 2026-08-18 (routine) : Suite du sweep d'audits full-file (skill
   code-review) sur les écrans UI, après `ArenaScreen.tsx` et
   `CharacterSelect.tsx` — cette fois `ResultsScreen.tsx` (écran de fin

@@ -40,19 +40,24 @@ export default function StoryScreen({
           return (
             <button
               key={ch.id}
-              className="planCard"
+              className={`planCard${open?.id === ch.id ? ' selected' : ''}`}
               disabled={!unlocked}
               aria-pressed={open?.id === ch.id}
               style={{
                 width: '100%',
                 textAlign: 'left',
                 opacity: unlocked ? 1 : 0.45,
-                borderColor: open?.id === ch.id ? 'var(--accent)' : undefined,
               }}
               onClick={() => setOpen(ch)}
             >
               <b>
-                {done ? '✅' : unlocked ? '🥊' : '🔒'} Chapitre {ch.num} — {ch.title}
+                {/* `unlocked` d'abord : `done` sans `unlocked` ne devrait
+                    jamais arriver en jeu normal (on ne peut effacer un
+                    chapitre déjà nettoyé), mais un localStorage trafiqué/
+                    corrompu ne doit pas afficher un ✅ « réussi » sur une
+                    carte désactivée et grisée — contradiction visuelle
+                    directe (trouvé en audit, 2026-08-18). */}
+                {!unlocked ? '🔒' : done ? '✅' : '🥊'} Chapitre {ch.num} — {ch.title}
               </b>
               {open?.id === ch.id && unlocked && (
                 <span style={{ display: 'block', marginTop: 6, fontSize: '0.78rem' }}>
