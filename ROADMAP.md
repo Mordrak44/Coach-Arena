@@ -2610,11 +2610,66 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       entre le changement de phase et `onSwitch`. 360 tests inchangés
       (aucun test unitaire sur les composants UI). `tsc --noEmit` +
       `npm run build` verts, funnel visuel vérifié sans régression.
+- [x] Audit de code (fichier entier) sur `CharacterSelect.tsx`
+      (2026-08-18), pas ciblé en profondeur depuis le round 3
+      (2026-08-16). **Vrai bug trouvé et corrigé, confirmé en Chromium
+      headless (A/B avant/après)** : après un forge réussi (guidé ou
+      expert), le formulaire de création restait rempli à l'IDENTIQUE
+      — chips toujours cochés, bouton « Donner vie à ce perso » toujours
+      actif, aucune confirmation visible du succès. Un 2e clic (double-
+      clic, ou le joueur qui pense que rien ne s'est passé) forgeait un
+      DOUBLON avec un nouvel id aléatoire, évinçant silencieusement le
+      plus ancien perso custom (`MAX_CUSTOMS=4`) — Lien inclus. Corrigé
+      en réinitialisant `prompt`/`gStyle`/`gTemper`/`gWorld`/`gName`
+      après un forge réussi. Vérifié : le bug reproduit à coup sûr sur
+      le code d'avant-fix (bouton toujours actif, champs toujours
+      remplis après le clic), corrigé après (bouton désactivé, champs
+      vidés). Corrigé au passage : les boutons-chips désactivés (relève
+      déjà à 2 équipiers, copie de carte déjà à 0 ou au plafond)
+      gardaient un curseur `pointer` — le style inline de `chip()`
+      ignorait l'état `disabled` du bouton. 360 tests inchangés. `tsc
+      --noEmit` + `npm run build` verts, funnel visuel sans régression.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite des audits de code full-file (skill
+  code-review) sur les écrans UI, après `ArenaScreen.tsx` plus tôt cette
+  itération de sweep — cette fois `CharacterSelect.tsx`, l'écran de
+  sélection/création de perso + deck-builder, pas ciblé en profondeur
+  depuis le round 3 (2026-08-16) alors que l'app a beaucoup changé
+  depuis (les fixes récents sur `pickOpponent`/équipe dans `App.tsx`,
+  la navigation `ReadyScreen`, les médias `ArenaScreen`). **Vrai bug
+  trouvé** : après un forge de perso réussi (mode guidé OU expert), le
+  formulaire de création restait rempli EXACTEMENT comme avant le clic
+  — les 3 chips guidées toujours cochées, le nom toujours dans le champ,
+  le bouton « Donner vie à ce perso » toujours actif — sans aucun signal
+  visuel que le perso avait déjà été créé (le formulaire n'est PAS
+  masqué après sélection, il reste affiché au-dessus du roster en
+  permanence). Un joueur qui double-clique, ou qui pense que son 1er
+  clic n'a rien fait, forge alors un DOUBLON avec un nouvel id aléatoire
+  — et `saveCustom()` (progression.ts) évince silencieusement le plus
+  ancien perso custom au-delà de `MAX_CUSTOMS=4`, avec tout son Lien
+  accumulé. Corrigé en réinitialisant `prompt`/`gStyle`/`gTemper`/
+  `gWorld`/`gName` dans `forgeFromPrompt()` (le point de sortie commun
+  aux 2 modes) juste après le succès. Vérifié avec la même discipline
+  que sur `ArenaScreen.tsx` cette itération : Chromium headless, funnel
+  jusqu'au forge guidé, lecture DOM de l'état du bouton/champ avant et
+  après le clic. `git stash` sur `CharacterSelect.tsx` seul, A/B
+  confirmé : sur le code d'avant-fix, le bouton restait actif et le nom
+  restait rempli après le clic (bug reproduit à coup sûr) ; sur le code
+  corrigé, le bouton se désactive et les champs se vident. Corrigé au
+  passage, trouvé par le même audit : les boutons-chips DÉSACTIVÉS
+  (relève déjà à 2 équipiers, copie de carte déjà à 0 ou au plafond
+  `MAX_COPIES`) affichaient quand même un curseur `pointer` au survol —
+  le style inline de `chip()` ne tenait pas compte de l'état `disabled`
+  du bouton (le style inline gagne toujours sur le CSS externe, qui n'a
+  pas de règle `:disabled` pour ces boutons non-`.btn`) ; `chip()` prend
+  maintenant un 2e paramètre `disabled` optionnel (curseur `not-allowed`
+  + opacité réduite). 360 tests inchangés (composants UI non couverts
+  par les tests unitaires). `tsc --noEmit` + `npm run build` verts,
+  funnel visuel standard vérifié sans régression.
 - 2026-08-18 (routine) : `game/` étant désormais proche de la saturation
   en couverture (99,65 % stmts, 98,54 % branches), retour à un audit de
   code full-file (skill code-review) — cette fois sur `ArenaScreen.tsx`

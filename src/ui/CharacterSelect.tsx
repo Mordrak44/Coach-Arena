@@ -213,6 +213,18 @@ export default function CharacterSelect({
     setTeammates(prev => prev.filter(t => next.some(x => x.id === t.id) || ROSTER.some(r => r.id === t.id)))
     setStableMsg('') // idem pickChar : le message d'écurie appartient à l'ancien perso
     setSelected(c)
+    // Sans ça, le formulaire (guidé ou expert) reste rempli avec exactement
+    // les mêmes réponses après un forge réussi, bouton toujours actif —
+    // rien ne signale visuellement que le perso a déjà été créé. Un 2e clic
+    // (double-clic, ou le joueur qui pense que le 1er n'a rien fait) forge
+    // un DOUBLON avec un nouvel id aléatoire, évinçant silencieusement le
+    // plus ancien perso custom (MAX_CUSTOMS=4) — Lien inclus (trouvé en
+    // audit, 2026-08-18).
+    setPrompt('')
+    setGStyle(null)
+    setGTemper(null)
+    setGWorld(null)
+    setGName('')
   }
 
   // Onboarding guidé : 3 questions composent le prompt à la place du joueur.
@@ -247,7 +259,11 @@ export default function CharacterSelect({
     forgeFromPrompt(p)
   }
 
-  const chip = (active: boolean): CSSProperties => ({
+  // `disabled` : sans lui, un bouton-chip désactivé (relève déjà pleine,
+  // copie déjà à 0/au plafond) gardait un curseur `pointer` — le style
+  // inline gagne toujours sur le CSS de `styles.css`, qui n'a pas de règle
+  // `:disabled` pour ces boutons non-`.btn` (trouvé en audit, 2026-08-18).
+  const chip = (active: boolean, disabled = false): CSSProperties => ({
     font: 'inherit',
     fontSize: '0.72rem',
     fontWeight: 700,
@@ -256,7 +272,8 @@ export default function CharacterSelect({
     border: active ? '2px solid var(--accent)' : '2px solid transparent',
     background: 'var(--panel2)',
     color: 'var(--text)',
-    cursor: 'pointer',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.5 : 1,
   })
 
   return (
@@ -386,7 +403,7 @@ export default function CharacterSelect({
                 return (
                   <button
                     key={c.id}
-                    style={chip(inTeam)}
+                    style={chip(inTeam, !inTeam && teammates.length >= 2)}
                     aria-pressed={inTeam}
                     disabled={!inTeam && teammates.length >= 2}
                     onClick={() =>
@@ -593,7 +610,7 @@ export default function CharacterSelect({
               <div style={{ fontSize: '0.7rem', marginTop: 4, color: 'var(--muted)' }}>{c.desc}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
                 <button
-                  style={chip(false)}
+                  style={chip(false, n === 0)}
                   onClick={() => setCopies(c.id, -1)}
                   disabled={n === 0}
                   aria-label={`Retirer une copie de ${c.name}`}
@@ -602,7 +619,7 @@ export default function CharacterSelect({
                 </button>
                 <b style={{ fontSize: '0.8rem' }}>×{n}</b>
                 <button
-                  style={chip(false)}
+                  style={chip(false, n >= MAX_COPIES)}
                   onClick={() => setCopies(c.id, +1)}
                   disabled={n >= MAX_COPIES}
                   aria-label={`Ajouter une copie de ${c.name}`}
