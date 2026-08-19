@@ -65,14 +65,27 @@ function writeJson(key: string, value: unknown) {
   }
 }
 
+// `readJson` ne valide que le CONTENEUR (objet vs tableau, voir son
+// commentaire) — une ENTRÉE individuelle corrompue (ex. { kenta: "oops" })
+// passe ce filtre. `map[charId] ?? {...}` la traiterait comme une vraie
+// CharProgress : `p.wins++` plante alors en mode strict (assignation de
+// propriété sur une primitive), synchrone dans le flux de résultat de
+// match (App.tsx, à chaque fin de combat) — même famille de bug déjà
+// corrigée sur stable.ts (trouvé en balayant les fichiers voisins,
+// 2026-08-18). Une entrée invalide est traitée comme absente plutôt que
+// de faire planter tout le magasin.
+function validProgress(v: unknown): CharProgress | undefined {
+  return v && typeof v === 'object' && !Array.isArray(v) ? (v as CharProgress) : undefined
+}
+
 export function getProgress(charId: string): CharProgress {
   const map = readJson<ProgressMap>(PROG_KEY, {})
-  return map[charId] ?? { wins: 0, losses: 0 }
+  return validProgress(map[charId]) ?? { wins: 0, losses: 0 }
 }
 
 export function recordResult(charId: string, won: boolean): CharProgress {
   const map = readJson<ProgressMap>(PROG_KEY, {})
-  const p = map[charId] ?? { wins: 0, losses: 0 }
+  const p = validProgress(map[charId]) ?? { wins: 0, losses: 0 }
   if (won) p.wins++
   else p.losses++
   map[charId] = p
@@ -162,7 +175,7 @@ export function pendingReward(charId: string): PendingReward | null {
 /** Le joueur garde une des deux cartes : +1 copie dans le deck de ce perso. */
 export function claimReward(charId: string, cardId: CardId): boolean {
   const map = readJson<ProgressMap>(PROG_KEY, {})
-  const p = map[charId] ?? { wins: 0, losses: 0 }
+  const p = validProgress(map[charId]) ?? { wins: 0, losses: 0 }
   const claimed = p.lastRewardLevel ?? 0
   // Palier + options recalculés depuis `p` (déjà en main) plutôt que via
   // pendingReward(charId), qui relirait et re-parserait PROG_KEY en double
@@ -174,7 +187,11 @@ export function claimReward(charId: string, cardId: CardId): boolean {
   const next = claimed + 1
   const options = rewardOptionsFor(charId, next)
   if (!options.includes(cardId)) return false
-  p.extraCopies = [...(p.extraCopies ?? []), cardId]
+  // `p.extraCopies` validé comme tableau (pas juste non-nullish) : une
+  // valeur corrompue (ex. `extraCopies: "oops"`, un objet `p` par ailleurs
+  // bien formé) ferait planter ce spread — `[...非-itérable]` (trouvé en
+  // audit, 2026-08-18, même famille que getExtraCopies ci-dessous).
+  p.extraCopies = [...(Array.isArray(p.extraCopies) ? p.extraCopies : []), cardId]
   p.lastRewardLevel = next
   map[charId] = p
   writeJson(PROG_KEY, map)
@@ -182,7 +199,14 @@ export function claimReward(charId: string, cardId: CardId): boolean {
 }
 
 export function getExtraCopies(charId: string): CardId[] {
-  return getProgress(charId).extraCopies ?? []
+  // Validé comme tableau, pas juste `?? []` (non-nullish) : une valeur
+  // corrompue mais non-nulle (ex. `extraCopies: "oops"`, un objet `p` par
+  // ailleurs bien formé) passerait `?? []` telle quelle, puis
+  // `deck.push(...extraCopies)` (deckBuilder.ts) l'épandrait caractère par
+  // caractère dans le deck du joueur — état incorrect propagé
+  // silencieusement plutôt qu'un repli sûr (trouvé en audit, 2026-08-18).
+  const ec = getProgress(charId).extraCopies
+  return Array.isArray(ec) ? ec : []
 }
 
 /** Retourne une copie du perso avec le bonus de Lien appliqué (HRT plafonné à 12). */
@@ -199,7 +223,17 @@ export function applyBond(char: Character): Character {
 // --- Persos créés par prompt : sauvegarde locale ---------------------------
 
 export function loadCustoms(): Character[] {
-  const customs = readJson<Character[]>(CUSTOM_KEY, [])
+  // `readJson` ne valide que le tableau lui-même, pas ses ÉLÉMENTS — un
+  // élément corrompu (ex. `[null]`, `["oops"]`) plantait la boucle de
+  // migration juste en dessous (`c.ulti` sur `null`), puis `CharCard`
+  // (déréférence `char.stats.atk` etc.) : un crash synchrone de l'écran
+  // de sélection, dès le montage (`useState(() => loadCustoms())`), même
+  // famille de bug déjà corrigée sur stable.ts (trouvé en audit,
+  // 2026-08-18). Un élément invalide est écarté plutôt que de faire
+  // planter tout le roster de persos créés.
+  const customs = readJson<Character[]>(CUSTOM_KEY, []).filter(
+    (c): c is Character => !!c && typeof c === 'object' && typeof c.id === 'string' && !!c.stats,
+  )
   // Migration : les persos sauvegardés avant l'Ulti n'en ont pas.
   for (const c of customs) {
     if (!c.ulti) {

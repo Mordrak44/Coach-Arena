@@ -2748,11 +2748,87 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       du stockage, corrompue ou pas). `stable.ts` fermé à 100 % sur les
       4 métriques. 4 nouveaux tests. `tsc --noEmit` + `npm run build`
       verts.
+- [x] Audit de code (fichier entier) sur `progression.ts` (Lien/paliers,
+      2026-08-18) — même famille de bugs que `stable.ts` juste avant,
+      trouvée en balayant les fichiers voisins persistés en
+      `localStorage`. **3 vrais bugs corrigés**, tous confirmés par
+      exécution directe du module contre un stockage fabriqué à la
+      main, puis par `git stash` A/B (les 3 nouveaux tests échouent bien
+      sur le code d'avant-fix) : (1) `loadCustoms()` ne validait que le
+      TABLEAU lui-même, pas ses ÉLÉMENTS — un élément corrompu
+      (`[null]`) plantait la boucle de migration Ulti dès le montage de
+      `CharacterSelect`. (2) `getProgress`/`recordResult`/`claimReward`
+      ne validaient que le CONTENEUR du magasin de progression, pas
+      chaque ENTRÉE — une entrée corrompue (`{"kenta": "oops"}`) faisait
+      planter `recordResult()` (`p.wins++` sur une primitive, mode
+      strict), appelée après CHAQUE match. (3) `getExtraCopies()` et
+      `claimReward()` traitaient `extraCopies` comme un tableau via
+      `?? []` sans vérifier que c'EST un tableau — une valeur corrompue
+      mais non-nulle passait telle quelle jusqu'au deck-builder, prête à
+      s'épandre caractère par caractère dans le deck du joueur. Corrigé
+      avec le même patron que `stable.ts` : validation par entrée dans
+      `readAll`/les accesseurs, jamais punitif (une entrée invalide est
+      juste écartée, pas tout le magasin). `progression.ts` fermé à
+      99 %/98,4 % (seule branche restante déjà documentée comme
+      structurellement inatteignable — preuve FNV-1a d'une session
+      antérieure). 3 nouveaux tests + 1 extension d'un test existant
+      (2e réclamation réelle sur `claimReward`, jamais exercée). 370
+      tests, suite vérifiée sur 3 exécutions consécutives. `tsc
+      --noEmit` + `npm run build` verts.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Immédiatement après `stable.ts`, même passage
+  sur `progression.ts` (Lien coach-perso, paliers de récompense, persos
+  créés par prompt — également persisté en `localStorage`) : la classe
+  de bug qui venait d'être trouvée sur un fichier voisin se retrouve
+  quasi identique ici, un signal fort qu'il valait la peine de vérifier
+  IMMÉDIATEMENT plutôt que de passer à autre chose. **3 vrais bugs
+  trouvés et corrigés**, la même famille structurelle que `stable.ts` :
+  chaque fonction valide le CONTENEUR du JSON stocké (tableau ou objet
+  selon la clé — déjà corrigé le 2026-08-16), mais AUCUNE n'allait
+  jusqu'à valider chaque ÉLÉMENT/ENTRÉE individuel. (1) `loadCustoms()` :
+  un ÉLÉMENT corrompu dans le tableau des persos créés (`[null]`,
+  `["oops"]`) plantait la boucle de migration Ulti (`c.ulti` sur `null`
+  → `TypeError`) — et ce tableau est chargé au MONTAGE de
+  `CharacterSelect` (`useState(() => loadCustoms())`), donc un crash de
+  tout l'écran de sélection pour un seul perso custom corrompu parmi
+  jusqu'à 4. (2) `getProgress`/`recordResult`/`claimReward` : une ENTRÉE
+  corrompue dans le magasin (`{"kenta": "oops"}`, le conteneur objet
+  reste valide) faisait `p.wins++` planter en mode strict (assignation
+  de propriété sur une primitive) — `recordResult()` est appelé après
+  CHAQUE match (`App.tsx`), donc un crash systématique du flux de
+  résultat pour ce perso jusqu'à ce que la clé corrompue soit effacée
+  manuellement. (3) `getExtraCopies()`/`claimReward()` : le champ
+  `extraCopies` d'une entrée par ailleurs bien formée pouvait être
+  corrompu SANS être nul (`extraCopies: "oops"`) — `?? []` ne filtre que
+  `null`/`undefined`, pas une chaîne. `getExtraCopies()` renvoyait alors
+  la chaîne telle quelle, prête à être épandue caractère par caractère
+  dans le deck du joueur par `deckBuilder.ts` (`deck.push(...extraCopies)`)
+  — un état incorrect propagé SILENCIEUSEMENT plutôt qu'un crash, plus
+  insidieux que les deux premiers. `claimReward()` avait le même défaut
+  sur son propre spread (`[...(p.extraCopies ?? [])]`). Corrigé avec
+  exactement le même patron que `stable.ts` juste avant : un helper
+  `validProgress()` pour les entrées du magasin de progression, un
+  `.filter()` sur les éléments du tableau de persos custom, et
+  `Array.isArray()` (pas `?? []`) partout où `extraCopies` est lu —
+  toujours « jamais punitif » : une donnée invalide est écartée
+  individuellement, jamais tout le magasin. Chaque bug reconfirmé par
+  `git stash` A/B sur les nouveaux tests (tous échouent sur le code
+  d'avant-fix). En écrivant le test pour `claimReward()` avec un
+  `extraCopies` corrompu, découverte au passage d'un angle mort de
+  couverture PRÉEXISTANT (pas un bug) : aucun test n'avait jamais
+  exercé une 2e réclamation RÉELLE sur le même perso (celle où
+  `p.extraCopies` contient déjà une carte valide) — étendu le test
+  `pendingReward`/`claimReward` existant plutôt que d'en écrire un
+  nouveau redondant. `progression.ts` fermé à 99 %/98,4 % (seule
+  branche restante déjà documentée comme structurellement inatteignable
+  — preuve FNV-1a d'une session antérieure sur ce même
+  `rewardOptionsFor`). 3 nouveaux tests + 1 extension. engine.test.ts
+  367 → 370, suite vérifiée sur 3 exécutions consécutives (370/370).
+  `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Suite des audits full-file côté `game/`, après
   `commentator.ts` — cette fois `stable.ts` (Vie d'Écurie : humeur,
   envies, entraînement, persisté en `localStorage`), pas ciblé en

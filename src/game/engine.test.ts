@@ -2170,9 +2170,15 @@ describe('Progression / Lien (progression.ts) — couverture des cas limites', (
     expect(claimReward('goro', first!.options[0])).toBe(true)
     expect(getExtraCopies('goro')).toEqual([first!.options[0]]) // la carte réclamée apparaît bien
     // Le palier suivant proposé est bien le 2, pas un saut plus loin.
-    expect(pendingReward('goro')?.level).toBe(2)
+    const second = pendingReward('goro')
+    expect(second?.level).toBe(2)
     // Impossible de réclamer deux fois le même palier avec la même carte déjà réclamée.
     expect(claimReward('goro', first!.options[0])).toBe(false)
+    // 2e réclamation réelle : `p.extraCopies` contient déjà la carte du
+    // palier 1 à ce stade — branche jamais exercée jusqu'ici (le seul
+    // test de claimReward() partait toujours d'un extraCopies vide/absent).
+    expect(claimReward('goro', second!.options[0])).toBe(true)
+    expect(getExtraCopies('goro')).toEqual([first!.options[0], second!.options[0]])
   })
 
   it("claimReward refuse aussi via la branche `level <= claimed` — jamais exercée : le test précédent la refusait toujours via `!options.includes(cardId)` (options du palier 2, carte du palier 1)", async () => {
@@ -2275,6 +2281,52 @@ describe('Progression / Lien (progression.ts) — couverture des cas limites', (
     expect(getProgress('kenta')).toEqual({ wins: 0, losses: 0 })
     expect(() => loadCustoms()).not.toThrow()
     expect(loadCustoms()).toEqual([])
+  })
+
+  it("bug d'audit (2026-08-18) : un ÉLÉMENT individuel corrompu dans customs (le tableau lui-même est valide, PAS un de ses éléments) plantait la boucle de migration — filtré sans faire tomber tout le roster de persos créés", async () => {
+    localStorage.setItem(
+      'coach-arena-customs-v1',
+      JSON.stringify([null, 'oops', 42, { id: 'valide', stats: { atk: 1, def: 1, spd: 1, hrt: 1, hp: 100 } }]),
+    )
+    const { loadCustoms } = await import('./progression')
+    expect(() => loadCustoms()).not.toThrow()
+    const customs = loadCustoms()
+    expect(customs.map(c => c.id)).toEqual(['valide']) // les 3 corrompus écartés, le bon gardé
+    expect(customs[0].ulti).toBeDefined() // migration toujours appliquée sur l'élément valide
+  })
+
+  it("bug d'audit (2026-08-18) : une ENTRÉE individuelle corrompue dans le magasin de progression (le conteneur est un objet valide, PAS une de ses entrées) plantait recordResult/getProgress/claimReward — `map[charId] ?? {...}` la traitait comme une vraie CharProgress, `p.wins++` plantait alors en mode strict", async () => {
+    localStorage.setItem('coach-arena-progress-v1', JSON.stringify({ kenta: 'oops' }))
+    const { getProgress, recordResult, claimReward } = await import('./progression')
+    expect(() => getProgress('kenta')).not.toThrow()
+    expect(getProgress('kenta')).toEqual({ wins: 0, losses: 0 })
+    expect(() => recordResult('kenta', true)).not.toThrow()
+    expect(recordResult('kenta', true).wins).toBeGreaterThan(0) // repart d'un état neuf, pas planté
+    localStorage.setItem('coach-arena-progress-v1', JSON.stringify({ rei: 'oops' }))
+    expect(() => claimReward('rei', 'massage')).not.toThrow()
+  })
+
+  it("bug d'audit (2026-08-18) : `extraCopies` corrompu (pas un tableau) sur une entrée par ailleurs bien formée — `?? []` seul ne suffit pas, une valeur non-nulle mais invalide passait telle quelle jusqu'à `deck.push(...extraCopies)` (deckBuilder.ts), l'épandant caractère par caractère dans le deck du joueur", async () => {
+    localStorage.setItem(
+      'coach-arena-progress-v1',
+      JSON.stringify({ rei: { wins: 5, losses: 1, extraCopies: 'oops' } }),
+    )
+    const { getExtraCopies, claimReward, rewardOptionsFor } = await import('./progression')
+    const ec = getExtraCopies('rei')
+    expect(Array.isArray(ec)).toBe(true)
+    expect(ec).toEqual([]) // repli sûr, pas la chaîne corrompue telle quelle
+    // claimReward doit aussi survivre au même champ corrompu — jusqu'AU
+    // spread `[...(p.extraCopies)]`, pas juste avant : options[0] réel du
+    // palier 1 (5 victoires -> niveau 2, palier 1 pas encore réclamé). Un
+    // seul appel : claimReward() consomme le palier, un 2e ne rejouerait
+    // pas le même chemin.
+    const [firstOption] = rewardOptionsFor('rei', 1)
+    let claimed = false
+    expect(() => {
+      claimed = claimReward('rei', firstOption)
+    }).not.toThrow()
+    expect(claimed).toBe(true)
+    expect(getExtraCopies('rei')).toContain(firstOption) // le spread a bien réussi, pas juste survécu
   })
 })
 
