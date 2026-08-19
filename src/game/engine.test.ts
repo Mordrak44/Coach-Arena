@@ -510,6 +510,22 @@ describe('consignes parlées', () => {
     expect(applyConsigne(m, c.effects, c.label)).toBe(true)
     expect(applyConsigne(m, c.effects, c.label)).toBe(false)
   })
+
+  it("applyConsigne refuse aussi hors pause/Temps Mort, et avec une liste d'effets vide — seul le refus par `consigneUsed` déjà posé était exercé", () => {
+    const m = freshMatch()
+    const c = parseConsigne('garde haute et respire')!
+
+    m.phase = 'fighting' // ni 'tactics' ni 'timeout'
+    expect(applyConsigne(m, c.effects, c.label)).toBe(false)
+    expect(m.consigneUsed).toBe(false) // pas consommé par un refus
+
+    m.phase = 'tactics'
+    expect(applyConsigne(m, [], c.label)).toBe(false) // aucun effet à appliquer
+    expect(m.consigneUsed).toBe(false)
+
+    // Toujours utilisable ensuite : aucun des refus n'a laissé d'état corrompu.
+    expect(applyConsigne(m, c.effects, c.label)).toBe(true)
+  })
 })
 
 describe('applyCardEffects (DSL → runtime) — kinds jamais exercés via une VRAIE consigne/carte', () => {
@@ -4232,6 +4248,48 @@ describe('forceRoundTimeout / chooseTacticPlan / addSpeechHype — API publique 
     expect(m.plan).toBe('concrete')
   })
 
+  it("le plan tactique influence VRAIMENT les dégâts en combat — jamais exercé : le seul test posait `m.plan` sans jamais laisser un coup partir (PRESSION booste l'attaque du joueur, BÉTON réduit les dégâts qu'il encaisse). Comparaison PAIRÉE sur nombres aléatoires communs (même graine rejouée avec/sans plan) : un coup isolé peut arrondir la même valeur (Math.round) et le bruit du dé (esquive/critique) domine largement l'effet du plan en tirages indépendants — apparier élimine ce bruit sans neutraliser artificiellement l'esquive/le critique", () => {
+    function totalDamage(atkSide: 'player' | 'enemy', plan: 'pressure' | 'concrete' | null, n: number) {
+      let seed = 1
+      const seededRandom = () => {
+        seed = (seed * 16807) % 2147483647
+        return (seed - 1) / 2147483646
+      }
+      let sum = 0
+      const origRandom = Math.random
+      Math.random = seededRandom
+      try {
+        for (let i = 0; i < n; i++) {
+          const m = freshMatch()
+          toFighting(m)
+          if (plan) chooseTacticPlan(m, plan)
+          if (atkSide === 'player') {
+            m.player.nextActionAt = m.t
+            m.enemy.nextActionAt = m.t + 1000
+          } else {
+            m.enemy.nextActionAt = m.t
+            m.player.nextActionAt = m.t + 1000
+          }
+          const target = atkSide === 'player' ? m.enemy : m.player
+          const before = target.hp
+          tick(m, 0.001, quiet)
+          sum += before - target.hp
+        }
+      } finally {
+        Math.random = origRandom
+      }
+      return sum
+    }
+    // PRESSION (atk ×1,12) : le joueur inflige plus de dégâts en attaquant.
+    expect(totalDamage('player', 'pressure', 300)).toBeGreaterThan(totalDamage('player', null, 300))
+    // BÉTON (def ×1,15) : le joueur encaisse moins de dégâts en défendant.
+    // Même graine rejouée (LCG remis à 1 à chaque appel de totalDamage) :
+    // les DEUX runs tirent l'EXACTE même séquence d'esquives/critiques,
+    // seul le plan diffère — élimine le bruit qui faisait flipper le signe
+    // du résultat d'une exécution à l'autre en tirage libre.
+    expect(totalDamage('enemy', 'concrete', 300)).toBeLessThan(totalDamage('enemy', null, 300))
+  })
+
   it('addSpeechHype ajoute de la Hype au joueur, mise à l\'échelle par son Cœur (HRT)', () => {
     const m = freshMatch() // Kenta, hrt=7 -> hrtScale = 0.5 + 7/12 ≈ 0,9167
     m.player.hype = 0
@@ -4461,6 +4519,22 @@ describe('drawCards : la défausse remélangée, et ultiReady via les dégâts d
     tick(m, 0.001, quiet)
     expect(m.enemy.ulti).toBe(ULTI_MAX)
     expect(m.events.some(e => e.kind === 'ultiReady' && e.who === 'enemy')).toBe(true)
+  })
+
+  it("même chose côté JOUEUR (`f === m.player ? 'player' : ...`, branche jamais prise ici : le seul test 'player' passait par la perte de round, un point de code totalement différent)", () => {
+    const m = freshMatch()
+    toFighting(m)
+    m.player.nextActionAt = m.t + 1000 // seul l'adversaire attaque ce tick
+    m.enemy.nextActionAt = m.t
+    vi.spyOn(Math, 'random').mockReturnValue(0.99) // jamais d'esquive, jamais de crit, jamais de garde
+    // Juste sous le plein plutôt qu'une valeur fixe arbitraire : le gain
+    // exact dépend des stats du perso qui encaisse (ici Kenta, pas Rei
+    // dans le test miroir ci-dessus), pas besoin de le calculer à l'avance.
+    m.player.ulti = ULTI_MAX - 0.01
+    m.player.ultiUsed = false
+    tick(m, 0.001, quiet)
+    expect(m.player.ulti).toBe(ULTI_MAX)
+    expect(m.events.some(e => e.kind === 'ultiReady' && e.who === 'player')).toBe(true)
   })
 })
 

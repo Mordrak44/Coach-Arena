@@ -2508,11 +2508,57 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       garde-fou, pas seulement celui de `'cheer'`. `mulligan()` avec un
       id absent de la main : ignoré sans planter, sans consommer l'essai
       unique. 7 nouveaux tests. Aucun bug trouvé.
+- [x] `game/combat.ts` : suite du sweep, branches 92,32 % → 93,76 %.
+      Fermé : `chargeUlti` déclenchant `ultiReady` côté JOUEUR par les
+      DÉGÂTS DE COMBAT (le seul test 'player' passait par la perte de
+      round, un point de code totalement différent) ; `applyConsigne`
+      refusé hors pause/Temps Mort et avec une liste d'effets vide (seul
+      le refus par `consigneUsed` déjà posé l'était) ; et surtout le
+      PLAN TACTIQUE (`chooseTacticPlan`) qui n'avait jamais influencé un
+      seul coup en combat dans aucun test — seule la pose de `m.plan`
+      était vérifiée. Comparaison PAIRÉE sur nombres aléatoires communs
+      (LCG remis à la même graine avec/sans plan, patron déjà utilisé
+      pour le bruit ailleurs dans ce fichier) : élimine le bruit
+      esquive/critique qui faisait flipper le signe du résultat d'une
+      exécution à l'autre en tirage libre, sans neutraliser
+      artificiellement le hasard du combat. Aucun bug trouvé.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite du sweep sur `combat.ts` (branches
+  92,32 % → 93,76 %). Fermé : `chargeUlti` déclenchait déjà `ultiReady`
+  côté 'enemy' par les dégâts de combat, mais côté 'player' UNIQUEMENT
+  via la perte d'un round (ligne 1024, un point de code séparé) —
+  jamais via un coup encaissé/porté (ligne 48) : ajout du test miroir,
+  côté joueur cette fois, avec un seuil `ULTI_MAX - 0.01` plutôt qu'une
+  valeur fixe (le gain exact dépend des stats du perso qui encaisse,
+  pas besoin de le calculer à l'avance). `applyConsigne` : ses 2 autres
+  garde-fous (mauvaise phase, liste d'effets vide) jamais exercés
+  individuellement, seul le refus par `consigneUsed` déjà posé l'était.
+  Et la trouvaille la plus significative de cette itération : le PLAN
+  TACTIQUE (`chooseTacticPlan` → PRESSION/BÉTON/etc.) n'avait JAMAIS
+  influencé un seul coup en combat dans TOUT le fichier de tests — le
+  seul test existant vérifiait juste que `m.plan` était bien posé,
+  sans jamais laisser un coup partir derrière. Écrire ce test a
+  d'abord échoué à cause d'un piège méthodologique instructif : un coup
+  isolé avec Math.random() figé arrondit souvent la MÊME valeur avec ou
+  sans plan (l'effet de BÉTON, def ×1,15, ne représente qu'environ 5 %
+  de dégâts en moins — trop fin pour franchir un seuil d'arrondi sur un
+  seul coup) ; puis une comparaison statistique sur 300 tirages LIBRES
+  s'est révélée trop bruitée (le hasard d'esquive/critique domine
+  largement l'effet du plan, le signe du résultat pouvait flipper d'une
+  exécution à l'autre) ; la solution retenue est une comparaison PAIRÉE
+  sur nombres aléatoires COMMUNS — un LCG (déjà utilisé ailleurs dans ce
+  fichier pour du bruit déterministe) remis à la même graine pour les
+  deux variantes (avec/sans plan), qui rejouent donc l'EXACTE même
+  séquence d'esquives/critiques : seul le plan diffère, le résultat
+  devient déterministe et fiable sur 5 exécutions consécutives sans
+  neutraliser artificiellement le hasard du combat. 4 nouveaux tests.
+  Aucun bug trouvé. engine.test.ts 334 → 337, suite vérifiée sur 3
+  exécutions consécutives (337/337). `tsc --noEmit` + `npm run build`
+  verts. ~20 branches restent ouvertes sur `combat.ts`.
 - 2026-08-18 (routine) : Suite du coverage-driven bug hunt côté `game/` :
   `combat.ts`, le cœur du moteur (branches 88,72 % → 92,32 %). Gros
   fichier (417 branches) : sweep PARTIEL cette itération, pas fermé à
