@@ -2471,11 +2471,48 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       volume mais saute la prosodie ; et `audioCtx.close()` qui rejette
       au `stop()` est absorbé silencieusement (même patron que
       `SoundSystem`). Aucun bug trouvé.
+- [x] `systems/` (facecam.ts, pitch.ts) fermés à 100 % — TOUT le dossier
+      `systems/` (facecam, pitch, recorder, sound, voice) est désormais à
+      100 % sur les 4 métriques. Fermé sur `facecam.ts` (branches 80 % →
+      100 %) : la décroissance douce de l'énergie de mouvement quand le
+      changement de pixels retombe sous l'énergie courante (seule la
+      montée était testée) ; et la construction via `OffscreenCanvas`
+      quand disponible (Chrome/Edge récents), jamais exercée dans un
+      sandbox qui ne l'a pas, seul le repli `<canvas>` l'était. Fermé sur
+      `pitch.ts` (branches 95,45 % → 100 %) : un lag dont la fenêtre de
+      corrélation tombe entièrement à zéro (den=0, cas réel en bord de
+      buffer) est bien ignoré sans produire de NaN. Aucun bug trouvé.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Clôture du coverage-driven bug hunt sur
+  `systems/` : `facecam.ts` (branches 80 % → 100 %) et `pitch.ts`
+  (branches 95,45 % → 100 %) — TOUT le dossier `systems/` (facecam,
+  pitch, recorder, sound, voice) est maintenant à 100 % sur les 4
+  métriques, disparu du rapport de couverture par défaut (seuls les
+  fichiers avec un écart y figurent). Fermé sur `facecam.ts` : la
+  décroissance douce de `energy` quand le changement de pixels retombe
+  sous sa valeur courante (`raw <= energy`, seule la montée
+  `raw > energy` était exercée — valeur exacte vérifiée : 0,5×0,92=0,46,
+  pas de chute brutale) ; et la construction via `OffscreenCanvas`
+  quand disponible, jamais exercée dans un sandbox Node qui ne l'a pas
+  nativement (seul le repli `<canvas>` l'était). Fermé sur `pitch.ts` :
+  un lag dont la fenêtre de corrélation tombe entièrement à zéro
+  (`den=0`, cas réel en bord de buffer — construit avec `sampleRate/
+  MIN_HZ` tombant PILE sur `maxLag`, réduisant sa fenêtre à un seul
+  échantillon mis à 0) est bien ignoré via le garde-fou `den > 0 ? ... :
+  0` sans jamais produire de NaN, sans perturber les autres lags qui
+  corrèlent normalement. 3 nouveaux tests, tous corrects du premier
+  coup. Aucun bug trouvé sur l'ensemble de ce sweep `systems/` (5
+  fichiers, ~15 tests ajoutés en tout sur les 4 dernières itérations).
+  engine.test.ts 323 → 326, suite vérifiée sur 3 exécutions consécutives
+  (326/326). `tsc --noEmit` + `npm run build` verts. Prochaine cible
+  naturelle : les derniers écarts de branches dans `game/` (combat.ts,
+  deckBuilder.ts, sceneDirector.ts, cardForge.ts) puis `render/
+  arenaRenderer.ts`, très peu couvert (canvas 2D, code-review déjà fait
+  plutôt que tests unitaires vu la nature du fichier).
 - 2026-08-18 (routine) : Suite du coverage-driven bug hunt sur `systems/`,
   après `recorder.ts` et `sound.ts` : `voice.ts` fermé à 100 % sur les 4
   métriques (branches 85,18 % → 100 %, fonctions 91,66 % → 100 %). Fermé

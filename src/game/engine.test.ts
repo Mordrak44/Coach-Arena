@@ -666,6 +666,25 @@ describe('prosodie (pitch local)', () => {
     expect(detectPitch(noise, 48000)).toBeNull()
   })
 
+  it("un lag dont la fenêtre de corrélation tombe entièrement à zéro (den=0) est ignoré sans NaN — branche `den > 0 ? ... : 0` jamais exercée, seuls des buffers uniformément voisés l'étaient", async () => {
+    const { detectPitch } = await import('../systems/pitch')
+    // sampleRate/MIN_HZ = 7000/70 = 100 = maxLag EXACTEMENT : sa fenêtre de
+    // corrélation ne fait plus qu'un seul échantillon (n - maxLag = 1).
+    // En mettant CE SEUL échantillon (et son miroir en fin de buffer) à 0,
+    // den tombe à 0 pile pour ce lag, sans toucher les autres — le reste
+    // du buffer garde assez d'énergie pour passer le seuil RMS global.
+    const sr = 7000
+    const n = 101
+    const buf = new Float32Array(n)
+    for (let i = 1; i < n - 1; i++) buf[i] = Math.sin((2 * Math.PI * 300 * i) / sr) * 0.5
+    buf[0] = 0
+    buf[n - 1] = 0
+    expect(() => detectPitch(buf, sr)).not.toThrow()
+    const hz = detectPitch(buf, sr)
+    expect(hz).not.toBeNull() // les autres lags, eux, corrèlent normalement
+    expect(Number.isNaN(hz)).toBe(false)
+  })
+
   it('le tracker suit la montée dans les aigus', async () => {
     const { PitchTracker } = await import('../systems/pitch')
     const t = new PitchTracker()
@@ -3185,6 +3204,46 @@ describe('FaceCoach (systems/facecam.ts) — énergie de mouvement par diff d\'i
     // changement de pixels total et immédiat donne raw=1, donc énergie=0,5
     // pile — la valeur EXACTE attendue, pas juste « plus que 0 ».
     expect(fc.state.energy).toBe(0.5)
+  })
+
+  it("un changement de pixels PLUS FAIBLE que l'énergie courante la fait redescendre en douceur (branche `raw <= energy` jamais exercée, seule la montée l'était)", async () => {
+    const { setFrame } = setup(new Uint8ClampedArray(FRAME_LEN).fill(0))
+    const { FaceCoach } = await import('../systems/facecam')
+    const fc = new FaceCoach()
+    ;(fc as any).sample() // référence noire
+    setFrame(new Uint8ClampedArray(FRAME_LEN).fill(255)) // saut max : énergie → 0,5
+    ;(fc as any).sample()
+    expect(fc.state.energy).toBe(0.5)
+    setFrame(new Uint8ClampedArray(FRAME_LEN).fill(255)) // frame IDENTIQUE à la précédente : raw=0, sous l'énergie courante
+    ;(fc as any).sample()
+    // Décroissance lente : energy*0.92 + raw*0.08 = 0.5*0.92 + 0 = 0.46, pas de chute brutale à 0.
+    expect(fc.state.energy).toBeCloseTo(0.46)
+  })
+
+  it("OffscreenCanvas, quand disponible (Chrome/Edge récents), est utilisé à la construction plutôt que le repli <canvas> — jamais exercé dans ce sandbox où OffscreenCanvas est absent", async () => {
+    setup(new Uint8ClampedArray(FRAME_LEN).fill(0))
+    let constructed: unknown[] = []
+    class FakeOffscreenCanvas {
+      width: number
+      height: number
+      constructor(w: number, h: number) {
+        this.width = w
+        this.height = h
+        constructed.push(this)
+      }
+      getContext() {
+        return { drawImage: () => {}, getImageData: () => ({ data: new Uint8ClampedArray(FRAME_LEN) }) }
+      }
+    }
+    ;(globalThis as any).OffscreenCanvas = FakeOffscreenCanvas
+    try {
+      const { FaceCoach } = await import('../systems/facecam')
+      const fc = new FaceCoach()
+      expect(constructed).toHaveLength(1) // le repli <canvas> n'a PAS été construit
+      expect((fc as any).canvas).toBeInstanceOf(FakeOffscreenCanvas)
+    } finally {
+      delete (globalThis as any).OffscreenCanvas
+    }
   })
 
   it("readyState < 2 (vidéo pas encore prête) : sample() ne plante pas et ne touche pas l'énergie", async () => {
