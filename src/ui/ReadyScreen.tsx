@@ -10,10 +10,12 @@ export default function ReadyScreen({
   player,
   enemy,
   onGo,
+  onBack,
 }: {
   player: Character
   enemy: Character
   onGo: (stream: MediaStream | null) => void
+  onBack: () => void
 }) {
   const [micOk, setMicOk] = useState<boolean | null>(null)
   const [camOk, setCamOk] = useState<boolean | null>(null)
@@ -145,6 +147,9 @@ export default function ReadyScreen({
         }}
       >
         {asking ? 'Vérification…' : '🔔 Faire sonner le gong'}
+      </button>
+      <button className="btn secondary" onClick={onBack}>
+        ← Retour
       </button>
     </div>
   )

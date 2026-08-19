@@ -2432,11 +2432,36 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       3e trouvaille notée mais NON corrigée (décision produit, pas un
       bug) : `ReadyScreen` (le Vestiaire) n'a aucun bouton retour vers la
       sélection de perso.
+- [x] `ReadyScreen` (Vestiaire) : ajout du bouton « ← Retour » manquant,
+      seul écran du funnel qui n'en avait pas — incohérence relevée lors
+      de l'audit `App.tsx` du 2026-08-18, reconsidérée comme un vrai trou
+      de navigation (le joueur pouvait se retrouver bloqué au Vestiaire
+      sans pouvoir changer de perso) plutôt qu'une pure décision produit.
+      Revient vers `select` en mode Rapide, vers `story` en mode Histoire
+      (même patron que `onNewChar` sur `ResultsScreen`).
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Ajout du bouton « ← Retour » manquant sur
+  `ReadyScreen` (le Vestiaire), noté mais délibérément non corrigé lors
+  de l'itération précédente (jugé produit/UX plutôt que bug). Reconsidéré
+  en revoyant les autres écrans du funnel (`StoryScreen`, `PrivacyScreen`,
+  `ResultsScreen`) : tous ont un moyen de revenir en arrière SAUF le
+  Vestiaire — un vrai trou de navigation, pas une décision cosmétique :
+  le joueur pouvait s'y retrouver coincé (mauvais perso choisi par
+  erreur, ou changement d'avis) sans autre option que fermer l'onglet.
+  Nouveau prop `onBack` sur `ReadyScreen`, câblé côté `App.tsx` sur le
+  même patron conditionnel que `onNewChar` de `ResultsScreen` : retour
+  vers `select` en mode Rapide, vers `story` en mode Histoire (le
+  nettoyage des capteurs micro/caméra à la sortie fonctionne déjà via le
+  cleanup du `useEffect` existant, aucun changement nécessaire côté
+  gestion des flux media). Vérifié en Chromium headless sur les DEUX
+  chemins (mode Rapide ET mode Histoire, jusqu'au choix de chapitre) :
+  le bouton est présent et ramène bien sur le bon écran dans les deux
+  cas. 304 tests inchangés (aucun test unitaire sur les composants UI).
+  `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Suite de l'audit de code (fichier entier) sur
   `App.tsx`, après `StoryScreen.tsx`/`ResultsScreen.tsx`/`TitleScreen.tsx`.
   **2 vrais bugs trouvés et corrigés**, tous deux confirmés réels par

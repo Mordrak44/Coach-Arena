@@ -134,7 +134,12 @@ export default function App() {
         )}
         {screen === 'select' && <CharacterSelect onConfirm={startMatch} />}
         {screen === 'ready' && player && enemy && (
-          <ReadyScreen player={player} enemy={enemy} onGo={enterArena} />
+          <ReadyScreen
+            player={player}
+            enemy={enemy}
+            onGo={enterArena}
+            onBack={() => setScreen(storyRef.current ? 'story' : 'select')}
+          />
         )}
         {screen === 'arena' && player && enemy && (
           <ArenaScreen
