@@ -1480,6 +1480,32 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       complète vérifiée sur 8 exécutions consécutives. Couverture `game/`
       globale 98,07 % → **98,62 %** (stmts), branches 92,15 % →
       **93,04 %**. `tsc --noEmit` + `npm run build` verts.
+- [x] **Vrai bug trouvé** — audit de code (skill code-review, effort
+      élevé, fichier ENTIER pas juste le dernier diff) sur `StoryScreen.tsx`
+      et `ResultsScreen.tsx` (aucun bug — ce dernier n'avait jamais eu
+      qu'un passage a11y, revérifié sain), puis `TitleScreen.tsx` (écran
+      titre à l'attract mode) : son conteneur `.screen` posait
+      `overflow: 'hidden'` en ligne, qui ÉCRASE le `overflow-y: auto` de
+      la feuille de style — le seul filet de scroll de toute l'appli,
+      documenté dans `styles.css` après le bug déjà corrigé sur
+      StoryScreen/CharacterSelect (contenu qui déborde, haut ou bas
+      inatteignable). Sur un petit écran (téléphone en paysage, fenêtre
+      étroite) ou avec le texte agrandi par accessibilité, le titre + la
+      tagline + les 2 boutons + la note de permissions + le lien Vie
+      privée (tous en flux normal, dans un `<div>` empilé PAR-DESSUS le
+      canvas d'attract mode) pouvaient déborder de la boîte SANS AUCUN
+      MOYEN d'atteindre le bas — ni le CTA principal, ni le lien Vie
+      privée. Corrigé en retirant `overflow: 'hidden'` (superflu : le
+      canvas et le voile en `position: absolute; inset: 0` restent calés
+      sur la boîte de `.screen` sans lui). Vérifié en conditions réelles,
+      pas supposé : Chromium headless à un viewport normal (funnel
+      identique, zéro régression) PUIS à un viewport très court
+      (700×320) — `scrollHeight` (593) > `clientHeight` (320) confirmant
+      le débordement réel, `scrollTop` atteignant le bas après un scroll
+      programmatique, et le lien Vie privée devenu visible après scroll
+      (jamais atteignable avant le correctif). 303 tests inchangés (pur
+      correctif CSS, aucune logique touchée). `tsc --noEmit` +
+      `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2400,6 +2426,20 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Audit de code (fichier entier, pas juste le
+  dernier diff) sur `StoryScreen.tsx`/`ResultsScreen.tsx` (rien trouvé) puis
+  `TitleScreen.tsx`. **Vrai bug trouvé** : `overflow: 'hidden'` en ligne
+  sur `.screen` écrasait le `overflow-y: auto` de la feuille de style — le
+  seul filet de scroll de l'appli, déjà documenté après le même bug
+  corrigé sur StoryScreen/CharacterSelect. Sur petit écran ou texte
+  agrandi, le titre/tagline/boutons/lien Vie privée (empilés sur le canvas
+  d'attract mode) pouvaient déborder sans AUCUN moyen d'atteindre le bas.
+  Corrigé en retirant l'`overflow: hidden` (superflu, le canvas reste
+  calé en `position: absolute` sans lui). Vérifié en Chromium headless à
+  viewport normal (identique) ET à viewport très court (700×320) :
+  `scrollHeight` > `clientHeight` confirmant le débordement réel, le lien
+  Vie privée devenu atteignable après scroll. 303 tests inchangés (pur
+  correctif CSS). `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Dernier passage sur `speechTactics.ts`,
   `sceneQueue.ts`, `cutPlanner.ts` : tous les 3 à 100 % désormais. Garde-fou
   « texte trop court » de `parseConsigne` (speechTactics) ; `cancel()`

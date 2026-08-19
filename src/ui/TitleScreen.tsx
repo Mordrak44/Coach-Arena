@@ -60,10 +60,16 @@ export default function TitleScreen({
   }, [])
 
   return (
-    <div
-      className="screen"
-      style={{ position: 'relative', overflow: 'hidden', justifyContent: 'flex-start' }}
-    >
+    <div className="screen" style={{ position: 'relative', justifyContent: 'flex-start' }}>
+      {/* Pas d'`overflow: hidden` ici : ça écrase le `overflow-y: auto` de
+          .screen (styles.css), le seul filet de scroll de l'appli — sur
+          un petit écran ou avec le texte agrandi (accessibilité), le
+          titre/tagline/boutons/lien vie privée en flux normal (le 3e
+          <div> ci-dessous) déborderait de la boîte SANS aucun moyen d'y
+          accéder, exactement le bug déjà corrigé sur StoryScreen/
+          CharacterSelect (trouvé en audit, 2026-08-18). Le canvas et le
+          voile en `position: absolute; inset: 0` restent calés sur la
+          boîte de .screen sans lui, aucun besoin de le clipper. */}
       <canvas
         ref={canvasRef}
         width={CANVAS_W}
