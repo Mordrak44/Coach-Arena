@@ -441,6 +441,10 @@ describe('consignes parlées', () => {
   })
 
   it('ignore le bruit et limite à une consigne par pause', () => {
+    // Garde-fou distinct du "ne matche aucune règle" ci-dessous : un texte
+    // trop COURT (< 6 caractères, ex. un mot de reco vocale coupé) est
+    // rejeté d'entrée, jamais testé jusqu'ici.
+    expect(parseConsigne('ok')).toBeNull()
     expect(parseConsigne('il fait beau ce soir non ?')).toBeNull()
     const m = freshMatch()
     m.phase = 'tactics'
@@ -925,6 +929,38 @@ describe('séquenceur de cuts (EDL)', () => {
     }
     expect(list.find(i => i.kind === 'counter-exchange')?.chars).toBe(2)
     expect(list.find(i => i.kind === 'impact-flash')?.chars).toBe(0)
+  })
+
+  it("cutsForEvent : côté JOUEUR de 'special'/'ulti' (by: 'player') — le match synthétique ci-dessus n'a qu'un ulti côté enemy et aucun special du tout, donc la moitié `by==='player'` de ces ternaires n'avait jamais tourné", async () => {
+    const { cutsForEvent } = await import('./cutPlanner')
+    const nameOf = (side: 'player' | 'enemy') => (side === 'player' ? 'Kenta' : 'Rei')
+    const special = cutsForEvent(
+      { kind: 'special', t: 5, by: 'player', name: 'Poing du Volcan', onoma: 'DOKAAN', dmg: 20 },
+      nameOf,
+    )
+    expect(special[0].chars).toEqual(['Kenta']) // nameOf(e.by)
+    expect(special[1].chars).toEqual(['Rei']) // nameOf(e.by === 'player' ? 'enemy' : 'player'), branche jamais exercée
+
+    const ulti = cutsForEvent(
+      { kind: 'ulti', t: 5, by: 'player', name: 'Éruption', onoma: 'GOOAR', dmg: 60 },
+      nameOf,
+    )
+    expect(ulti[0].chars).toEqual(['Kenta'])
+    expect(ulti[1].chars).toEqual(['Rei']) // même branche jamais exercée, côté ulti
+
+    // 'countered' côté ENEMY (by: 'enemy') : le match synthétique n'a un
+    // countered que côté player, donc cette moitié du même ternaire n'était
+    // jamais exercée non plus.
+    const countered = cutsForEvent({ kind: 'countered', t: 5, by: 'enemy', dmg: 10 }, nameOf)
+    expect(countered[0].chars).toEqual(['Kenta', 'Rei']) // [nameOf('player'), nameOf(e.by)]
+  })
+
+  it("planCuts : un event 'special' (jamais présent dans le match synthétique ci-dessus) ferme le dernier case d'eventScore jamais atteint", async () => {
+    const { planCuts } = await import('./cutPlanner')
+    const m = freshMatch()
+    m.events = [{ kind: 'special', t: 5, by: 'player', name: 'X', onoma: 'X', dmg: 1 }]
+    const cuts = planCuts(m, ROSTER[0], ROSTER[1])
+    expect(cuts.some(c => c.kind === 'special-cast')).toBe(true)
   })
 })
 
@@ -1444,6 +1480,23 @@ describe('SceneJobQueue (file de génération asynchrone des scènes)', () => {
     queue.start()
     await new Promise(r => setTimeout(r, 10))
     expect(queue.jobs()[0].status).toBe('failed')
+  })
+
+  it("cancel() AVANT qu'un submitter en vol ne REJETTE : le garde-fou `if (this.cancelled) return` du .catch() n'était jamais exercé (seul celui du .then() l'était)", async () => {
+    const { SceneJobQueue } = await import('./sceneQueue')
+    const updates: string[][] = []
+    let rejectSubmit: (err: Error) => void
+    const pending = new Promise<string | null>((_, rej) => (rejectSubmit = rej))
+    const queue = new SceneJobQueue([plan('a')], {
+      submitter: { submit: () => pending },
+      onUpdate: jobs => updates.push(jobs.map(j => j.status)),
+    })
+    queue.start()
+    queue.cancel()
+    rejectSubmit!(new Error('network error, mais trop tard'))
+    await new Promise(r => setTimeout(r, 10))
+    expect(updates).toEqual([]) // jamais notifié : annulé avant le rejet
+    expect(queue.jobs()[0].status).toBe('pending') // pas basculé à 'failed' non plus
   })
 })
 

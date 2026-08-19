@@ -1456,6 +1456,30 @@ portraits du roster qu'après accord explicite de l'utilisateur.
       sur 8 exécutions consécutives. Couverture `game/` globale 98,07 %
       (stmts), branches **92,15 %**. `tsc --noEmit` + `npm run build`
       verts.
+- [x] Dernier passage sur les 3 derniers fichiers `game/` incomplets —
+      `speechTactics.ts`, `sceneQueue.ts`, `cutPlanner.ts` : tous **100 %**
+      désormais. `speechTactics.ts` : le garde-fou « texte trop court
+      (< 6 caractères) » de `parseConsigne`, distinct du « ne matche
+      aucune règle » déjà testé, jamais exercé. `sceneQueue.ts` :
+      `cancel()` appelée AVANT qu'un submitter en vol ne REJETTE (pas
+      juste `resolve(null)`) — le garde-fou `if (this.cancelled) return`
+      du `.catch()` n'était jamais exercé, seul celui du `.then()`
+      l'était (même patron que le bug déjà corrigé pour ce fichier, cette
+      fois côté rejet). `cutPlanner.ts` : même trouvaille systémique que
+      `commentator.ts` la fois précédente — le match synthétique partagé
+      par toute la describe « séquenceur de cuts » n'avait qu'un seul
+      `ulti` (côté enemy) et un seul `countered` (côté player), et AUCUN
+      `special` du tout : la moitié manquante de chaque ternaire
+      `by === 'player' ? ... : ...` (dans `cutsForEvent`, exportée) et le
+      case `'special'` d'`eventScore` (jamais atteint faute d'event)
+      n'avaient jamais tourné. Testé directement via `cutsForEvent`
+      (exportée) plutôt qu'en modifiant le montage synthétique partagé —
+      risque de régression sur les assertions existantes (compte de
+      cuts, budget par round) jugé disproportionné pour ce gain. Aucun
+      bug trouvé. 5 nouveaux tests, engine.test.ts 300 → 303, suite
+      complète vérifiée sur 8 exécutions consécutives. Couverture `game/`
+      globale 98,07 % → **98,62 %** (stmts), branches 92,15 % →
+      **93,04 %**. `tsc --noEmit` + `npm run build` verts.
 
 ## v1 — Vie d'Écurie & progression (voir GAME_DESIGN.md §4 quater)
 
@@ -2376,6 +2400,20 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
 
 ## Journal
 
+- 2026-08-18 (routine) : Dernier passage sur `speechTactics.ts`,
+  `sceneQueue.ts`, `cutPlanner.ts` : tous les 3 à 100 % désormais. Garde-fou
+  « texte trop court » de `parseConsigne` (speechTactics) ; `cancel()`
+  avant qu'un submitter REJETTE plutôt que résolve `null` (sceneQueue,
+  même patron que le bug déjà corrigé côté résolution) ; et même
+  trouvaille systémique que `commentator.ts` sur `cutPlanner.ts` — le
+  match synthétique partagé par toute la describe n'avait qu'un ulti
+  côté enemy, un countered côté player, et aucun special : la moitié
+  manquante de chaque ternaire `by==='player'?...` n'avait jamais tourné.
+  Testé directement via `cutsForEvent` (exportée) pour ne pas risquer de
+  casser les assertions du montage synthétique partagé. Aucun bug
+  trouvé. 5 tests, engine.test.ts 300 → 303, suite vérifiée sur 8
+  exécutions consécutives. `game/` global : 98,07 % → 98,62 % (stmts),
+  branches 92,15 % → 93,04 %. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Suite du coverage-driven bug hunt : `commentator.ts`
   (96,07 % → 100 %, branches 72 % → 98 %). Trouvaille structurelle : le
   test « poids cohérents » existant passait SYSTÉMATIQUEMENT `'player'`
