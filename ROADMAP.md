@@ -2459,11 +2459,45 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       normalement inatteignable via l'usage réel, et le seuil anti-
       ré-écrasement de `setCrowdHype()` (variation < 0,005 → aucune
       rampe reprogrammée). Aucun bug trouvé.
+- [x] `systems/voice.ts` fermé à 100 % sur les 4 métriques (branches
+      85,18 % → 100 %, fonctions 91,66 % → 100 %) : résultat de reco
+      vocale à texte vide (espaces seuls) bien ignoré, y compris pour le
+      compteur de finalisations ; un texte reconnu mais sans commande
+      détectée (aucun pattern) laisse `pendingCommand` INCHANGÉ — une
+      commande déjà en attente n'est pas effacée par une phrase
+      hors-sujet, comportement confirmé voulu ; la boucle de volume
+      s'arrête bien net dès `stopped=true` même si une frame restait
+      programmée ; sans `timeBuf`, la boucle continue de mesurer le
+      volume mais saute la prosodie ; et `audioCtx.close()` qui rejette
+      au `stop()` est absorbé silencieusement (même patron que
+      `SoundSystem`). Aucun bug trouvé.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite du coverage-driven bug hunt sur `systems/`,
+  après `recorder.ts` et `sound.ts` : `voice.ts` fermé à 100 % sur les 4
+  métriques (branches 85,18 % → 100 %, fonctions 91,66 % → 100 %). Fermé
+  côté `onresult` : un résultat dont le transcript ne contient que des
+  espaces est bien ignoré par `if (!text) continue` — y compris pour le
+  compteur `finalSeq`, jamais vérifié explicitement jusqu'ici ; et surtout
+  un texte reconnu mais SANS commande détectée (aucun pattern ne matche,
+  ex. « bonjour, comment ça va ? ») laisse `pendingCommand` INCHANGÉ —
+  comportement voulu confirmé par un test dédié : une commande déjà en
+  attente n'est pas effacée par une phrase hors-sujet, seule une NOUVELLE
+  commande reconnue écrase l'ancienne. Fermé côté boucle de volume : la
+  boucle s'arrête net dès `stopped=true` même si une frame restait déjà
+  programmée (aucune mesure n'est traitée après un `stop()`) ; sans
+  `timeBuf` (relâché entre-temps), la boucle continue de mesurer le
+  volume mais saute la prosodie sans planter. Et même patron que
+  `SoundSystem` (2026-08-18, plus tôt) : `audioCtx.close()` qui rejette
+  au `stop()` de `VoiceCoach` est absorbé silencieusement — jamais
+  exercé, seule la fonction de rejet manquait pour les 100 % de
+  fonctions. 5 nouveaux tests, tous corrects du premier coup. Aucun bug
+  trouvé. engine.test.ts 318 → 323, suite vérifiée sur 3 exécutions
+  consécutives (323/323). `voice.ts` : 100 % sur les 4 métriques.
+  `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Suite du coverage-driven bug hunt sur `systems/`,
   après `recorder.ts` : `sound.ts` (branches 87,03 % → 100 %). Fermé :
   `start()` n'était jamais rappelé une 2e fois dans les tests (garde-fou

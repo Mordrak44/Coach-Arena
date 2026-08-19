@@ -3106,6 +3106,34 @@ describe('VoiceCoach — onresult/onend, le cœur du flux de reco vocale, jamais
     expect(vc.state.listening).toBe(true) // rien n'a bougé
     expect(vc.state.pendingCommand).toBeNull()
   })
+
+  it("un résultat dont le transcript ne contient que des espaces est ignoré (`if (!text) continue` jamais exercé) — ne compte même pas comme finalisé", async () => {
+    ;(globalThis as any).window = { SpeechRecognition: FakeRecognition }
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const rec = (vc as any).recognition
+    rec.onresult({
+      resultIndex: 0,
+      results: [finalResult('   '), finalResult('attaque')],
+    })
+    expect(vc.state.finalSeq).toBe(1) // le résultat vide ne compte pas, seul le 2e finalise
+    expect(vc.state.lastHeard).toBe('attaque') // pas écrasé par le vide
+    expect(vc.state.pendingCommand).toBe('attack')
+  })
+
+  it("un texte reconnu mais SANS commande (aucun pattern ne matche) laisse pendingCommand INCHANGÉ — une commande déjà en attente n'est pas effacée par une phrase hors-sujet (`if (cmd)` jamais exercé côté faux)", async () => {
+    ;(globalThis as any).window = { SpeechRecognition: FakeRecognition }
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const rec = (vc as any).recognition
+    rec.onresult({ resultIndex: 0, results: [finalResult('esquive')] })
+    expect(vc.state.pendingCommand).toBe('dodge')
+    rec.onresult({ resultIndex: 0, results: [finalResult('bonjour, comment ça va ?')] })
+    expect(vc.state.lastHeard).toBe('bonjour, comment ça va ?') // bien entendu…
+    expect(vc.state.pendingCommand).toBe('dodge') // …mais la commande en attente reste celle d'avant
+  })
 })
 
 describe('FaceCoach (systems/facecam.ts) — énergie de mouvement par diff d\'images, jamais testée', () => {
@@ -3864,6 +3892,46 @@ describe('VoiceCoach.startVolumeMeter — la boucle de volume/pitch, jamais exer
     ctx.state = 'suspended'
     vc.resume()
     expect(ctx.resumeCalls).toBe(callsAtStart + 1) // suspendu : débloqué
+  })
+
+  it("la boucle s'arrête net dès que stopped=true, même si une frame était déjà programmée (`if (this.stopped || ...) return` jamais exercé côté vrai)", async () => {
+    const { rafQueue } = setup()
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const energyBefore = vc.state.energy
+    vc.stop() // stopped=true, mais la frame déjà programmée reste dans notre file de fake RAF
+    expect(rafQueue.length).toBe(1)
+    expect(() => rafQueue.shift()!()).not.toThrow()
+    expect(vc.state.energy).toBe(energyBefore) // la frame n'a rien traité : sortie immédiate
+  })
+
+  it("sans timeBuf (relâché entre-temps), la boucle continue de mesurer le volume mais saute la prosodie (`if (this.timeBuf && this.audioCtx)` jamais exercé côté faux)", async () => {
+    const { rafQueue } = setup()
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    ;(vc as any).timeBuf = null
+    const ratioBefore = vc.state.pitchRatio
+    const analyser = (vc as any).analyser as FakeAnalyser
+    analyser.freqData.fill(200)
+    expect(() => rafQueue.shift()!()).not.toThrow()
+    expect(vc.state.energy).toBeGreaterThan(0) // le volume est mesuré indépendamment
+    expect(vc.state.pitchRatio).toBe(ratioBefore) // mais la prosodie n'a pas bougé, sautée
+  })
+
+  it("stop() : un audioCtx.close() qui rejette est absorbé silencieusement, comme pour SoundSystem — jamais exercé (le fake résout toujours)", async () => {
+    setup()
+    class RejectingAudioContext extends FakeAudioContext {
+      close() {
+        return Promise.reject(new Error('AudioContext already closed'))
+      }
+    }
+    ;(globalThis as any).AudioContext = RejectingAudioContext
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    expect(() => vc.stop()).not.toThrow()
   })
 })
 
