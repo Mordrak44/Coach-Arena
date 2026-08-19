@@ -2439,11 +2439,41 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       sans pouvoir changer de perso) plutôt qu'une pure décision produit.
       Revient vers `select` en mode Rapide, vers `story` en mode Histoire
       (même patron que `onNewChar` sur `ResultsScreen`).
+- [x] `systems/recorder.ts` fermé à 100 % (branches 79,24 % → 100 %) :
+      chunks `ondataavailable` de taille 0 jamais accumulés (garde-fou
+      `size > 0` jamais exercé côté faux, ni pour `MatchRecorder` ni pour
+      `HighlightRecorder`), résolution `null`/`prevBlob` quand un
+      segment s'arrête sans avoir produit de données, et repli
+      `rec.mimeType || 'video/webm'` jamais exercé côté vide (3 sites :
+      `MatchRecorder.stop()`, `HighlightRecorder.rotate()`,
+      `HighlightRecorder.stop()`) + même repli sur `blob.type` dans
+      `shareOrDownload`. Aucun bug trouvé, code déjà correct sur les 8
+      cas testés.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Coverage-driven bug hunt sur `systems/recorder.ts`
+  (branches 79,24 % → 100 %). `game/` étant déjà quasi saturé (98,55 %
+  stmts / 92,93 % branches), retour sur `systems/` où plusieurs fichiers
+  gardaient des écarts de branches malgré des statements/fonctions à
+  100 %. Fermé : le garde-fou `e.data.size > 0` sur `ondataavailable`
+  n'avait jamais son côté FAUX exercé (un chunk de taille 0, cas réel
+  d'un segment coupé sans avoir produit de données) — ni pour
+  `MatchRecorder` ni pour `HighlightRecorder` ; la résolution
+  `chunks.length ? new Blob(...) : null` de `stop()`/`rotate()` n'avait
+  jamais son côté `null` exercé (arrêt réussi mais sans données, pas un
+  chemin d'échec — différent des tests d'échec déjà existants) ; le
+  repli `rec.mimeType || 'video/webm'` n'avait jamais son côté vide
+  exercé sur ses 3 sites (`MatchRecorder.stop()`,
+  `HighlightRecorder.rotate()`, `HighlightRecorder.stop()`) ; et le même
+  repli sur `blob.type` dans `shareOrDownload`. 8 nouveaux tests, tous
+  passent du premier coup — code déjà correct, aucun bug trouvé cette
+  fois (fichier déjà lourdement audité en 2026-08-16/17). engine.test.ts
+  304 → 312, suite vérifiée sur 3 exécutions consécutives (312/312).
+  `recorder.ts` : 100 % sur les 4 métriques. `tsc --noEmit` +
+  `npm run build` verts.
 - 2026-08-18 (routine) : Ajout du bouton « ← Retour » manquant sur
   `ReadyScreen` (le Vestiaire), noté mais délibérément non corrigé lors
   de l'itération précédente (jugé produit/UX plutôt que bug). Reconsidéré

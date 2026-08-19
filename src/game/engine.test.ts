@@ -3512,6 +3512,146 @@ describe('recorder.ts — chemins de succès de stop(), jamais exercés (seuls l
   })
 })
 
+describe("recorder.ts — chunks de taille nulle et repli de type MIME, angles morts de branches jamais exercés", () => {
+  afterEach(() => {
+    delete (globalThis as any).MediaRecorder
+    delete (globalThis as any).window
+    delete (globalThis as any).navigator
+  })
+
+  class EmptyChunkRecorder {
+    static isTypeSupported() {
+      return true
+    }
+    state = 'recording'
+    mimeType = 'video/webm'
+    ondataavailable: ((e: { data: { size: number } }) => void) | null = null
+    onstop: (() => void) | null = null
+    start() {}
+    stop() {
+      // Un vrai MediaRecorder peut s'arrêter sans avoir jamais produit un
+      // seul octet de données (segment démarré puis aussitôt coupé) : le
+      // dernier `ondataavailable` arrive quand même, mais avec size 0.
+      this.ondataavailable?.({ data: { size: 0 } })
+      this.state = 'inactive'
+      this.onstop?.()
+    }
+  }
+
+  function fakeCanvasAndMic() {
+    const fakeStream = { addTrack: () => {}, getTracks: () => [], getAudioTracks: () => [] }
+    const fakeCanvas = { captureStream: () => fakeStream } as unknown as HTMLCanvasElement
+    return { fakeCanvas }
+  }
+
+  it("MatchRecorder : un chunk ondataavailable de taille 0 n'est PAS accumulé (garde-fou `size > 0` jamais exercé côté false)", async () => {
+    ;(globalThis as any).MediaRecorder = EmptyChunkRecorder
+    const { fakeCanvas } = fakeCanvasAndMic()
+    const mr = new MatchRecorder()
+    expect(mr.start(fakeCanvas, null)).toBe(true)
+    const rec = (mr as any).recorder
+    rec.ondataavailable({ data: { size: 0 } }) // chunk vide en cours d'enregistrement
+    expect((mr as any).chunks).toHaveLength(0)
+  })
+
+  it("MatchRecorder.stop() résout null quand le recorder s'arrête sans avoir jamais accumulé de données (chunks vide malgré un arrêt réussi, pas un échec)", async () => {
+    ;(globalThis as any).MediaRecorder = EmptyChunkRecorder
+    const { fakeCanvas } = fakeCanvasAndMic()
+    const mr = new MatchRecorder()
+    expect(mr.start(fakeCanvas, null)).toBe(true)
+    const blob = await mr.stop()
+    expect(blob).toBeNull()
+    expect((mr as any).mixStream).toBeNull() // pistes quand même relâchées
+  })
+
+  it("HighlightRecorder.rotate() : un segment sortant sans données met prevBlob à null, pas à un Blob vide", async () => {
+    ;(globalThis as any).MediaRecorder = EmptyChunkRecorder
+    ;(globalThis as any).window = { setInterval: () => 0, clearInterval: () => {} }
+    const { HighlightRecorder } = await import('../systems/recorder')
+    const hr = new HighlightRecorder()
+    const { fakeCanvas } = fakeCanvasAndMic()
+    expect(hr.start(fakeCanvas, null)).toBe(true)
+    ;(hr as any).rotate() // segment sortant : aucun chunk n'est jamais arrivé avant la rotation
+    expect((hr as any).prevBlob).toBeNull()
+  })
+
+  it("HighlightRecorder.stop() : segment courant assez long mais sans données retombe sur prevBlob via `blob ?? prevBlob`", async () => {
+    ;(globalThis as any).MediaRecorder = EmptyChunkRecorder
+    ;(globalThis as any).window = { setInterval: () => 0, clearInterval: () => {} }
+    const { HighlightRecorder } = await import('../systems/recorder')
+    const hr = new HighlightRecorder()
+    const { fakeCanvas } = fakeCanvasAndMic()
+    expect(hr.start(fakeCanvas, null)).toBe(true)
+    ;(hr as any).prevBlob = new Blob(['segment précédent complet'], { type: 'video/webm' })
+    ;(hr as any).currentStartedAt = performance.now() - 7000 // > 6 s : le segment courant serait normalement gardé
+    const blob = await hr.stop()
+    expect(blob).toBe((hr as any).prevBlob) // mais il n'a produit aucune donnée → repli sur le précédent
+  })
+
+  class NoMimeTypeRecorder {
+    static isTypeSupported() {
+      return true
+    }
+    state = 'recording'
+    // Un MediaRecorder peut en théorie exposer un mimeType vide (aucun
+    // conteneur négocié) : le repli `rec.mimeType || 'video/webm'` sur la
+    // construction du Blob final n'était jamais exercé côté vide.
+    mimeType = ''
+    ondataavailable: ((e: { data: { size: number } }) => void) | null = null
+    onstop: (() => void) | null = null
+    start() {}
+    stop() {
+      this.ondataavailable?.({ data: { size: 42 } })
+      this.state = 'inactive'
+      this.onstop?.()
+    }
+  }
+
+  it("MatchRecorder.stop() : rec.mimeType vide retombe sur 'video/webm' pour le type du Blob final", async () => {
+    ;(globalThis as any).MediaRecorder = NoMimeTypeRecorder
+    const { fakeCanvas } = fakeCanvasAndMic()
+    const mr = new MatchRecorder()
+    expect(mr.start(fakeCanvas, null)).toBe(true)
+    const blob = await mr.stop()
+    expect(blob!.type).toBe('video/webm')
+  })
+
+  it("HighlightRecorder.rotate() : rec.mimeType vide retombe aussi sur 'video/webm' pour prevBlob", async () => {
+    ;(globalThis as any).MediaRecorder = NoMimeTypeRecorder
+    ;(globalThis as any).window = { setInterval: () => 0, clearInterval: () => {} }
+    const { HighlightRecorder } = await import('../systems/recorder')
+    const hr = new HighlightRecorder()
+    const { fakeCanvas } = fakeCanvasAndMic()
+    expect(hr.start(fakeCanvas, null)).toBe(true)
+    ;(hr as any).rotate()
+    expect((hr as any).prevBlob!.type).toBe('video/webm')
+  })
+
+  it("HighlightRecorder.stop() : rec.mimeType vide retombe aussi sur 'video/webm' pour le segment courant", async () => {
+    ;(globalThis as any).MediaRecorder = NoMimeTypeRecorder
+    ;(globalThis as any).window = { setInterval: () => 0, clearInterval: () => {} }
+    const { HighlightRecorder } = await import('../systems/recorder')
+    const hr = new HighlightRecorder()
+    const { fakeCanvas } = fakeCanvasAndMic()
+    expect(hr.start(fakeCanvas, null)).toBe(true)
+    ;(hr as any).currentStartedAt = performance.now() - 7000 // segment assez long : gardé tel quel
+    const blob = await hr.stop()
+    expect(blob!.type).toBe('video/webm')
+  })
+
+  it("shareOrDownload : un blob sans type MIME (blob.type === '') retombe sur 'video/webm' pour le File partagé", async () => {
+    let shared: any = null
+    ;(globalThis as any).navigator = {
+      canShare: () => true,
+      share: async (data: any) => {
+        shared = data
+      },
+    }
+    await shareOrDownload(new Blob(['x']), 'match', 'texte') // pas de `type` : blob.type === ''
+    expect(shared.files[0].type).toBe('video/webm')
+  })
+})
+
 describe('VoiceCoach.startVolumeMeter — la boucle de volume/pitch, jamais exercée', () => {
   afterEach(() => {
     delete (globalThis as any).AudioContext
