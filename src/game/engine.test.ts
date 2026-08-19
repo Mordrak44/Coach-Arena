@@ -3428,6 +3428,128 @@ describe('SoundSystem (systems/sound.ts) — bande-son synthétisée, jamais tes
   })
 })
 
+describe('SoundSystem — branches jamais exercées : start() idempotent, resume(), setMuted() avec ctx, startCrowd() défensif, seuil de setCrowdHype()', () => {
+  afterEach(() => {
+    delete (globalThis as any).AudioContext
+  })
+
+  class FakeParam {
+    value = 0
+    calls: unknown[] = []
+    setValueAtTime() {
+      return this
+    }
+    exponentialRampToValueAtTime() {
+      return this
+    }
+    linearRampToValueAtTime(...args: unknown[]) {
+      this.calls.push(args)
+      return this
+    }
+    cancelScheduledValues() {
+      return this
+    }
+  }
+  class FakeNode {
+    connect() {
+      return this
+    }
+  }
+  class FakeGainNode extends FakeNode {
+    gain = new FakeParam()
+  }
+  class FakeAudioContext {
+    currentTime = 0
+    sampleRate = 44100
+    state = 'running'
+    destination = new FakeNode()
+    resumeCalls = 0
+    createGain() {
+      return new FakeGainNode()
+    }
+    createOscillator() {
+      return Object.assign(new FakeNode(), { type: 'sine', frequency: new FakeParam(), start() {}, stop() {} })
+    }
+    createBiquadFilter() {
+      return Object.assign(new FakeNode(), { type: 'lowpass', frequency: new FakeParam(), Q: new FakeParam() })
+    }
+    createBufferSource() {
+      return Object.assign(new FakeNode(), { buffer: null, loop: false, start() {} })
+    }
+    createBuffer(_channels: number, length: number) {
+      return { getChannelData: () => new Float32Array(length) }
+    }
+    resume() {
+      this.resumeCalls++
+      return Promise.resolve()
+    }
+    close() {
+      return Promise.resolve()
+    }
+  }
+
+  it("start() est idempotent : un 2e appel alors qu'un contexte tourne déjà ne reconstruit rien (garde-fou `if (this.ctx) return` jamais exercé)", () => {
+    ;(globalThis as any).AudioContext = FakeAudioContext
+    const ss = new SoundSystem()
+    ss.start()
+    const ctxAfterFirst = (ss as any).ctx
+    const masterAfterFirst = (ss as any).master
+    ss.start() // ne doit RIEN reconstruire
+    expect((ss as any).ctx).toBe(ctxAfterFirst)
+    expect((ss as any).master).toBe(masterAfterFirst)
+  })
+
+  it("resume() débloque réellement un contexte 'suspended' (Safari/iOS) — jamais exercé, tous les tests précédents avaient un ctx déjà 'running'", () => {
+    ;(globalThis as any).AudioContext = FakeAudioContext
+    const ss = new SoundSystem()
+    ss.start() // appelle déjà resume() une 1re fois en interne
+    const ctx = (ss as any).ctx as FakeAudioContext
+    const before = ctx.resumeCalls
+    ctx.state = 'suspended'
+    ss.resume()
+    expect(ctx.resumeCalls).toBe(before + 1)
+  })
+
+  it("resume() ne fait rien si le contexte est déjà 'running' (pas de resume() superflu)", () => {
+    ;(globalThis as any).AudioContext = FakeAudioContext
+    const ss = new SoundSystem()
+    ss.start()
+    const ctx = (ss as any).ctx as FakeAudioContext
+    const before = ctx.resumeCalls // start() a déjà appelé resume() une fois
+    ss.resume()
+    expect(ctx.resumeCalls).toBe(before)
+  })
+
+  it("setMuted() avec un contexte réel bascule bien le gain du master entre 0 et 0.7 (jamais exercé : le seul test de setMuted tournait sans AudioContext, master toujours null)", () => {
+    ;(globalThis as any).AudioContext = FakeAudioContext
+    const ss = new SoundSystem()
+    ss.start()
+    const master = (ss as any).master as FakeGainNode
+    ss.setMuted(true)
+    expect(master.gain.value).toBe(0)
+    ss.setMuted(false)
+    expect(master.gain.value).toBe(0.7)
+  })
+
+  it("startCrowd() (privée) est un no-op sûr sans ctx/master — garde-fou jamais exercé (appelée uniquement en interne par start(), toujours après ctx/master posés)", () => {
+    const ss = new SoundSystem()
+    expect(() => (ss as any).startCrowd()).not.toThrow()
+    expect((ss as any).crowdGain).toBeNull()
+  })
+
+  it("setCrowdHype() : une variation de Hype sous le seuil de 0.005 ne reprogramme PAS de rampe (évite de ré-écraser une rampe déjà en cours pour rien)", () => {
+    ;(globalThis as any).AudioContext = FakeAudioContext
+    const ss = new SoundSystem()
+    ss.start()
+    ss.setCrowdHype(0.5) // 0,03 + 0,5*0,1 = 0,08 : premier appel, dépasse forcément le seuil
+    const crowdGain = (ss as any).crowdGain as FakeGainNode
+    const callsAfterFirst = crowdGain.gain.calls.length
+    expect(callsAfterFirst).toBeGreaterThan(0)
+    ss.setCrowdHype(0.5001) // cible quasi identique : diff bien sous 0,005
+    expect(crowdGain.gain.calls.length).toBe(callsAfterFirst) // aucune rampe supplémentaire programmée
+  })
+})
+
 describe('recorder.ts — chemins de succès de stop(), jamais exercés (seuls les chemins d\'échec l\'étaient)', () => {
   afterEach(() => {
     delete (globalThis as any).MediaRecorder

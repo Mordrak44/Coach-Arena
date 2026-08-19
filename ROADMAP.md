@@ -2449,11 +2449,41 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       `HighlightRecorder.stop()`) + même repli sur `blob.type` dans
       `shareOrDownload`. Aucun bug trouvé, code déjà correct sur les 8
       cas testés.
+- [x] `systems/sound.ts` fermé à 100 % (branches 87,03 % → 100 %) :
+      `start()` idempotent (2e appel sans effet — jamais exercé),
+      `resume()` débloquant vraiment un contexte `suspended` (tous les
+      tests précédents avaient un ctx déjà `running`), `setMuted()` avec
+      un vrai contexte (le seul test tournait sans `AudioContext`,
+      `master` toujours `null`), `startCrowd()` (privée) appelée
+      directement sans ctx/master pour exercer son garde-fou défensif
+      normalement inatteignable via l'usage réel, et le seuil anti-
+      ré-écrasement de `setCrowdHype()` (variation < 0,005 → aucune
+      rampe reprogrammée). Aucun bug trouvé.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Suite du coverage-driven bug hunt sur `systems/`,
+  après `recorder.ts` : `sound.ts` (branches 87,03 % → 100 %). Fermé :
+  `start()` n'était jamais rappelé une 2e fois dans les tests (garde-fou
+  `if (this.ctx) return` jamais exercé — vérifié idempotent : même
+  instance `ctx`/`master`, rien reconstruit) ; `resume()` n'avait jamais
+  de contexte réellement `suspended` à débloquer (Safari/iOS) — tous les
+  fakes précédents démarraient `running` ; `setMuted()` avec un contexte
+  réel (le seul test existant tournait volontairement SANS
+  `AudioContext`, donc `master` toujours `null`, la bascule 0/0.7 jamais
+  exercée) ; le garde-fou défensif de `startCrowd()` (privée, appelée
+  uniquement en interne par `start()` toujours après ctx/master posés —
+  non atteignable via l'usage réel, exercé directement comme
+  `HighlightRecorder.startSegment()` l'avait été avant elle) ; et le
+  seuil anti-ré-écrasement de `setCrowdHype()` (variation < 0,005 →
+  aucune rampe reprogrammée, seul le cas au-dessus du seuil était
+  couvert). 6 nouveaux tests, tous corrects du premier coup après un
+  faux départ sur le comptage de `resume()` (`start()` en appelle déjà
+  un en interne). Aucun bug trouvé. engine.test.ts 312 → 318, suite
+  vérifiée sur 3 exécutions consécutives (318/318). `sound.ts` : 100 %
+  sur les 4 métriques. `tsc --noEmit` + `npm run build` verts.
 - 2026-08-18 (routine) : Coverage-driven bug hunt sur `systems/recorder.ts`
   (branches 79,24 % → 100 %). `game/` étant déjà quasi saturé (98,55 %
   stmts / 92,93 % branches), retour sur `systems/` où plusieurs fichiers
