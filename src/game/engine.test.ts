@@ -1646,6 +1646,39 @@ describe('création par prompt & réalisateur', () => {
     expect(highlight?.prompt).not.toContain('undefined')
   })
 
+  it("buildScenePlans : un spécial du JOUEUR (pas seulement adverse) référence bien l'ENNEMI comme cible dans le prompt — `foeOf('player')` jamais exercé, seul `foeOf('enemy')` (spécial adverse) l'était", () => {
+    const m = freshMatch()
+    m.events.push(
+      { kind: 'special', t: 20, by: 'player', name: ROSTER[0].special.name, onoma: 'DOKAAN!!', dmg: 30 },
+      { kind: 'roundEnd', t: 25, winner: 'player' },
+      { kind: 'matchEnd', t: 25, winner: 'player' },
+    )
+    m.playerWins = 2
+    const plans = buildScenePlans(m, ROSTER[0], ROSTER[1])
+    const highlight = plans.find(p => p.id === 'round1-highlight')
+    expect(highlight?.refChars).toEqual([ROSTER[0].id]) // le JOUEUR a lancé le spécial
+    expect(highlight?.prompt).toContain(ROSTER[1].name) // la CIBLE nommée dans le prompt : l'ennemi
+    expect(highlight?.prompt).not.toContain('undefined')
+  })
+
+  it("un round où un contre (score 4) est suivi d'un crit encaissé (score 3, INFÉRIEUR) garde le contre comme moment fort — jamais exercé, tous les tests précédents n'avaient qu'un seul candidat scorant par round, le comparateur `s > cur.score` ne pouvait jamais échouer", () => {
+    const m = freshMatch()
+    m.events.push(
+      { kind: 'roundStart', t: 0, round: 1 },
+      { kind: 'countered', t: 5, by: 'player', dmg: 25 }, // score 4
+      { kind: 'hit', t: 8, target: 'enemy', dmg: 10, crit: false, onoma: 'BAM!' }, // score 0 : n'écrase jamais rien
+      { kind: 'hit', t: 12, target: 'player', dmg: 20, crit: true, onoma: 'BAM!' }, // score 3 : n'écrase pas 4
+      { kind: 'roundEnd', t: 15, winner: 'player' },
+      { kind: 'matchEnd', t: 15, winner: 'player' },
+    )
+    m.playerWins = 2
+    const plans = buildScenePlans(m, ROSTER[0], ROSTER[1])
+    const highlight = plans.find(p => p.id === 'round1-highlight')
+    // Le contre (le joueur) l'emporte, pas le crit encaissé (qui aurait référencé l'ennemi).
+    expect(highlight?.refChars).toEqual([ROSTER[0].id])
+    expect(highlight?.prompt).toContain('counter')
+  })
+
   it('buildScenePlans : un contre du joueur produit un moment fort référençant le joueur', () => {
     const m = freshMatch()
     m.events.push(

@@ -2571,11 +2571,50 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       trouvé sur l'ensemble du sweep `combat.ts` (5 itérations,
       ~40 tests ajoutés en tout, 88,72 % → 99,52 %). `game/` global :
       98,55 % → 99,65 % stmts, branches 92,82 % → 98,2 %.
+- [x] `game/sceneDirector.ts` : branches 89,61 % → 93,5 %. Fermé : un
+      spécial du JOUEUR (pas seulement adverse) référence bien l'ennemi
+      comme cible (`foeOf('player')` jamais exercé) ; et un round où un
+      contre (score 4) est suivi d'un crit encaissé (score 3, inférieur)
+      garde bien le contre comme moment fort — tous les tests précédents
+      n'avaient qu'un seul candidat scorant par round, le comparateur
+      `s > cur.score` ne pouvait jamais échouer. 2 branches défensives
+      documentées comme structurellement inatteignables (`momentPrompt`
+      n'est appelée QUE sur des events déjà scorés > 0 par `eventScore` —
+      les 2 fonctions doivent rester synchronisées à la main, sans quoi
+      ajouter un nouveau kind scorant sans son cas dans `momentPrompt`
+      reproduirait silencieusement le bug déjà corrigé sur `hypeFull`).
+      2 nouveaux tests. Aucun bug trouvé.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Coverage-driven bug hunt sur `sceneDirector.ts`
+  (branches 89,61 % → 93,5 %), le prochain plus bas dossier `game/`
+  après la clôture de `combat.ts`. Fermé : un spécial lancé par le
+  JOUEUR (pas seulement adverse) — `foeOf('player')` retourne bien
+  l'ennemi comme cible nommée dans le prompt, seul `foeOf('enemy')`
+  (spécial adverse) avait un test ; et un round avec DEUX events
+  scorants où le second (crit encaissé, score 3) est INFÉRIEUR au
+  premier (contre, score 4) garde bien le premier comme moment fort du
+  round — tous les tests précédents de ce fichier n'avaient jamais
+  qu'un seul candidat scorant par round, donc le comparateur
+  `s > cur.score` de l'élection ne pouvait structurellement jamais
+  échouer. Documenté plutôt que forcé : 2 branches défensives
+  (`if (prompt)` dans `buildScenePlans`, et le `default` du switch de
+  sélection `by`) sont inatteignables via l'API publique — `momentPrompt`
+  n'est appelée QUE sur des events déjà scorés positivement par
+  `eventScore`, et les deux fonctions ne couvrent QUE les 4 mêmes kinds
+  ('ulti'/'special'/'countered'/'hit' critique) ; elles sont maintenues
+  à la main plutôt que dérivées l'une de l'autre — sans le garde-fou, un
+  futur kind scorant sans son cas dans `momentPrompt` reproduirait
+  silencieusement le bug déjà corrigé sur `'hypeFull'` (2026-08-16). 2
+  nouveaux tests, tous corrects du premier coup. Aucun bug trouvé.
+  engine.test.ts 358 → 360, suite vérifiée sur 3 exécutions consécutives
+  (360/360). `tsc --noEmit` + `npm run build` verts. Restent, tous déjà
+  >94 % (gains marginaux) : `cardForge.ts`, `cards.ts`, `deckBuilder.ts`,
+  `liveCutPlayer.ts`, `progression.ts` — `game/` global proche de la
+  saturation (99,65 % stmts, 98,54 % branches).
 - 2026-08-18 (routine) : CLÔTURE du sweep de couverture sur `combat.ts`
   (branches 97,36 % → 99,52 %, 100 % statements/fonctions/lignes),
   commencé il y a 5 itérations à 88,72 %. Fermé cette fois : posture

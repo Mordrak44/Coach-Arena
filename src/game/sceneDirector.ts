@@ -103,6 +103,14 @@ function momentPrompt(e: CombatEvent, player: Character, enemy: Character): stri
       return `${look(d)} reads the incoming attack perfectly and reverses it with a lightning counter, time freezes for an instant then the counter lands, the crowd erupts. ${STYLE}`
     }
     case 'hit':
+      // Le côté `: null` (crit=false) et le `default` juste en dessous
+      // sont structurellement inatteignables via buildScenePlans() :
+      // momentPrompt() n'est appelée QUE sur un event déjà retenu par
+      // eventScore() > 0 (ligne ~153) — pour 'hit', ça signifie déjà
+      // crit=true (voir eventScore, même couplage documenté que
+      // hypeFull) ; pour tout autre kind, eventScore renvoie 0 et
+      // l'event n'atteint jamais ce switch. Garde défensive non forcée
+      // par un test artificiel (vérifié par couverture, 2026-08-18).
       return e.crit
         ? `A devastating critical blow connects in extreme close-up, the frame shakes, giant onomatopoeia "${'onoma' in e ? e.onoma : 'DOKAN!!'}" slams across the screen. ${STYLE}`
         : null
@@ -156,6 +164,13 @@ export function buildScenePlans(
   best.sort((a, b) => b.score - a.score)
   for (const c of best.slice(0, maxMoments).sort((a, b) => a.round - b.round)) {
     const prompt = momentPrompt(c.e, player, enemy)
+    // `prompt` toujours vrai ici EN PRATIQUE (`c.e` vient de `best`, donc
+    // scoré > 0 par eventScore — les 4 kinds qu'il score positivement
+    // sont exactement les 4 que momentPrompt sait rendre). Le `if` reste
+    // un vrai garde-fou : eventScore et momentPrompt sont maintenus à la
+    // main, pas dérivés l'un de l'autre — sans lui, ajouter un nouveau
+    // kind scorant sans son cas dans momentPrompt referait le bug déjà
+    // corrigé pour 'hypeFull' (voir eventScore), mais silencieusement.
     if (prompt) {
       // 'hit' n'a pas de champ `by`, seulement `target` (qui ENCAISSE) —
       // l'attaquant est donc l'AUTRE côté. `'by' in c.e` valait toujours
@@ -170,6 +185,8 @@ export function buildScenePlans(
           case 'special':
           case 'countered':
             return c.e.by === 'enemy' ? enemy : player
+          // Inatteignable pour la même raison que `prompt` ci-dessus :
+          // `c.e.kind` est toujours l'un des 4 cas gérés plus haut.
           default:
             return player
         }
