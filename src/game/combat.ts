@@ -322,16 +322,30 @@ function applyCardEffects(m: MatchState, effects: EffectPrimitive[], side: 'play
 
 /**
  * Le Temps Mort — gèle le combat en pleine action pour parler et jouer
- * une carte, comme un vrai coach de sport. Précieux (1/match) : le
- * timing de l'appel est lui-même une décision stratégique. Le combat
- * reprend EXACTEMENT où il en était (aucun état des combattants ne
- * bouge pendant le gel — tick() se contente de ne rien résoudre).
+ * une carte, comme un vrai coach de sport. Précieux (1/round, rechargé à
+ * chaque coin du ring) : le timing de l'appel est lui-même une décision
+ * stratégique. Le combat reprend EXACTEMENT où il en était (aucun état
+ * des combattants ne bouge pendant le gel — tick() se contente de ne
+ * rien résoudre).
  */
 export function callTimeout(m: MatchState): boolean {
   if (m.phase !== 'fighting' || m.timeoutsLeft <= 0) return false
   m.timeoutsLeft--
   m.phase = 'timeout'
   m.phaseUntil = m.t + TIMEOUT_DURATION
+  // Le Temps Mort accorde SA PROPRE consigne, indépendante de celle déjà
+  // utilisée au coin du ring plus tôt dans le round — cohérent avec
+  // `playCard()` juste en dessous, qui autorise déjà l'une comme l'autre
+  // phase sans distinction. Sans ce reset, `consigneUsed` restait à
+  // `true` depuis la dernière pause tactique (remis à `false` UNIQUEMENT
+  // à l'entrée de 'tactics', jamais à l'entrée de 'timeout') : une
+  // consigne parlée pendant le gel, pourtant correctement isolée par
+  // ArenaScreen.tsx (qui réinitialise `lastFinalSeq` exprès à l'entrée du
+  // Temps Mort — « seul ce qui est dit PENDANT le gel doit pouvoir
+  // devenir une consigne »), était alors silencieusement rejetée par
+  // `applyConsigne()`, sans le moindre message d'erreur pour expliquer
+  // pourquoi (trouvé en audit, 2026-08-20).
+  m.consigneUsed = false
   m.events.push({ kind: 'timeout', t: m.t, side: 'player' })
   return true
 }

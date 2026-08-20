@@ -3174,11 +3174,108 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       tests, suite vérifiée sur 3 exécutions consécutives (aucun rejet non
       géré). `tsc --noEmit` + `npm run build` verts. Couverture de
       `sceneQueue.ts` : 100 % sur les 4 métriques.
+- [x] Audit de code (fichier entier) sur `game/speechTactics.ts`
+      (`parseConsigne`, parseur de consignes parlées au coin du ring,
+      2026-08-20) — confirmé SAIN après vérification programmatique
+      ciblée : contrairement au bug déjà corrigé dans `matchCommand`
+      (`voice.ts`, ordre `attack` avant `counter` rendant « contre-
+      attaque » inatteignable), `parseConsigne` est ADDITIF (jusqu'à
+      `MAX_CONSIGNE_EFFECTS`), pas premier-match-gagnant — aucune
+      collision de précédence trouvée sur les 9 `RULES` ; le lookbehind
+      négatif `(?<!dernier )souffle` reste correctement scopé à sa seule
+      alternative (confirmé par simulation). En revanche, en suivant
+      `parseConsigne()` jusqu'à son application réelle (`applyConsigne()`
+      dans `combat.ts`, appelée par `ArenaScreen.tsx`), **1 vrai bug
+      trouvé et corrigé**, confirmé par `git stash` A/B : `m.consigneUsed`
+      n'était remis à `false` QU'À L'ENTRÉE de la phase `'tactics'` (le
+      coin du ring entre les rounds), JAMAIS à l'entrée de `'timeout'`
+      (le Temps Mort, en plein round) — alors qu'`applyConsigne()`
+      autorise explicitement les DEUX phases (`m.phase !== 'tactics' &&
+      m.phase !== 'timeout'`), exactement comme `playCard()` juste à
+      côté. Résultat : un joueur qui donnait déjà une consigne au coin du
+      ring, puis appelait son Temps Mort du round (rechargé chaque round,
+      pas chaque match — voir aussi le docstring corrigé au passage,
+      « (1/match) » était une trace obsolète d'avant l'introduction de la
+      recharge par round) et parlait de nouveau pendant le gel, voyait sa
+      consigne silencieusement REJETÉE — sans le moindre message
+      d'erreur — alors qu'`ArenaScreen.tsx` réinitialise déjà
+      soigneusement `lastFinalSeq` À L'ENTRÉE du Temps Mort avec le
+      commentaire explicite « seul ce qui est dit PENDANT le gel doit
+      pouvoir devenir une consigne » : cette machinerie UI signalait sans
+      ambiguïté l'intention (le Temps Mort mérite SA PROPRE consigne),
+      jamais honorée côté simulation. Corrigé en remettant aussi
+      `m.consigneUsed = false` à l'entrée de `callTimeout()`. 1 nouveau
+      test, reconfirmé par `git stash` A/B (échoue bien sur le code
+      d'avant-fix : la 2e consigne, pendant le Temps Mort, est refusée).
+      395 tests, suite vérifiée sur 3 exécutions consécutives. `tsc
+      --noEmit` + `npm run build` verts. Couverture de `combat.ts` :
+      99,52 % branches, inchangée par rapport au balayage précédent
+      (les 2 branches restantes déjà documentées comme structurellement
+      inatteignables, pas de nouveau trou introduit par ce fix).
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-20 (routine, suite) : Dernier fichier de la famille « cuts/
+  scènes » à auditer fichier entier : `game/speechTactics.ts`
+  (`parseConsigne`), le parseur par mots-clés qui transforme une phrase
+  du coach dite au coin du ring en effets de jeu. Vérification ciblée
+  d'abord : ce fichier a-t-il la MÊME classe de bug que `matchCommand`
+  dans `voice.ts` (une règle plus générale, testée en premier, empêchant
+  structurellement une règle plus spécifique de jamais matcher) ? Testé
+  programmatiquement (simulation Node contre des dizaines de phrases
+  françaises ciblées) : NON — `parseConsigne` est ADDITIF (accumule
+  jusqu'à `MAX_CONSIGNE_EFFECTS` = 2 effets, en testant TOUTES les
+  règles), pas premier-match-gagnant comme `matchCommand` — cette classe
+  de bug ne peut structurellement pas s'y reproduire. Le lookbehind
+  négatif `(?<!dernier )souffle` (déjà corrigé le 2026-08-16 pour éviter
+  qu'un « dernier souffle » ne déclenche à tort un soin) reste
+  correctement scopé à sa seule alternative — confirmé par simulation,
+  pas juste relu. `speechTactics.ts` lui-même : sain, rien à corriger.
+  Mais en suivant le fil jusqu'à l'application RÉELLE du résultat de
+  `parseConsigne()` — `applyConsigne()` dans `game/combat.ts`, appelée
+  depuis `ArenaScreen.tsx` — **1 vrai bug trouvé et corrigé**, à la
+  frontière entre deux mécaniques censées être indépendantes : la
+  consigne du coin du ring (pause tactique entre les rounds) et la
+  consigne du Temps Mort (pause d'urgence en PLEIN round). `applyConsigne
+  ()` autorise EXPLICITEMENT les deux phases (`'tactics'` ET `'timeout'`)
+  — exactement comme `playCard()` juste à côté, qui traite déjà les deux
+  pauses sans distinction — mais `m.consigneUsed` (le verrou « une
+  consigne par pause ») n'était remis à `false` QU'à l'entrée de
+  `'tactics'`, jamais à l'entrée de `'timeout'`. Conséquence concrète : un
+  joueur qui donne une consigne au coin du ring, puis (plus tard dans le
+  MÊME round) appelle son Temps Mort — une ressource précieuse, rechargée
+  CHAQUE round, pas chaque match — et parle de nouveau pendant le gel,
+  voit sa seconde consigne silencieusement REJETÉE, sans le moindre
+  signal d'erreur. Le plus révélateur : `ArenaScreen.tsx` réinitialise
+  DÉJÀ soigneusement `lastFinalSeq` à l'entrée du Temps Mort, avec un
+  commentaire d'intention limpide — « Ignore les phrases prononcées AVANT
+  l'appel du temps mort — seul ce qui est dit PENDANT le gel doit pouvoir
+  devenir une consigne » — toute la mécanique CÔTÉ UI pour isoler
+  proprement une nouvelle consigne existait déjà et fonctionnait
+  parfaitement ; seul le verrou côté SIMULATION (`consigneUsed`, dans
+  `combat.ts`) n'avait jamais reçu son propre reset symétrique. Un bug de
+  cohérence entre deux couches qui documentent la même intention sans la
+  faire aboutir ensemble — le genre d'écart qui ne saute aux yeux que
+  lorsqu'on suit le fil jusqu'au bout plutôt que de s'arrêter au fichier
+  qu'on avait initialement l'intention d'auditer. Corrigé en remettant
+  aussi `m.consigneUsed = false` à l'entrée de `callTimeout()`, avec un
+  commentaire renvoyant explicitement vers la mécanique `playCard()`
+  voisine pour la cohérence. Petit à-côté corrigé au passage : le
+  docstring de `callTimeout()` affirmait encore « Précieux (1/match) »,
+  une trace obsolète d'AVANT l'introduction de la recharge par round
+  (`TIMEOUTS_PER_ROUND`, remis à zéro dans `startNextRound` — un
+  commentaire adjacent, déjà correct, le documentait très bien) — corrigé
+  en « (1/round, rechargé à chaque coin du ring) » pour ne plus induire
+  en erreur un futur audit. 1 nouveau test, reconfirmé par `git stash`
+  A/B (échoue bien sur le code d'avant-fix : la consigne du Temps Mort
+  est refusée après une consigne au coin). 395 tests, suite vérifiée sur
+  3 exécutions consécutives, `tsc --noEmit` et `npm run build` verts.
+  Couverture de `combat.ts` : 99,52 % branches, EXACTEMENT comme avant ce
+  fix — les 2 branches restantes sont celles déjà documentées comme
+  structurellement inatteignables lors du balayage de couverture
+  antérieur de ce même fichier, aucun nouveau trou introduit.
 - 2026-08-20 (routine, suite) : Après `cutPlanner.ts` la veille, suite
   logique dans la même famille « scènes/montage » : `game/sceneQueue.ts`
   (`SceneJobQueue`), la file qui pilote la génération asynchrone des

@@ -589,6 +589,25 @@ describe('consignes parlées', () => {
     // Toujours utilisable ensuite : aucun des refus n'a laissé d'état corrompu.
     expect(applyConsigne(m, c.effects, c.label)).toBe(true)
   })
+
+  it("bug d'audit (2026-08-20) : callTimeout() accorde SA PROPRE consigne, indépendante de celle déjà utilisée au coin du ring plus tôt dans le round — jusqu'ici `consigneUsed` n'était remis à false qu'à l'entrée de 'tactics', jamais à l'entrée de 'timeout', donc un Temps Mort après une consigne au coin était silencieusement ignoré", () => {
+    const m = freshMatch()
+    const c = parseConsigne('garde haute et respire')!
+
+    // Consigne utilisée au coin du ring, plus tôt dans le round.
+    m.phase = 'tactics'
+    expect(applyConsigne(m, c.effects, c.label)).toBe(true)
+    expect(m.consigneUsed).toBe(true)
+
+    // Le combat reprend, puis le joueur appelle son Temps Mort du round.
+    m.phase = 'fighting'
+    m.timeoutsLeft = 1
+    expect(callTimeout(m)).toBe(true)
+    expect(m.phase).toBe('timeout')
+
+    // Sans le fix : consigneUsed valait encore true → refusée à tort.
+    expect(applyConsigne(m, c.effects, c.label)).toBe(true)
+  })
 })
 
 describe('applyCardEffects (DSL → runtime) — kinds jamais exercés via une VRAIE consigne/carte', () => {
