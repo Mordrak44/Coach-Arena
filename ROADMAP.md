@@ -3363,11 +3363,129 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       consécutives (le test probabiliste inclus, aucune instabilité).
       `tsc --noEmit` + `npm run build` verts. Couverture de
       `characters.ts` : 100 % sur les 4 métriques.
+- [x] Audit de code (fichier entier) sur `game/sceneDirector.ts`
+      (`buildScenePlans`, le Réalisateur — prompts vidéo Kling du récap
+      post-match, 2026-08-20) — n'avait eu qu'un balayage de couverture
+      pur jusqu'ici (2026-08-16/18), jamais un audit de LOGIQUE complet
+      comme les autres fichiers `game/`. **2 vrais bugs corrigés**, tous
+      deux confirmés par `git stash` A/B. (1) Le bug principal :
+      `buildScenePlans()` attribuait TOUJOURS chaque moment fort et la
+      finale aux `Character` INITIAUX passés en paramètre (les props
+      `player`/`enemy` d'`ArenaScreen.tsx`, jamais mises à jour après le
+      montage), ignorant totalement les events `switch` d'une relève
+      Écurie en cours de match — alors que `planCuts()` dans
+      `cutPlanner.ts`, la fonction ANALOGUE pour les cuts vidéo en
+      direct, rejoue déjà correctement ces mêmes events pour attribuer
+      chaque cut au bon perso. Scénario concret : le joueur relève Yuna
+      à la place de Kenta au coin du round 1 ; Yuna lance son spécial et
+      remporte le match — le moment fort ET la finale continuaient de
+      créditer Kenta (mauvaise planche de référence envoyée en
+      génération Kling PAYANTE, mauvais nom narré « Kenta lève le poing
+      vers le ciel » alors que c'est Yuna qui a gagné). Corrigé en
+      reconstituant une table nom→Character (les events `switch` ne
+      portent qu'un NOM, jamais l'objet complet) depuis TOUS les
+      combattants ayant pu porter chaque camp — `player`/`enemy` INITIAUX
+      + titulaires ACTUELS (`m.player`/`m.enemy`) + bancs finaux des deux
+      côtés — puis en rejouant les events chronologiquement pour capturer
+      un instantané `activePlayer`/`activeEnemy` au moment EXACT de
+      chaque candidat retenu comme moment fort, et l'état final pour la
+      finale. Un premier jet du fix avait un trou (oublié `m.player`/
+      `m.enemy` FINAUX dans la table, ne gardant que le banc) — repéré
+      immédiatement par mon propre nouveau test avant même le `git stash`
+      A/B, pas après : la relève testée (le titulaire ENTRANT, jamais sur
+      le banc final puisqu'il vient d'en sortir) restait introuvable dans
+      la table. (2) Trouvé au passage, même fichier : le vainqueur de la
+      finale était RECALCULÉ depuis `m.playerWins >= 2`, un seuil
+      dupliqué SANS être partagé (déjà écrit tel quel dans `combat.ts`
+      ET `ArenaScreen.tsx`) — si la règle de victoire changeait un jour
+      dans un seul de ces trois endroits, la finale aurait pu diverger
+      silencieusement du vrai résultat du match. Corrigé en lisant
+      directement `winner` sur l'event `matchEnd` (déjà calculé par
+      `combat.ts`, la source de vérité), même principe que `planCuts()`
+      qui fait déjà exactement ça. 3 nouveaux tests (relève joueur,
+      relève adverse — symétrie vérifiée, pas supposée — et vainqueur lu
+      depuis `matchEnd` plutôt que recalculé), chacun reconfirmé par
+      `git stash` A/B. 406 tests, suite vérifiée sur 3 exécutions
+      consécutives. `tsc --noEmit` + `npm run build` verts. Couverture de
+      `sceneDirector.ts` : 100 % fonctions (auparavant 91 %, fermé par le
+      test de relève adverse), 98 % lignes/statements, 92,94 % branches —
+      les 2 écarts restants déjà documentés comme structurellement
+      inatteignables lors du balayage antérieur (2026-08-16/18), sans
+      lien avec ce fix.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-20 (routine, suite) : Après `characters.ts`, poursuite du
+  balayage du dossier `game/` avec `sceneDirector.ts` (`buildScenePlans`,
+  le Réalisateur qui écrit les prompts vidéo Kling du récap post-match) —
+  un fichier qui n'avait eu qu'un balayage de COUVERTURE pur lors d'une
+  session antérieure (2026-08-16/18 : combler des trous de branches),
+  jamais un audit de LOGIQUE complet fichier entier comme les autres
+  fichiers `game/` cette semaine. **2 vrais bugs trouvés et corrigés**,
+  tous deux confirmés par `git stash` A/B. Le principal, et le plus
+  intéressant à traquer : `buildScenePlans()` attribuait TOUJOURS chaque
+  moment fort et la scène finale aux `Character` INITIAUX passés en
+  paramètre — les props `player`/`enemy` d'`ArenaScreen.tsx`, jamais
+  remises à jour après le montage du composant — ignorant totalement les
+  events `switch` qu'une relève Écurie en cours de match produit
+  pourtant. La piste : `cutPlanner.ts`, audité deux jours plus tôt, a une
+  fonction directement ANALOGUE (`planCuts()`, le montage hors ligne des
+  cuts vidéo) qui, elle, rejoue déjà correctement ces mêmes events
+  `switch` pour attribuer chaque cut au bon perso — un précédent établi
+  dans le dossier `game/` que `sceneDirector.ts` n'avait jamais suivi.
+  Scénario concret : le joueur relève Yuna à la place de Kenta au coin du
+  ring du round 1 (1 Souffle, une mécanique Écurie standard) ; Yuna lance
+  son spécial et remporte le match — le moment fort du round ET la scène
+  finale continuaient de créditer Kenta : la mauvaise planche de
+  référence partait en génération Kling PAYANTE pour un mouvement que
+  Kenta n'a jamais fait, et la finale narrait « Kenta lève le poing vers
+  le ciel » alors que c'est Yuna qui vient de gagner le match sous les
+  yeux du joueur. Corrigé en reconstituant une table nom→Character (les
+  events `switch` ne portent qu'un NOM, jamais l'objet `Character`
+  complet — voir combat.ts) depuis TOUS les combattants ayant pu porter
+  chaque camp au fil du match : les `player`/`enemy` INITIAUX, les
+  titulaires ACTUELS en fin de match (`m.player`/`m.enemy`), et les bancs
+  finaux des deux côtés — puis en rejouant les events chronologiquement
+  pour capturer un instantané `activePlayer`/`activeEnemy` au moment EXACT
+  où chaque moment fort candidat est retenu, et l'état final pour la
+  scène finale. Un premier jet du correctif avait lui-même un trou :
+  la table nom→Character ne listait que les params initiaux + les bancs,
+  oubliant les titulaires ACTUELS (`m.player`/`m.enemy`) — hors, le perso
+  ENTRANT d'une relève n'est justement PLUS sur le banc une fois monté
+  (il en est sorti), donc il restait introuvable dans cette table
+  incomplète. Repéré immédiatement par mon propre nouveau test de
+  régression, AVANT même l'étape habituelle de `git stash` A/B — le test
+  a fait exactement ce pour quoi il a été écrit, révélant un bug dans le
+  fix lui-même avant qu'il ne soit committé. Second bug, trouvé en
+  creusant la finale du même fichier : le vainqueur y était RECALCULÉ
+  depuis `m.playerWins >= 2`, un seuil de victoire dupliqué SANS être
+  partagé (déjà écrit tel quel, mot pour mot, dans `combat.ts` ET dans
+  `ArenaScreen.tsx`) — si la règle de victoire changeait un jour dans un
+  seul de ces trois endroits (par exemple un futur mode « best of 5 »),
+  la scène finale aurait pu se mettre à diverger silencieusement du vrai
+  résultat du match, sans qu'aucun des trois endroits ne se contredise
+  suffisamment fort pour qu'un test existant le remarque. Corrigé en
+  lisant directement le champ `winner` sur l'event `matchEnd` déjà
+  présent dans `m.events` — la source de vérité que `combat.ts` a de
+  toute façon déjà calculée — plutôt que de la recalculer une quatrième
+  fois ; exactement le même principe que `planCuts()`, qui lit lui aussi
+  `e.winner` sur ce même event plutôt que de recalculer quoi que ce soit.
+  3 nouveaux tests : une relève CÔTÉ JOUEUR, une relève CÔTÉ ADVERSE
+  (ajoutée spécifiquement pour vérifier la symétrie du fix plutôt que de
+  la supposer — et qui a fermé au passage le dernier trou de couverture
+  FONCTION du fichier, `m.enemyBench.map()` jamais exercé avec un banc
+  non vide jusque-là), et le vainqueur de la finale lu depuis `matchEnd`
+  plutôt que recalculé. Chacun des trois reconfirmé par `git stash` A/B
+  (échouent bien sur le code d'avant-fix, avec exactement les mauvais
+  persos crédités que l'analyse prédisait). 406 tests, suite vérifiée sur
+  3 exécutions consécutives, `tsc --noEmit` et `npm run build` verts.
+  Couverture de `sceneDirector.ts` : 100 % fonctions (montée depuis 91 %),
+  98 % lignes/statements, 92,94 % branches — les 2 écarts de branches
+  restants sont ceux déjà documentés comme structurellement inatteignables
+  lors du balayage de couverture antérieur (2026-08-16/18), sans lien
+  avec ce fix.
 - 2026-08-20 (routine, suite) : Après `cards.ts`, poursuite du balayage du dossier
   `game/` avec `characters.ts` (le roster, la sélection d'adversaire du
   mode Rapide, la création de perso par prompt). **2 vrais bugs

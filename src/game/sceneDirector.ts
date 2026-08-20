@@ -138,16 +138,51 @@ export function buildScenePlans(
     },
   ]
 
+  // Table nom → Character : les events `switch` ne portent qu'un NOM (voir
+  // combat.ts), jamais l'objet Character complet — reconstituée depuis
+  // TOUS les combattants ayant pu porter chaque camp au fil du match :
+  // `player`/`enemy` INITIAUX (paramètres), le titulaire ACTUEL de
+  // chaque camp en fin de match (`m.player`/`m.enemy` — l'entrant d'une
+  // relève n'est plus sur le banc une fois monté, seul ce champ le
+  // référence encore une fois la relève faite), et le banc final de
+  // chaque côté (qui contient qui en est SORTI via une relève,
+  // switchFighter y déposant l'ancien titulaire). Même principe déjà
+  // établi dans planCuts() (cutPlanner.ts), qui rejoue déjà les events
+  // `switch` pour attribuer chaque cut au bon perso — jamais répercuté
+  // ici avant cet audit : sans cette table, chaque moment fort ET la
+  // finale restaient attribués aux persos INITIAUX même après une
+  // relève (Écurie), avec la mauvaise planche de référence envoyée en
+  // génération payante et le mauvais nom narré dans la finale (trouvé
+  // en audit, 2026-08-20).
+  const nameToChar = new Map<string, Character>()
+  for (const c of [
+    player,
+    enemy,
+    m.player.char,
+    m.enemy.char,
+    ...m.bench.map(f => f.char),
+    ...m.enemyBench.map(f => f.char),
+  ]) {
+    nameToChar.set(c.name, c)
+  }
+  const active = { player, enemy }
+
   // Meilleur moment de chaque round, puis on garde les `maxMoments` mieux notés.
   interface Cand {
     round: number
     score: number
     e: CombatEvent
+    activePlayer: Character
+    activeEnemy: Character
   }
   const best: Cand[] = []
   let round = 1
   let cur: Cand | null = null
   for (const e of m.events) {
+    if (e.kind === 'switch') {
+      active[e.side] = nameToChar.get(e.name) ?? active[e.side]
+      continue
+    }
     if (e.kind === 'roundStart') {
       round = e.round
       continue
@@ -158,12 +193,13 @@ export function buildScenePlans(
       continue
     }
     const s = eventScore(e)
-    if (s > 0 && (!cur || s > cur.score)) cur = { round, score: s, e }
+    if (s > 0 && (!cur || s > cur.score))
+      cur = { round, score: s, e, activePlayer: active.player, activeEnemy: active.enemy }
   }
   if (cur) best.push(cur)
   best.sort((a, b) => b.score - a.score)
   for (const c of best.slice(0, maxMoments).sort((a, b) => a.round - b.round)) {
-    const prompt = momentPrompt(c.e, player, enemy)
+    const prompt = momentPrompt(c.e, c.activePlayer, c.activeEnemy)
     // `prompt` toujours vrai ici EN PRATIQUE (`c.e` vient de `best`, donc
     // scoré > 0 par eventScore — les 4 kinds qu'il score positivement
     // sont exactement les 4 que momentPrompt sait rendre). Le `if` reste
@@ -180,15 +216,15 @@ export function buildScenePlans(
       const by = ((): Character => {
         switch (c.e.kind) {
           case 'hit':
-            return c.e.target === 'player' ? enemy : player
+            return c.e.target === 'player' ? c.activeEnemy : c.activePlayer
           case 'ulti':
           case 'special':
           case 'countered':
-            return c.e.by === 'enemy' ? enemy : player
+            return c.e.by === 'enemy' ? c.activeEnemy : c.activePlayer
           // Inatteignable pour la même raison que `prompt` ci-dessus :
           // `c.e.kind` est toujours l'un des 4 cas gérés plus haut.
           default:
-            return player
+            return c.activePlayer
         }
       })()
       plans.push({
@@ -200,8 +236,21 @@ export function buildScenePlans(
     }
   }
 
-  const winner = m.playerWins >= 2 ? player : enemy
-  const loser = winner === player ? enemy : player
+  // Le vainqueur est lu DIRECTEMENT depuis l'event `matchEnd` — la même
+  // source de vérité que combat.ts a déjà calculée — plutôt que
+  // recalculé ici depuis `m.playerWins >= 2` : ce seuil était dupliqué
+  // sans être partagé (déjà présent tel quel dans combat.ts ET
+  // ArenaScreen.tsx), un changement de la règle de victoire dans un seul
+  // de ces trois endroits aurait fait diverger silencieusement la
+  // finale du vrai résultat du match. Même principe déjà établi dans
+  // planCuts() (cutPlanner.ts), qui lit lui aussi `e.winner` sur l'event
+  // `matchEnd` plutôt que de recalculer (trouvé en audit, 2026-08-20).
+  let winnerSide: 'player' | 'enemy' = m.playerWins >= 2 ? 'player' : 'enemy'
+  for (const e of m.events) {
+    if (e.kind === 'matchEnd') winnerSide = e.winner
+  }
+  const winner = winnerSide === 'player' ? active.player : active.enemy
+  const loser = winnerSide === 'player' ? active.enemy : active.player
   plans.push({
     id: 'finale',
     title: 'La finale (clip héroïque)',

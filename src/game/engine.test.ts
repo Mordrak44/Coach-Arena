@@ -1701,6 +1701,66 @@ describe('création par prompt & réalisateur', () => {
     }
   })
 
+  it("bug d'audit (2026-08-20) : après une relève (Écurie), le moment fort suivant ET la finale attribuent bien au perso ACTUELLEMENT sur le ring, pas au perso INITIAL — buildScenePlans() ignorait totalement les events `switch`, envoyant la mauvaise planche de référence en génération payante et narrant le mauvais nom en finale", () => {
+    const m = freshMatch()
+    // Simule une relève joueur : ROSTER[0] (Kenta, titulaire initial) sort
+    // au banc, ROSTER[2] (Yuna) entre — sans passer par switchFighter() :
+    // seuls m.bench/m.player/l'event `switch` importent pour buildScenePlans.
+    m.bench = [{ ...m.player, char: ROSTER[0] }]
+    m.player = { ...m.player, char: ROSTER[2] }
+    m.events.push(
+      { kind: 'switch', t: 5, side: 'player', name: ROSTER[2].name },
+      { kind: 'special', t: 10, by: 'player', name: ROSTER[2].special.name, onoma: 'PAF!', dmg: 30 },
+      { kind: 'roundEnd', t: 15, winner: 'player' },
+      { kind: 'matchEnd', t: 15, winner: 'player' },
+    )
+    m.playerWins = 2
+    // Params INITIAUX (Kenta) — comme le fait réellement ArenaScreen.tsx,
+    // qui ne remet jamais à jour ses props après une relève en cours de match.
+    const plans = buildScenePlans(m, ROSTER[0], ROSTER[1])
+    const highlight = plans.find(p => p.id === 'round1-highlight')
+    expect(highlight?.refChars).toEqual([ROSTER[2].id]) // Yuna (relevée), PAS Kenta (initial)
+    expect(highlight?.prompt).toContain(ROSTER[2].special.name)
+    expect(highlight?.prompt).not.toContain(ROSTER[0].name)
+    const finale = plans.find(p => p.id === 'finale')!
+    expect(finale.refChars).toEqual([ROSTER[2].id]) // la finale crédite Yuna, la gagnante réelle
+    expect(finale.prompt).toContain(ROSTER[2].name)
+    expect(finale.prompt).not.toContain(ROSTER[0].name)
+  })
+
+  it("bug d'audit (2026-08-20) : même correctif côté ENNEMI — une relève adverse (banc adverse) attribue aussi le moment fort au perso adverse ACTUELLEMENT sur le ring, symétrique au côté joueur", () => {
+    const m = freshMatch()
+    // Relève ADVERSE cette fois : ROSTER[1] (Rei, titulaire initial ennemi)
+    // sort au banc adverse, ROSTER[3] (Gorō) entre.
+    m.enemyBench = [{ ...m.enemy, char: ROSTER[1] }]
+    m.enemy = { ...m.enemy, char: ROSTER[3] }
+    m.events.push(
+      { kind: 'switch', t: 5, side: 'enemy', name: ROSTER[3].name },
+      { kind: 'special', t: 10, by: 'enemy', name: ROSTER[3].special.name, onoma: 'GOGOGO!', dmg: 30 },
+      { kind: 'roundEnd', t: 15, winner: 'enemy' },
+      { kind: 'matchEnd', t: 15, winner: 'enemy' },
+    )
+    const plans = buildScenePlans(m, ROSTER[0], ROSTER[1])
+    const highlight = plans.find(p => p.id === 'round1-highlight')
+    expect(highlight?.refChars).toEqual([ROSTER[3].id]) // Gorō (relevé), PAS Rei (initial)
+    const finale = plans.find(p => p.id === 'finale')!
+    expect(finale.refChars).toEqual([ROSTER[3].id]) // la finale crédite Gorō, le vainqueur réel
+  })
+
+  it("bug d'audit (2026-08-20) : le vainqueur de la finale est lu depuis l'event `matchEnd` (source de vérité déjà calculée par combat.ts), pas recalculé depuis `m.playerWins >= 2` — un `m.playerWins` incohérent avec l'event réel ne doit plus produire une finale contredisant le vrai résultat du match", () => {
+    const m = freshMatch()
+    m.events.push(
+      { kind: 'hit', t: 10, target: 'player', dmg: 40, crit: true, onoma: 'DOKAN!!' },
+      { kind: 'roundEnd', t: 15, winner: 'enemy' },
+      { kind: 'matchEnd', t: 15, winner: 'enemy' }, // source de vérité : l'ENNEMI gagne
+    )
+    m.playerWins = 2 // délibérément incohérent avec l'event matchEnd ci-dessus
+    const plans = buildScenePlans(m, ROSTER[0], ROSTER[1])
+    const finale = plans.find(p => p.id === 'finale')!
+    expect(finale.refChars).toEqual([ROSTER[1].id]) // l'ennemi (matchEnd), pas le joueur (playerWins)
+    expect(finale.prompt).toContain(ROSTER[0].name) // le joueur est bien le PERDANT nommé
+  })
+
   it('colorWord traduit les hex en mots', () => {
     expect(colorWord('#ff4757')).toBe('red')
     expect(colorWord('#3742fa')).toBe('blue')
