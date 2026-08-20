@@ -214,9 +214,24 @@ export default function ArenaScreen({
   const [activeCut, setActiveCut] = useState<ActiveCut | null>(null)
   const activeCutUrlRef = useRef<string | null>(null)
 
+  // Arrêt DIFFÉRÉ des pistes de `sys.stream` programmé par un démontage —
+  // voir le nettoyage de l'effet ci-dessous pour le pourquoi. Un `useRef`
+  // séparé (pas un champ sur `sysRef.current`) : c'est un détail de
+  // coordination de CET effet, pas un système du jeu.
+  const pendingStreamStopRef = useRef(0)
+
   // -- setup : médias + boucle de jeu ---------------------------------------
   useEffect(() => {
     const sys = sysRef.current!
+    // Un remount StrictMode immédiat (mount → cleanup → mount, synchrone,
+    // sur ce même `sysRef.current` qui survit au double-montage) peut avoir
+    // programmé l'arrêt DIFFÉRÉ des pistes de `sys.stream` lors du cleanup
+    // précédent (voir plus bas) — annulé ici puisque ce nouveau setup() va
+    // reprendre ce même flux tout de suite (trouvé en audit, 2026-08-20).
+    if (pendingStreamStopRef.current) {
+      window.clearTimeout(pendingStreamStopRef.current)
+      pendingStreamStopRef.current = 0
+    }
     let disposed = false
     let rafId = 0
     let last = performance.now()
@@ -588,7 +603,25 @@ export default function ArenaScreen({
       sys.recorder.stop()
       sys.highlight.stop()
       sys.sound.stop()
-      sys.stream?.getTracks().forEach(t => t.stop())
+      // `sys.stream` peut être le `preStream` du Vestiaire : un flux
+      // PARTAGÉ (prop, pas recréé par `setup()`), contrairement au
+      // contexte/recorder/reco de chaque système ci-dessus qui, eux, sont
+      // fraîchement reconstruits par LEUR PROPRE start() à chaque appel —
+      // l'arrêter tout de suite ici casse un remount StrictMode immédiat
+      // qui réutilise LE MÊME objet stream (repro confirmée en dev :
+      // `getVideoTracks()[0].readyState === 'ended'` dès l'arrivée dans
+      // l'arène, voix et facecam mortes pour tout le match). Différé d'un
+      // tick, annulé par le `setup()` suivant s'il reprend ce même flux
+      // (voir plus haut) — un démontage RÉEL, lui, n'a personne pour
+      // annuler : les pistes sont bien arrêtées, juste un tick plus tard
+      // (trouvé en audit, 2026-08-20, même famille StrictMode que
+      // recorder.ts/voice.ts/facecam.ts/sound.ts, mais à la frontière
+      // ReadyScreen→ArenaScreen plutôt qu'à l'intérieur d'un seul système).
+      const streamToRelease = sys.stream
+      pendingStreamStopRef.current = window.setTimeout(() => {
+        pendingStreamStopRef.current = 0
+        if (sys.stream === streamToRelease) streamToRelease?.getTracks().forEach(t => t.stop())
+      }, 0)
       // Sans ça, un mood/proc encore en vol au démontage (jusqu'à 3000 ms
       // pour moodTimer, 1600 ms pour procTimer) déclenche son setState
       // longtemps après coup — no-op React 18, mais toute la fermeture

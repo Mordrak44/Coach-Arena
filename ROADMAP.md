@@ -3039,11 +3039,132 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       le reconstruire à un lag proche de `minLag` demanderait de mettre à
       zéro la quasi-totalité du buffer, tuant le signal périodique que ce
       même test doit détecter).
+- [x] Audit de code (fichier entier) sur `ui/ReadyScreen.tsx` (Vestiaire,
+      2026-08-20) — nouvel angle après la famille « API navigateur bas
+      niveau » : cette fois un composant React lui-même, plutôt qu'un
+      système en classe. `ReadyScreen.tsx` relu intégralement et confirmé
+      SAIN — son propre effet gère déjà correctement le double-montage
+      StrictMode (flux local à `ask()`, jamais réutilisé entre montages,
+      `disposed` fermé sur le résultat de CET appel précis ; `goneRef`
+      empêche explicitement d'arrêter le flux qu'on vient de transmettre
+      via le bouton gong). **1 vrai bug trouvé à la frontière avec
+      `ArenaScreen.tsx`** — le fichier qui REÇOIT ce flux — confirmé
+      d'abord en DIRECT dans Chromium headless (serveur `vite` DEV, pas
+      `vite preview` : StrictMode ne double-invoque les effets qu'en dev,
+      jamais en build prod) avant toute modification : après avoir
+      atteint l'arène avec de vrais faux capteurs (`--use-fake-device-
+      for-media-stream` + permissions accordées), `getVideoTracks()[0]
+      .readyState` valait déjà `'ended'` — voix ET facecam mortes pour
+      tout le match, sans qu'aucune erreur ne soit visible. Cause :
+      `ArenaScreen`'s `setup()` s'exécute ENTIÈREMENT de façon SYNCHRONE
+      quand `preStream` est déjà fourni (`stream = preStream`, aucun
+      `await` déclenché) — donc en StrictMode (mount → cleanup → mount
+      synchrones sur le MÊME `sysRef.current`), le cleanup du 1er montage
+      arrête déjà les pistes de `sys.stream` AVANT que le 2e montage ne
+      les redemande — sauf que `preStream` est un flux PARTAGÉ (une prop),
+      pas recréé par `setup()` à chaque appel comme le contexte audio, le
+      recorder ou la reco vocale de chaque système (déjà rendus
+      résilients à ce même double-montage lors des 4 audits précédents) :
+      le 2e montage récupère alors LE MÊME objet stream, mais déjà mort.
+      Corrigé SANS changer le modèle de propriété du flux (`ArenaScreen`
+      reste responsable de l'arrêter, une fois, à la fin) : l'arrêt des
+      pistes dans le nettoyage de l'effet est désormais DIFFÉRÉ d'un tick
+      (`setTimeout(0)`, tracké via un `useRef` dédié) plutôt
+      qu'immédiat, et ANNULÉ si un `setup()` suivant revendique CE MÊME
+      flux avant que ce tick ne s'écoule — un démontage RÉEL (quitter
+      l'arène pour de bon), lui, n'a personne pour annuler : les pistes
+      sont bien arrêtées, juste un tick plus tard, imperceptible.
+      Reconfirmé par la MÊME repro Chromium headless post-fix :
+      `readyState` vaut `'live'`, stable sur 4,5 s d'observation (bien
+      au-delà de tout `setTimeout(0)` en attente, prouvant l'annulation
+      tenue et pas juste un instantané chanceux). Pas de test unitaire
+      permanent ajouté : ce projet n'a pas d'infrastructure de rendu de
+      composants React (confirmé en cherchant — aucun
+      `@testing-library`/jsdom, aucun `ui/*.test.*`, `ArenaScreen` n'est
+      JAMAIS monté dans `engine.test.ts`) ; la vérification en direct via
+      Chromium headless (scripts jetables, supprimés après usage) est la
+      méthode déjà établie pour les bugs de cycle de vie React de ce
+      dépôt. 387 tests (suite `game/`, inchangée — aucun test unitaire ne
+      touche `ArenaScreen.tsx`) vérifiés sur 3 exécutions consécutives,
+      `tsc --noEmit` + `npm run build` verts, funnel visuel standard
+      (`scripts/shot.mjs`) rejoué sans régression.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-20 (routine, suite) : La famille « API navigateur bas niveau »
+  de `systems/` étant close, changé d'angle : `ui/ReadyScreen.tsx` (le
+  Vestiaire), un COMPOSANT React cette fois plutôt qu'un système en
+  classe — jamais audité fichier entier jusqu'ici, et manipulant lui
+  aussi un `MediaStream` en cycle de vie. `ReadyScreen.tsx` lui-même
+  s'est révélé déjà sain : son effet gère correctement le double-montage
+  StrictMode (le flux qu'il acquiert via `requestCoachStream()` est
+  local à SON appel `ask()`, jamais partagé entre montages ; `disposed`
+  ferme précisément sur le résultat de CET appel ; `goneRef` empêche
+  explicitement d'arrêter le flux au moment où on le transmet via le
+  bouton gong). Mais en creusant CE QUE ce flux devient une fois transmis
+  — `onGo(stream)` → `App.tsx` → prop `preStream` de `ArenaScreen.tsx` —
+  **1 vrai bug trouvé à cette frontière entre les deux fichiers**, dans
+  `ArenaScreen.tsx` cette fois. Confirmé D'ABORD en direct dans Chromium
+  headless AVANT toute modification, une première pour un bug de cycle
+  de vie React dans cette session : contrairement aux vérifications
+  habituelles de `scripts/shot.mjs` (qui tournent sur `vite preview`,
+  un build de PRODUCTION), il a fallu lancer le vrai serveur `vite` DEV
+  — StrictMode ne double-invoque les effets qu'en développement, jamais
+  dans un build prod, donc `vite preview` ne peut PHYSIQUEMENT pas
+  reproduire ce genre de bug. Avec `--use-fake-device-for-media-stream`
+  et les permissions caméra/micro accordées, en atteignant l'arène par
+  le vrai funnel (sélection → Vestiaire → gong), `document.querySelector
+  ('video').srcObject.getVideoTracks()[0].readyState` valait déjà
+  `'ended'` — la voix et la facecam étaient mortes pour tout le match,
+  sans la moindre erreur visible dans la console. La cause : le `setup()`
+  d'`ArenaScreen` s'exécute ENTIÈREMENT de façon SYNCHRONE quand
+  `preStream` est déjà fourni par le Vestiaire (`stream = preStream`,
+  aucun `await` n'est jamais déclenché sur ce chemin) — donc en
+  StrictMode (mount → cleanup → mount, strictement synchrones, sur le
+  MÊME `sysRef.current` qui survit au double-montage, exactement comme
+  pour les 4 bugs précédents de cette même journée), le cleanup du 1er
+  montage arrête déjà les pistes de `sys.stream` AVANT que le 2e montage
+  n'ait la moindre chance de les redemander. La différence structurelle
+  avec `recorder.ts`/`voice.ts`/`facecam.ts`/`sound.ts` : dans ces
+  quatre fichiers, la ressource détruite au cleanup (AudioContext,
+  MediaRecorder, SpeechRecognition, intervalle) est TOUJOURS recréée à
+  l'identique par le `start()`/`setup()` suivant — donc un compteur de
+  génération (identité de l'instance) suffisait à distinguer « instance
+  périmée » de « instance courante ». Ici, `preStream` est une PROP
+  PARTAGÉE, pas recréée par `setup()` à chaque appel — le 2e montage
+  récupère LE MÊME objet stream, mais désormais mort, et cette approche
+  par identité d'instance ne peut rien distinguer puisque c'est
+  littéralement le même objet des deux côtés. Corrigé sans toucher au
+  modèle de propriété (`ArenaScreen` reste responsable, in fine, d'arrêter
+  ce flux une fois le match terminé — personne d'autre ne le fait) : le
+  nettoyage de l'effet DIFFÈRE désormais l'arrêt des pistes d'un tick
+  (`setTimeout(0)`, suivi via un `useRef` dédié `pendingStreamStopRef`),
+  et ce `setup()` suivant ANNULE ce délai s'il revendique le même flux
+  avant que le tick ne s'écoule. Un démontage RÉEL (quitter l'arène pour
+  de bon, vers l'écran de résultats) n'a personne pour annuler cette
+  temporisation : les pistes sont bien arrêtées, juste un tick plus tard
+  — imperceptible pour le joueur, l'indicateur caméra/micro du navigateur
+  s'éteint toujours au bon moment. Reconfirmé par la MÊME repro Chromium
+  headless, cette fois post-fix : `readyState` vaut `'live'` à l'arrivée
+  dans l'arène, et RESTE `'live'` après 4,5 secondes d'observation — pas
+  juste un instantané chanceux, la preuve que l'annulation tient dans la
+  durée et qu'aucun arrêt différé ne se déclenche en douce plus tard.
+  Aucun test unitaire permanent ajouté pour ce fix précis : ce dépôt n'a
+  aucune infrastructure de rendu de composants React (vérifié —
+  ni `@testing-library`, ni jsdom/happy-dom dans les dépendances, aucun
+  fichier `ui/*.test.*`, et `ArenaScreen` n'est JAMAIS réellement monté
+  dans `engine.test.ts`, seulement mentionné en commentaire) ; la
+  vérification en direct via Chromium headless, scripts jetables
+  supprimés après usage, est la méthode déjà établie dans cette session
+  pour ce type de bug (cf. les captures d'écran de vérification des
+  fixes ArenaScreen/ResultsScreen/StoryScreen d'avant la compaction de ce
+  fil). 387 tests de la suite `game/` (inchangée, aucun test unitaire ne
+  touchant `ArenaScreen.tsx`) vérifiés sur 3 exécutions consécutives,
+  `tsc --noEmit` et `npm run build` verts, funnel visuel standard
+  (`scripts/shot.mjs`, sur un vrai build de PRODUCTION cette fois) rejoué
+  sans régression visible.
 - 2026-08-20 (routine, suite) : Deux fichiers restaient pour clore
   vraiment la famille « API navigateur bas niveau » de `systems/`, notés
   explicitement à la fin du journal précédent : `media.ts` et `pitch.ts`.
