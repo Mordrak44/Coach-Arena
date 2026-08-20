@@ -2980,11 +2980,151 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       corps vide d'un `.catch(() => {})` défensif jamais exercé côté
       rejet réel — même motif déjà accepté ailleurs dans ce fichier,
       pas forcé).
+- [x] Audit de code (fichier entier) sur `systems/pitch.ts` (détection de
+      hauteur de voix par autocorrélation, 2026-08-20) — clôt la famille
+      « API navigateur bas niveau » de `systems/` (`recorder.ts`,
+      `voice.ts`, `facecam.ts`, `sound.ts` déjà faits ; `media.ts` relu et
+      confirmé trivial — un simple enchaînement de fallback sans état, 17
+      lignes, rien à auditer). Fichier purement algorithmique (aucun état
+      async/lifecycle), donc l'audit a porté sur la correction numérique
+      plutôt que sur le motif StrictMode des quatre précédents. **1 vrai
+      bug corrigé, confirmé par simulation AVANT toute modification**
+      (script jetable reproduisant l'algorithme exact hors du navigateur,
+      supprimé après usage) : `detectPitch()` cherchait le maximum GLOBAL
+      de corrélation normalisée sur toute la plage de lags plutôt que le
+      PREMIER pic voisé — l'erreur d'octave classique de l'autocorrélation
+      naïve. Sur un signal de voix synthétique réaliste (fondamentale +
+      2e/3e harmonique, comme une vraie voyelle, AUCUN bruit ajouté),
+      42 % des essais (212/500 dans la simulation initiale) verrouillaient
+      sur une SOUS-harmonique (moitié/tiers/quart de la vraie fréquence)
+      au lieu de la fondamentale — un cas concret confirmé : 288,8 Hz
+      détecté comme 72,2 Hz. La cause : à un lag plus long (sous-
+      harmonique), le bruit de quantification entre échantillons entiers
+      pouvait faire dépasser NUMÉRIQUEMENT la corrélation du vrai pic,
+      sans que ce soit une meilleure estimation de hauteur — et comme la
+      boucle scrute tous les lags en cherchant un maximum global, ce
+      dépassement l'emportait silencieusement. Ce signal corrompu
+      alimente `PitchTracker` (`current`/`baseline`) puis `pitchRatio`,
+      consommé par `combat.ts` pour la détection « voix aiguë » — un coach
+      qui crie à ~300 Hz pouvait ponctuellement s'enregistrer comme
+      parlant à ~75 Hz, un signal de prosodie qui saute de façon
+      imprévisible. Corrigé en s'arrêtant au PREMIER maximum local qui
+      franchit le seuil de voisement (0,5) en scrutant du lag le plus
+      court (fréquence la plus aiguë plausible) vers le plus long, au lieu
+      de continuer vers un maximum global — la fondamentale est
+      systématiquement le premier pic fort rencontré, ses harmoniques
+      (sous-multiples de fréquence) ne sont que des échos plus loin dans
+      la plage. Fix reconfirmé par la MÊME simulation post-fix : 0 erreur
+      d'octave sur 500 essais (vs 212 avant), plus des vérifications de
+      non-régression (silence, bruit blanc, sinus purs à 4 fréquences —
+      tout inchangé). 2 nouveaux tests permanents (une repro exacte de
+      288,8 Hz, et un balayage de 200 fréquences aléatoires en assertion
+      `toBe(0)` erreur d'octave), reconfirmés par `git stash` A/B (échouent
+      bien sur le code d'avant-fix : 76/200 erreurs d'octave, 216 Hz
+      détecté au lieu de 288,8). Deux autres pistes soulevées par l'audit
+      délibérément NON corrigées : un `sampleRate` ≥ ~143 kHz désactiverait
+      la détection en permanence (buffer fixe de 2048 échantillons dans
+      `voice.ts`) — matériel audio externe professionnel uniquement,
+      jamais rencontré en pratique, dégradation gracieuse déjà cohérente
+      avec le reste du fichier ; et un `sampleRate` < 500 Hz (jamais
+      atteignable via le seul appelant réel, `AudioContext.sampleRate`
+      étant toujours ≥ plusieurs kHz) — hors-scope, `detectPitch()` n'a
+      pas à se protéger contre des entrées qu'aucun appelant réel ne peut
+      produire. 387 tests, suite vérifiée sur 3 exécutions consécutives.
+      `tsc --noEmit` + `npm run build` verts. Couverture de `pitch.ts` :
+      100 % lignes/statements/fonctions, 95,45 % branches — le seul
+      manque documenté en commentaire de code plutôt que forcé (le test
+      pré-existant qui construisait un cas `den === 0` en fin de plage
+      n'est plus atteint, le nouveau `break` anticipé s'arrêtant avant ;
+      le reconstruire à un lag proche de `minLag` demanderait de mettre à
+      zéro la quasi-totalité du buffer, tuant le signal périodique que ce
+      même test doit détecter).
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-20 (routine, suite) : Deux fichiers restaient pour clore
+  vraiment la famille « API navigateur bas niveau » de `systems/`, notés
+  explicitement à la fin du journal précédent : `media.ts` et `pitch.ts`.
+  `media.ts` (17 lignes) relu intégralement et confirmé trivial — un
+  simple enchaînement `try/catch` de fallback getUserMedia (audio+vidéo →
+  audio seul → null), sans aucun état ni cycle de vie, rien à auditer.
+  `pitch.ts` (détection de hauteur de voix par autocorrélation) est lui
+  aussi sans état async/lifecycle — donc a priori pas de bug « zombie
+  StrictMode » comme les quatre fichiers précédents — mais reste un
+  candidat légitime pour un audit de CORRECTION NUMÉRIQUE plutôt que de
+  cycle de vie, jamais fait jusqu'ici. **1 vrai bug trouvé et corrigé**,
+  confirmé par simulation directe de l'algorithme (script Node jetable,
+  hors navigateur, exécutant le code exact de `detectPitch`) AVANT toute
+  modification du fichier source — discipline « confirmer avant de
+  corriger » appliquée ici à un cas purement algorithmique plutôt qu'à
+  une corruption de `localStorage` ou un state React comme les fois
+  précédentes. Le bug : la recherche du meilleur lag prenait le maximum
+  GLOBAL de corrélation normalisée sur toute la plage de fréquences
+  possibles, l'erreur d'octave classique de l'autocorrélation naïve — sur
+  un signal de voix synthétique réaliste (fondamentale + 2e/3e harmonique,
+  comme une vraie voyelle chantée ou criée, sans aucun bruit ajouté), la
+  simulation a mesuré 42 % (212/500) d'essais qui verrouillaient sur une
+  SOUS-harmonique (moitié, tiers ou quart de la vraie fréquence) au lieu
+  de la fondamentale — cas concret vérifié : 288,8 Hz détecté comme
+  72,2 Hz, un facteur 4. La cause profonde : à un lag plus long (donc une
+  fréquence sous-multiple), le bruit de quantification entre échantillons
+  ENTIERS peut faire dépasser NUMÉRIQUEMENT la corrélation du vrai pic —
+  sans que ce soit réellement une meilleure estimation physique de
+  hauteur — et comme l'algorithme d'origine continuait de scruter TOUTE
+  la plage à la recherche d'un maximum global, ce dépassement ponctuel
+  l'emportait silencieusement. Ce signal corrompu remonte directement
+  jusqu'au gameplay : `PitchTracker` lisse `current`/`baseline` à partir
+  de ces valeurs, et `pitchRatio` qui en découle alimente la détection
+  « voix aiguë » de `combat.ts` — un coach qui monte dans les aigus pour
+  de vrai pouvait ponctuellement s'enregistrer comme parlant deux à quatre
+  fois plus grave, un signal de prosodie qui saute de façon imprévisible
+  au fil d'un même cri. Corrigé en s'arrêtant au PREMIER maximum local qui
+  franchit le seuil de voisement (0,5 de corrélation normalisée) en
+  scrutant les lags du plus court vers le plus long (donc de la fréquence
+  la plus aiguë plausible vers la plus grave), au lieu de continuer à
+  chercher un maximum global sur toute la plage restante — la fondamentale
+  d'un son voisé est quasi-systématiquement le PREMIER pic suffisamment
+  fort rencontré dans ce sens de balayage ; ses sous-harmoniques ne sont
+  que des échos plus loin, à des lags plus longs. Le correctif a été
+  revérifié avec la MÊME simulation, post-fix cette fois : 0 erreur
+  d'octave sur 500 essais (contre 212 avant), plus une batterie de
+  vérifications de non-régression sur le même script (silence → null,
+  bruit blanc → null dans 50/50 essais, sinus purs à 4 fréquences sans
+  harmoniques → détection quasi-exacte) — rien de cassé par le changement
+  de stratégie de recherche. Scripts de vérification supprimés une fois
+  le fix confirmé des deux côtés. 2 nouveaux tests permanents ajoutés à
+  la suite officielle (une reproduction exacte du cas 288,8 Hz, et un
+  balayage de 200 fréquences de parole aléatoires avec assertion stricte
+  `toBe(0)` erreur d'octave), chacun reconfirmé par `git stash` A/B :
+  échouent bien sur le code d'avant-fix, avec les symptômes précis prédits
+  par la simulation (76/200 erreurs d'octave sur ce balayage, 216 Hz
+  détecté au lieu de 288,8 sur la repro). Deux autres pistes soulevées par
+  l'audit initial délibérément écartées, cette fois pour des raisons de
+  portée plutôt que de risque : un `sampleRate` extrêmement élevé
+  (≥ ~143 kHz, matériel audio professionnel externe uniquement) qui
+  désactiverait la détection en permanence sans jamais planter — déjà une
+  dégradation gracieuse cohérente avec le reste du fichier, pas une
+  régression ; et un `sampleRate` < 500 Hz qui ferait planter
+  différemment (division par un lag nul) — explicitement INATTEIGNABLE
+  via le seul appelant réel (`voice.ts`, dont l'`AudioContext.sampleRate`
+  est toujours de plusieurs kHz), donc hors du principe établi de ne pas
+  valider contre des entrées qu'aucun appelant réel ne peut produire. 387
+  tests, suite vérifiée sur 3 exécutions consécutives, `tsc --noEmit` et
+  `npm run build` verts. Couverture de `pitch.ts` : 100 % lignes/
+  statements/fonctions, 95,45 % branches — le seul manque restant
+  documenté en commentaire de code (le `break` anticipé du fix empêche
+  maintenant d'atteindre le cas `den === 0` qu'un test préexistant
+  construisait délibérément tout au bout de la plage de lags ; le
+  reconstruire à un lag proche du début demanderait de mettre à zéro la
+  quasi-totalité du buffer, tuant le signal périodique que ce même test
+  doit par ailleurs détecter — documenté plutôt que forcé). Avec ce
+  fichier, la famille « API navigateur bas niveau » de `systems/` est
+  maintenant intégralement couverte : `recorder.ts`, `voice.ts`,
+  `facecam.ts`, `sound.ts`, `pitch.ts`, `media.ts` — 4 fichiers avec de
+  vrais bugs trouvés et corrigés (6 bugs distincts au total sur cette
+  famille en une journée), 2 confirmés déjà sains.
 - 2026-08-20 (routine, suite) : Le journal de la veille qualifiait
   `facecam.ts` de « dernier fichier » de la famille « API navigateur bas
   niveau » — trop tôt : `systems/sound.ts` (bande-son WebAudio

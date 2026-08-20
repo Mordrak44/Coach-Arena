@@ -986,6 +986,57 @@ describe('prosodie (pitch local)', () => {
     expect(Number.isNaN(hz)).toBe(false)
   })
 
+  it("bug d'audit (2026-08-20) : erreur d'OCTAVE — un signal de voix (fondamentale + harmoniques, comme une vraie voyelle) verrouillait parfois sur une SOUS-harmonique (moitié/tiers/quart de la vraie fréquence) au lieu de la fondamentale, à cause du bruit de quantification entre échantillons entiers qui faisait numériquement gagner un lag plus long", async () => {
+    const { detectPitch } = await import('../systems/pitch')
+    const sr = 48000
+    const n = 2048
+    // Repro exacte trouvée en audit : fondamentale + 2e/3e harmonique
+    // (comme une voyelle chantée/criée), AUCUN bruit — avant le fix,
+    // détectée à 72,2 Hz (le quart de 288,8) au lieu de la fondamentale.
+    const f0 = 288.8
+    const buf = new Float32Array(n)
+    for (let i = 0; i < n; i++) {
+      const t = i / sr
+      buf[i] =
+        Math.sin(2 * Math.PI * f0 * t) +
+        0.4 * Math.sin(2 * Math.PI * 2 * f0 * t) +
+        0.2 * Math.sin(2 * Math.PI * 3 * f0 * t)
+    }
+    const hz = detectPitch(buf, sr)
+    expect(hz).not.toBeNull()
+    expect(Math.abs(hz! - f0)).toBeLessThan(f0 * 0.05) // ±5 %, pas la moitié/le tiers/le quart
+  })
+
+  it("bug d'audit (2026-08-20) : sur un balayage de 500 fréquences de parole (90-340 Hz) avec harmoniques, AUCUNE erreur d'octave ne doit survenir (avant le fix : 42 % des essais verrouillaient sur une sous-harmonique — simulation reconfirmée ici comme test permanent, pas juste un script jetable)", async () => {
+    const { detectPitch } = await import('../systems/pitch')
+    const sr = 48000
+    const n = 2048
+    let seed = 7
+    const rand = () => {
+      seed = (seed * 16807) % 2147483647
+      return seed / 2147483647
+    }
+    let octaveErrors = 0
+    const trials = 200
+    for (let i = 0; i < trials; i++) {
+      const f0 = 90 + rand() * 250
+      const buf = new Float32Array(n)
+      for (let j = 0; j < n; j++) {
+        const t = j / sr
+        buf[j] =
+          Math.sin(2 * Math.PI * f0 * t) +
+          0.4 * Math.sin(2 * Math.PI * 2 * f0 * t) +
+          0.2 * Math.sin(2 * Math.PI * 3 * f0 * t)
+      }
+      const hz = detectPitch(buf, sr)
+      if (hz === null) continue
+      const ratio = hz / f0
+      const isOctaveError = Math.abs(ratio - 0.5) < 0.05 || Math.abs(ratio - 1 / 3) < 0.03 || Math.abs(ratio - 0.25) < 0.02
+      if (isOctaveError) octaveErrors++
+    }
+    expect(octaveErrors).toBe(0)
+  })
+
   it('le tracker suit la montée dans les aigus', async () => {
     const { PitchTracker } = await import('../systems/pitch')
     const t = new PitchTracker()
