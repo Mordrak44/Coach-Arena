@@ -2847,11 +2847,125 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       `navigator.share()` et le repli `a.click()` (limitation de
       plateforme, pas un bug de logique — nécessiterait un changement
       d'UX, pas juste un correctif de code).
+- [x] Audit de code (fichier entier) sur `systems/voice.ts` (reco vocale
+      Web Speech API + volume/pitch, 2026-08-20) — suite immédiate de
+      l'audit de `recorder.ts`, même famille de fichiers (API navigateur
+      bas niveau, jamais couverts par un audit fichier entier jusqu'ici).
+      **2 vrais bugs corrigés**, tous les deux confirmés par `git stash`
+      A/B (4 des 5 nouveaux tests échouent bien sur le code d'avant-fix,
+      le 5e — cas déjà correct — sert de garde non-régression). (1) Bug
+      principal, un vrai zombie de reconnaissance : `rec.onend` relançait
+      `rec.start()` en se basant SEULEMENT sur `this.stopped`, sans
+      vérifier que `rec` était toujours `this.recognition` — reproductible
+      concrètement en React 18 StrictMode (activé dans `main.tsx`) :
+      `ArenaScreen` appelle `sys.voice.start()` dans un effet dont
+      `sysRef.current` (donc l'instance `VoiceCoach`) survit au
+      double-montage StrictMode, et quand le flux caméra est déjà
+      disponible (`preStream`, cas du Vestiaire) `setup()` s'exécute de
+      façon synchrone jusqu'à `voice.start()` — donc start → cleanup
+      (stop) → start retombe en succession immédiate SUR LA MÊME
+      instance. Le `onend` TARDIF de l'ancienne reco (rec1), arrivant
+      après que `start()` a déjà remis `stopped` à `false` pour la
+      nouvelle (rec2), relançait alors `rec1.start()` : une session de
+      reco fantôme tournait en parallèle de la vraie, toutes deux
+      écrivant dans le même état partagé (`pendingCommand`/`lastFinal`),
+      jamais arrêtable ensuite (le `stop()` suivant ne touche que
+      `this.recognition`, donc rec2). Même défaut sur `rec.onresult` : un
+      résultat final livré par le Web Speech API ENTRE `.stop()` et son
+      event `'end'` (comportement documenté de l'API) pouvait écraser
+      `pendingCommand` avec une commande obsolète si une nouvelle
+      instance avait déjà pris le relais. Corrigé en gardant `rec` en
+      closure et en vérifiant `rec === this.recognition` en tête de
+      `onresult` ET `onend` — une instance périmée ne peut plus ni se
+      ressusciter, ni écrire dans l'état partagé ; `onresult` vérifie en
+      plus `this.stopped` pour ignorer aussi un résultat tardif SANS
+      resurrection (arrêt définitif, pas de nouveau `start()` derrière).
+      (2) `rec.onerror` était un no-op total (« géré par onend », commenté
+      dans le code) et `onend` relançait inconditionnellement — sur une
+      erreur PERMANENTE (`not-allowed` : permission micro révoquée en
+      cours de match ; `audio-capture`/`service-not-allowed`), ça
+      produisait une boucle start/error/end infinie pour le reste du
+      match, sans jamais le signaler (`state.supported` restait `true`).
+      Corrigé en retenant le code d'erreur dans `onerror` (fermeture
+      locale `fatalError`, consultée par `onend`) : sur erreur fatale,
+      `onend` arrête la boucle et bascule `state.supported = false` — sur
+      erreur transitoire ou absente (coupure Chrome périodique, silence
+      prolongé), le comportement de relance reste identique à avant. Un
+      test préexistant qui figeait `onerror` comme « un vrai no-op »
+      a été adapté (son intitulé, pas son assertion — le no-op
+      IMMÉDIAT reste vrai, seul `onend` agit dessus après coup). 5
+      nouveaux tests. 380 tests, suite vérifiée sur 3 exécutions
+      consécutives. `tsc --noEmit` + `npm run build` verts. Couverture de
+      `voice.ts` : 100 % sur les 4 métriques.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-20 (routine, suite) : Immédiatement après `recorder.ts`, même
+  stratégie appliquée à `systems/voice.ts` (reco vocale Web Speech API +
+  volume/pitch) — fichier soeur dans la même famille « API navigateur bas
+  niveau » (capture/reco temps réel), jamais couvert par un audit
+  fichier entier jusqu'ici, choisi pour la même raison que `recorder.ts`
+  l'avait été. **2 vrais bugs trouvés et corrigés**, tous deux confirmés
+  par `git stash` A/B. Le principal, un zombie de reconnaissance vocale :
+  `rec.onend` ne vérifiait que `this.stopped` avant de relancer
+  `rec.start()`, jamais que `rec` était encore réellement
+  `this.recognition` — un manque qui devient concrètement exploitable en
+  React 18 StrictMode (activé dans `main.tsx`), puisque `ArenaScreen`
+  garde son instance `VoiceCoach` stable via `sysRef.current` À TRAVERS
+  le double-montage StrictMode, et que `setup()` peut appeler
+  `voice.start()` de façon SYNCHRONE quand le flux caméra est déjà
+  disponible (`preStream`, cas du joueur qui a déjà autorisé la caméra
+  au Vestiaire) : start → cleanup (stop) → start retombent en succession
+  immédiate sur la MÊME instance de `VoiceCoach`. Le `onend` tardif de
+  l'ancienne reco arrivait alors après que le nouveau `start()` avait
+  déjà remis `stopped` à `false` pour la nouvelle instance — donc il la
+  relançait quand même : une session de reconnaissance fantôme tournait
+  en parallèle de la vraie, toutes deux écrivant dans le même état
+  partagé (`pendingCommand`, `lastFinal`, `finalSeq`), et cette ancienne
+  session devenait définitivement inarrêtable (le `stop()` suivant ne
+  touche que `this.recognition`, donc uniquement la nouvelle). Exactement
+  le même trou existait sur `onresult` : le Web Speech API peut livrer un
+  dernier résultat final ENTRE l'appel à `.stop()` et l'event `'end'`
+  (comportement documenté de l'API, pas un cas limite exotique) — sans
+  garde-fou, ce résultat obsolète écrasait `pendingCommand` avec une
+  commande périmée si une nouvelle instance avait déjà pris le relais,
+  exactement le genre d'action fantôme qu'un joueur streamé ne peut pas
+  s'expliquer. Corrigé en gardant la référence `rec` dans la closure de
+  chaque handler et en vérifiant `rec === this.recognition` en tête
+  d'`onresult` ET d'`onend` : une instance périmée ne peut plus ni se
+  ressusciter elle-même, ni écrire dans l'état partagé après avoir été
+  remplacée ; `onresult` vérifie en plus `this.stopped` pour couvrir le
+  cas sans resurrection (arrêt définitif, sans `start()` derrière).
+  Second bug, plus classique mais tout aussi réel : `rec.onerror` était
+  un no-op total assumé (« géré par onend », un commentaire qui datait
+  d'avant que cet audit ne creuse ce que « géré » signifiait vraiment) et
+  `onend` relançait alors inconditionnellement, sans distinction — sur
+  une erreur PERMANENTE (`not-allowed`, la permission micro révoquée en
+  plein match ; `audio-capture` ou `service-not-allowed`, un service de
+  reco bloqué par l'OS/le navigateur), ça produisait une boucle
+  start/error/end infinie jusqu'à la fin du match, sans jamais le
+  signaler nulle part (`state.supported` restait figé à `true`, aucun
+  moyen pour l'UI de distinguer « ça essaie encore » de « c'est cassé
+  pour de bon »). Corrigé en retenant le code d'erreur dans `onerror` via
+  une fermeture locale (`fatalError`), consultée par `onend` juste
+  après : sur erreur fatale, la boucle de relance s'arrête et
+  `state.supported` bascule à `false` ; sur erreur transitoire ou
+  absente (coupure Chrome périodique, silence prolongé — le cas nominal
+  documenté par le commentaire existant), le comportement de relance
+  reste identique à avant, aucune régression. Un test préexistant qui
+  figeait `onerror` comme « un vrai no-op assumé » a vu son intitulé
+  adapté à la nouvelle réalité (son assertion, elle, reste vraie :
+  appeler `onerror()` seul, sans `onend` derrière, ne change toujours
+  rien dans l'immédiat — c'est `onend` qui agit, pas `onerror`
+  directement). 5 nouveaux tests, dont un qui confirme explicitement
+  qu'un résultat tardu SANS resurrection (arrêt définitif, cas déjà
+  correct avant ce fix) continue d'être ignoré — pour ne pas régresser
+  ce qui marchait déjà. 380 tests, suite vérifiée sur 3 exécutions
+  consécutives, `tsc --noEmit` et `npm run build` verts. Couverture de
+  `voice.ts` : 100 % sur les 4 métriques (statements/branches/
+  fonctions/lignes) — clôturé sans reste.
 - 2026-08-20 (routine) : Le balayage `localStorage` étant clos (5/5
   modules `game/` vérifiés : `deckBuilder.ts` relu et confirmé déjà sûr
   — `sanitizeTemplate()` re-dérive chaque valeur depuis `CARD_POOL` et la

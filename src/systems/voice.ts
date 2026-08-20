@@ -141,7 +141,28 @@ export class VoiceCoach {
     rec.lang = 'fr-FR'
     rec.continuous = true
     rec.interimResults = true
+    // Erreur FATALE (permission micro révoquée en cours de match, service de
+    // reco bloqué par le navigateur/l'OS) vs transitoire (coupure Chrome
+    // périodique, silence prolongé) : consultée par onend juste en dessous,
+    // qui ne peut pas distinguer les deux lui-même (il ne reçoit aucun code
+    // d'erreur). Sans cette distinction, onend relançait `rec.start()` en
+    // boucle indéfiniment même après une panne permanente — `start()` puis
+    // `error`/`end` immédiats, sans jamais s'arrêter ni le signaler (trouvé
+    // en audit, 2026-08-20).
+    let fatalError = false
     rec.onresult = (ev: any) => {
+      // Un START() plus récent sur CE MÊME VoiceCoach a pu remplacer
+      // `this.recognition` par une nouvelle instance (voir onend
+      // ci-dessous) pendant que CETTE instance-ci (`rec`, périmée) était en
+      // train de s'arrêter — le Web Speech API peut encore livrer un
+      // résultat final « en retard » entre `.stop()` et l'event 'end'.
+      // Sans ce garde-fou, ce résultat périmé écrivait quand même dans
+      // l'état PARTAGÉ (pendingCommand/lastFinal/finalSeq), consommé par la
+      // boucle de jeu comme si le joueur venait de parler alors que c'est
+      // un vestige de l'ancienne session (trouvé en audit, 2026-08-20,
+      // reproductible en StrictMode : start() → cleanup → start() en
+      // succession immédiate sur la même instance de VoiceCoach).
+      if (rec !== this.recognition || this.stopped) return
       // ev.resultIndex n'est que le PREMIER index changé — un même event
       // peut porter plusieurs résultats fraîchement finalisés (deux
       // ordres courts dits coup sur coup). Ne lire que resultIndex
@@ -165,7 +186,19 @@ export class VoiceCoach {
       }
     }
     rec.onend = () => {
+      // Même garde-fou d'instance périmée que onresult ci-dessus : un
+      // start() plus récent a déjà remplacé `this.recognition` — sans ce
+      // contrôle, ce onend (celui de l'ANCIENNE instance, `stopped` étant
+      // déjà retombé à `false` par le start() suivant) relançait quand même
+      // `rec.start()` : l'ancienne instance ressuscitait en zombie, tournant
+      // en parallèle de la nouvelle, toutes deux écrivant dans le même état
+      // partagé (trouvé en audit, 2026-08-20).
+      if (rec !== this.recognition) return
       this.state.listening = false
+      if (fatalError) {
+        this.state.supported = false
+        return
+      }
       if (!this.stopped) {
         // Chrome coupe la reco régulièrement : on relance en continu.
         try {
@@ -176,8 +209,11 @@ export class VoiceCoach {
         }
       }
     }
-    rec.onerror = () => {
-      /* géré par onend */
+    rec.onerror = (ev: any) => {
+      if (ev?.error === 'not-allowed' || ev?.error === 'audio-capture' || ev?.error === 'service-not-allowed') {
+        fatalError = true
+      }
+      /* le reste est géré par onend */
     }
     try {
       rec.start()

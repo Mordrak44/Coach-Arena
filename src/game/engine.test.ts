@@ -3671,13 +3671,14 @@ describe('VoiceCoach — onresult/onend, le cœur du flux de reco vocale, jamais
     expect(vc.consumeCommand()).toBeNull() // ...donc plus rien à consommer une 2e fois
   })
 
-  it('rec.onerror est un vrai no-op assumé (« géré par onend », commenté dans le code) — ne doit rien changer ni planter', async () => {
+  it("rec.onerror sans code d'erreur (ou appelé seul, sans onend derrière) ne change rien dans l'immédiat — seul le onend qui suit peut agir dessus (2026-08-20 : onerror n'est plus un no-op total, il retient juste l'erreur pour onend)", async () => {
     ;(globalThis as any).window = { SpeechRecognition: FakeRecognition }
     const { VoiceCoach } = await import('../systems/voice')
     const vc = new VoiceCoach()
     await vc.start({} as any)
     const rec = (vc as any).recognition
     expect(() => rec.onerror()).not.toThrow()
+    expect(() => rec.onerror({})).not.toThrow()
     expect(vc.state.listening).toBe(true) // rien n'a bougé
     expect(vc.state.pendingCommand).toBeNull()
   })
@@ -3708,6 +3709,109 @@ describe('VoiceCoach — onresult/onend, le cœur du flux de reco vocale, jamais
     rec.onresult({ resultIndex: 0, results: [finalResult('bonjour, comment ça va ?')] })
     expect(vc.state.lastHeard).toBe('bonjour, comment ça va ?') // bien entendu…
     expect(vc.state.pendingCommand).toBe('dodge') // …mais la commande en attente reste celle d'avant
+  })
+})
+
+describe("VoiceCoach — bug d'audit (2026-08-20) : instance de reco périmée ressuscitée en zombie (StrictMode : start → stop → start immédiats sur la même instance de VoiceCoach), et boucle de relance infinie sur une erreur permanente", () => {
+  afterEach(() => {
+    delete (globalThis as any).window
+    delete (globalThis as any).cancelAnimationFrame
+  })
+
+  class FakeRecognition {
+    lang = ''
+    continuous = false
+    interimResults = false
+    onresult: ((ev: unknown) => void) | null = null
+    onend: (() => void) | null = null
+    onerror: ((ev: unknown) => void) | null = null
+    startCalls = 0
+    start() {
+      this.startCalls++
+    }
+    stop() {}
+  }
+
+  function finalResult(transcript: string, isFinal = true) {
+    return Object.assign([{ transcript }], { isFinal })
+  }
+
+  it("StrictMode : stop() immédiatement suivi d'un start() sur la MÊME instance de VoiceCoach, puis le onend TARDIF de l'ANCIENNE reco ne la ressuscite plus (avant le fix : rec1.start() était rappelé, un 2e flux de reco tournait en parallèle du nouveau)", async () => {
+    ;(globalThis as any).window = { SpeechRecognition: FakeRecognition }
+    ;(globalThis as any).cancelAnimationFrame = () => {}
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const rec1 = (vc as any).recognition
+    vc.stop() // cleanup StrictMode du 1er montage : stopped = true, rec1.stop() appelé (mais pas encore son 'end')
+    await vc.start({} as any) // 2e montage StrictMode, immédiat : stopped = false, this.recognition devient rec2
+    const rec2 = (vc as any).recognition
+    expect(rec2).not.toBe(rec1)
+    rec1.onend() // le 'end' tardif de rec1 arrive maintenant, après coup
+    expect(rec1.startCalls).toBe(1) // pas de relance : rec1 n'est plus this.recognition, jamais ressuscitée
+    expect(rec2.startCalls).toBe(1) // rec2 non plus (seul son propre onend le ferait)
+  })
+
+  it("StrictMode : un résultat FINAL tardif de l'ANCIENNE instance (livré entre .stop() et son 'end') n'écrase plus l'état partagé une fois qu'une nouvelle instance a pris le relais", async () => {
+    ;(globalThis as any).window = { SpeechRecognition: FakeRecognition }
+    ;(globalThis as any).cancelAnimationFrame = () => {}
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const rec1 = (vc as any).recognition
+    vc.stop()
+    await vc.start({} as any)
+    const rec2 = (vc as any).recognition
+    expect(rec2).not.toBe(rec1)
+    // Web Speech API : un résultat final peut encore être livré par rec1
+    // après .stop() mais avant son event 'end' — simulé ici directement.
+    rec1.onresult({ resultIndex: 0, results: [finalResult('attaque maintenant')] })
+    expect(vc.state.pendingCommand).toBeNull() // ignoré : rec1 n'est plus l'instance courante
+    expect(vc.state.finalSeq).toBe(0)
+    // Un résultat de la VRAIE instance courante (rec2), lui, doit toujours compter.
+    rec2.onresult({ resultIndex: 0, results: [finalResult('esquive')] })
+    expect(vc.state.pendingCommand).toBe('dodge')
+  })
+
+  it("un résultat livré APRÈS stop() mais SANS qu'aucun nouveau start() n'ait suivi (pas de resurrection) est aussi ignoré — stopped=true bloque à lui seul", async () => {
+    ;(globalThis as any).window = { SpeechRecognition: FakeRecognition }
+    ;(globalThis as any).cancelAnimationFrame = () => {}
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const rec = (vc as any).recognition
+    vc.stop()
+    rec.onresult({ resultIndex: 0, results: [finalResult('attaque maintenant')] })
+    expect(vc.state.pendingCommand).toBeNull()
+  })
+
+  it("erreur FATALE ('not-allowed', permission micro révoquée) : onend n'essaie plus de relancer indéfiniment, et signale la reco comme non-fonctionnelle via supported=false", async () => {
+    ;(globalThis as any).window = { SpeechRecognition: FakeRecognition }
+    ;(globalThis as any).cancelAnimationFrame = () => {}
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const rec = (vc as any).recognition
+    expect(vc.state.supported).toBe(true)
+    rec.onerror({ error: 'not-allowed' })
+    rec.onend()
+    expect(rec.startCalls).toBe(1) // pas de relance après une erreur fatale
+    expect(vc.state.listening).toBe(false)
+    expect(vc.state.supported).toBe(false) // signalé comme cassé, pas juste silencieux
+  })
+
+  it("erreur TRANSITOIRE ('no-speech', silence prolongé) : onend continue de relancer normalement, supported reste true", async () => {
+    ;(globalThis as any).window = { SpeechRecognition: FakeRecognition }
+    ;(globalThis as any).cancelAnimationFrame = () => {}
+    const { VoiceCoach } = await import('../systems/voice')
+    const vc = new VoiceCoach()
+    await vc.start({} as any)
+    const rec = (vc as any).recognition
+    rec.onerror({ error: 'no-speech' })
+    rec.onend()
+    expect(rec.startCalls).toBe(2) // relancée comme avant : erreur non fatale
+    expect(vc.state.listening).toBe(true)
+    expect(vc.state.supported).toBe(true)
   })
 })
 
