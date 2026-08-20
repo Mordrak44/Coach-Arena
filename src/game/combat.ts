@@ -59,6 +59,11 @@ function fireUlti(m: MatchState, side: 'player' | 'enemy'): void {
   const dmg = Math.round(d.maxHp * (0.32 + a.char.ulti.power * 0.035))
   d.hp = Math.max(0, d.hp - dmg)
   d.anim = { kind: 'hurt', until: m.t + 1.2 }
+  // Encaisser charge l'Ulti (mécanique de comeback) — fireSpecial() le fait
+  // déjà pour un coup bien plus faible ; l'oublier ici privait le camp qui
+  // encaisse LE plus gros coup du jeu de tout gain d'Ulti (trouvé en audit,
+  // 2026-08-20).
+  chargeUlti(m, d, dmg, true)
   m.events.push({
     kind: 'ulti',
     t: m.t,
@@ -465,14 +470,22 @@ function applyCommand(m: MatchState, cmd: CoachCommand, voiceEnergy: number, voi
   }
 
   if (cmd === 'special') {
-    if (f.hype >= HYPE_MAX && m.t >= f.confusedUntil) {
+    // Provoqué (carte adverse) : sourd à TOUT ordre, pas seulement aux
+    // ordres de posture — symétrique d'enemyCoachAI (ligne ~820), qui
+    // renvoie AVANT même de considérer son propre spécial/ulti quand
+    // provoqué. Sans ce garde-fou ici, le coach pouvait encore crier
+    // « SPÉCIAL ! » ou « ULTI ! » pendant la fenêtre de provocation — les
+    // deux coups les plus forts du jeu échappant totalement à une carte
+    // vendue comme rendant le perso « sourd à son coach » (trouvé en
+    // audit, 2026-08-20).
+    if (f.hype >= HYPE_MAX && m.t >= f.confusedUntil && m.t >= m.enemyMods.provokedUntil) {
       fireSpecial(m, 'player')
     }
     return
   }
 
   if (cmd === 'ulti') {
-    if (f.ulti >= ULTI_MAX && !f.ultiUsed && m.t >= f.confusedUntil) {
+    if (f.ulti >= ULTI_MAX && !f.ultiUsed && m.t >= f.confusedUntil && m.t >= m.enemyMods.provokedUntil) {
       fireUlti(m, 'player')
     }
     return
@@ -753,6 +766,19 @@ function enemyCardValue(m: MatchState, card: CoachCard): number {
  */
 export function enemyCornerPlay(m: MatchState): void {
   m.enemySouffle = SOUFFLE_PER_CORNER
+  // Vol de Souffle joué par le joueur au round précédent : le coin adverse
+  // arrive essoufflé à sa pause. Appliqué AVANT toute dépense (relève
+  // incluse) — sinon la relève ci-dessous décidait sur un Souffle pas
+  // encore drainé et pouvait switcher alors que le vol, une fois appliqué,
+  // l'en aurait empêché ; symétrique du coin JOUEUR (tick(), phase
+  // roundEnd), où le drain adverse est déjà appliqué avant que le joueur
+  // ne puisse dépenser quoi que ce soit à sa propre pause (trouvé en
+  // audit, 2026-08-20).
+  if (m.mods.drainEnemySouffle > 0) {
+    m.enemySouffle = Math.max(0, m.enemySouffle - m.mods.drainEnemySouffle)
+    m.mods.drainEnemySouffle = 0
+    m.events.push({ kind: 'cardProc', t: m.t, text: '🌬️ SOUFFLE ADVERSE VOLÉ !!' })
+  }
   // La relève adverse : si son actif est entamé et qu'un équipier est plus
   // frais, le coin adverse fait monter la réserve (coûte 1 Souffle).
   if (m.enemyBench.length > 0 && m.enemySouffle >= SWITCH_COST) {
@@ -775,13 +801,6 @@ export function enemyCornerPlay(m: MatchState): void {
       m.enemySouffle -= SWITCH_COST
       m.events.push({ kind: 'switch', t: m.t, side: 'enemy', name: incoming.char.name })
     }
-  }
-  // Vol de Souffle joué par le joueur au round précédent : le coin adverse
-  // arrive essoufflé à sa pause.
-  if (m.mods.drainEnemySouffle > 0) {
-    m.enemySouffle = Math.max(0, m.enemySouffle - m.mods.drainEnemySouffle)
-    m.mods.drainEnemySouffle = 0
-    m.events.push({ kind: 'cardProc', t: m.t, text: '🌬️ SOUFFLE ADVERSE VOLÉ !!' })
   }
   drawEnemyCards(m, HAND_SIZE - m.enemyHand.length)
   for (;;) {
@@ -822,6 +841,14 @@ function enemyCoachAI(m: MatchState, dt: number): void {
     e.stance = 'aggressive'
     return
   }
+  // Un combattant tombé à 0 PV plus tôt DANS CE MÊME TICK (via le spécial/
+  // Ulti du joueur, appliqué juste avant dans tick() par applyCommand) ne
+  // peut plus frapper — même bug de fond que le double-KO déjà corrigé
+  // pour la boucle d'actions (voir plus bas) : sans ce garde-fou, un
+  // combattant DÉJÀ MORT ce tick pouvait quand même lancer son Ulti/spécial
+  // sur le joueur, produisant un double-KO simultané où le camp mort en
+  // premier « gagnait » quand même le round (trouvé en audit, 2026-08-20).
+  if (e.hp <= 0) return
   // Probabilités en taux PAR SECONDE (× dt) : la difficulté ne doit pas
   // dépendre du refresh de l'écran (144 Hz ≠ 2,4× plus d'ultis qu'à 60 Hz).
   if (e.ulti >= ULTI_MAX && !e.ultiUsed && Math.random() < 0.9 * dt) {
@@ -1042,7 +1069,14 @@ export function tick(m: MatchState, dt: number, input: CoachInput): void {
 
   // --- Fin de round --- (le timer de round est tenu par l'UI/sim)
   if (m.player.hp <= 0 || m.enemy.hp <= 0) {
-    const winner = m.player.hp <= 0 ? 'enemy' : 'player'
+    // Double-KO simultané (les deux à 0 PV le même tick — possible via
+    // un contre mutuel dans la boucle d'actions ci-dessus) : départager
+    // par `m.player.hp <= 0 ? 'enemy' : 'player'` donnait TOUJOURS le
+    // round à l'ennemi, sans lien avec qui avait vraiment agi en premier
+    // — asymétrique avec forceRoundTimeout (ligne plus bas), dont le
+    // départage à égalité favorise le joueur. Même tie-break ici pour
+    // rester cohérent (trouvé en audit, 2026-08-20).
+    const winner = m.player.hp <= 0 && m.enemy.hp > 0 ? 'enemy' : 'player'
     endRound(m, winner)
   }
 }

@@ -6041,3 +6041,84 @@ describe('planLabel (combat.ts) — fonction exportée jamais appelée par un te
     expect(planLabel('coldblood')).toBe('SANG-FROID')
   })
 })
+
+describe('Bugs trouvés par audit (code-review, 2026-08-20, combat.ts round 2) — verrouillés par des tests', () => {
+  function freeze(m: MatchState): void {
+    m.player.nextActionAt = m.t + 1000
+    m.enemy.nextActionAt = m.t + 1000
+  }
+
+  it("Provoqué (carte adverse) : le coach ne peut plus déclencher NI Spécial NI Ulti pendant la fenêtre — jusqu'ici seuls les ordres de posture (attack/defend/dodge/counter) étaient bloqués, laissant passer les 2 coups les plus forts du jeu", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.enemyMods.provokedUntil = m.t + 5
+    m.player.hype = HYPE_MAX
+    const enemyHpBefore = m.enemy.hp
+    tick(m, 0.001, { command: 'special', voiceEnergy: 0.5, faceEnergy: 0 })
+    expect(m.player.hype).toBe(HYPE_MAX) // fireSpecial() l'aurait remise à 0
+    expect(m.enemy.hp).toBe(enemyHpBefore) // aucun dégât : le spécial n'est jamais parti
+    m.player.ulti = ULTI_MAX
+    m.player.ultiUsed = false
+    tick(m, 0.001, { command: 'ulti', voiceEnergy: 0.5, faceEnergy: 0 })
+    expect(m.player.ultiUsed).toBe(false) // fireUlti() l'aurait mise à true
+    expect(m.enemy.hp).toBe(enemyHpBefore)
+  })
+
+  it("fireUlti() charge l'Ulti du camp qui encaisse, comme fireSpecial() le fait déjà — jusqu'ici encaisser LE plus gros coup du jeu (32%+ des PV max) ne rapportait ZÉRO charge d'Ulti, contrairement à un simple spécial", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.player.ulti = ULTI_MAX
+    m.player.ultiUsed = false
+    m.enemy.ulti = 0
+    m.enemy.ultiUsed = false
+    tick(m, 0.001, { command: 'ulti', voiceEnergy: 0.5, faceEnergy: 0 })
+    expect(m.enemy.ulti).toBeGreaterThan(0)
+  })
+
+  it("enemyCoachAI ne fait plus tirer un combattant DÉJÀ MORT ce tick (via le spécial/Ulti du joueur, résolu juste avant) — même famille de bug que le double-KO déjà corrigé pour la boucle d'actions, mais via un chemin différent (le coach fantôme, hors boucle)", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.player.ulti = ULTI_MAX
+    m.player.ultiUsed = false
+    m.enemy.hp = 1 // le moindre Ulti joueur l'achève
+    m.enemy.ulti = ULTI_MAX // sans le garde-fou, tirerait quand même en retour
+    m.enemy.ultiUsed = false
+    const playerHpBefore = m.player.hp
+    vi.spyOn(Math, 'random').mockReturnValue(0) // sous le seuil 0,9×dt d'enemyCoachAI
+    tick(m, 1, { command: 'ulti', voiceEnergy: 0.5, faceEnergy: 0 })
+    expect(m.enemy.hp).toBe(0) // bien achevé par l'Ulti du joueur
+    expect(m.enemy.ultiUsed).toBe(false) // …mais n'a JAMAIS pu tirer le sien en retour
+    expect(m.player.hp).toBe(playerHpBefore) // aucune riposte fantôme reçue
+    vi.restoreAllMocks()
+  })
+
+  it("Double-KO simultané (les deux à 0 PV le même tick) : départage désormais cohérent avec forceRoundTimeout, qui favorise le joueur à égalité — jusqu'ici le départage donnait TOUJOURS le round à l'ennemi, sans lien avec qui avait agi en premier", () => {
+    const m = freshMatch()
+    toFighting(m)
+    freeze(m)
+    m.player.hp = 0
+    m.enemy.hp = 0
+    tick(m, 0.01, quiet)
+    expect(m.phase).toBe('roundEnd')
+    expect(m.playerWins).toBe(1)
+    expect(m.enemyWins).toBe(0)
+    expect(m.events.some(e => e.kind === 'roundEnd' && e.winner === 'player')).toBe(true)
+  })
+
+  it("enemyCornerPlay() applique le Vol de Souffle AVANT d'évaluer la relève — jusqu'ici la relève se décidait sur un Souffle pas encore drainé et pouvait switcher (coûtant 1 Souffle) alors qu'un drain total, appliqué en premier, l'aurait empêchée", () => {
+    const m = createMatch(ROSTER[0], ROSTER[1], [], { enemyTeam: [ROSTER[4]] })
+    m.enemy.hp = Math.round(m.enemy.maxHp * 0.1) // très entamé : switcherait normalement (banc frais)
+    m.enemyDeck = []
+    m.enemyDiscard = []
+    m.enemyHand = []
+    m.mods.drainEnemySouffle = SOUFFLE_PER_CORNER // draine tout le Souffle de la pause
+    enemyCornerPlay(m)
+    expect(m.enemy.char.id).toBe(ROSTER[1].id) // pas de switch : plus assez de Souffle une fois drainé
+    expect(m.events.some(e => e.kind === 'switch' && e.side === 'enemy')).toBe(false)
+    expect(m.enemySouffle).toBe(0)
+    expect(m.mods.drainEnemySouffle).toBe(0) // le pari reste bien consommé
+  })
+})
