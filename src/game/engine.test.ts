@@ -3284,6 +3284,51 @@ describe('ArenaRenderer — prefers-reduced-motion (WCAG 2.3.3, audit accessibil
   })
 })
 
+describe('ArenaRenderer.drawCommentary — repli de mise en page, jamais exercé', () => {
+  function fakeCtx() {
+    const fillTexts: string[] = []
+    const strokeTexts: string[] = []
+    const ctx: any = {
+      save() {},
+      restore() {},
+      fillRect() {},
+      strokeText: (t: string) => strokeTexts.push(t),
+      fillText: (t: string) => fillTexts.push(t),
+    }
+    return { ctx, fillTexts, strokeTexts }
+  }
+
+  it("bug d'audit (2026-08-20) : un texte long SANS AUCUN ESPACE (ex. un nom de carte/perso forgé par le joueur, jusqu'à 21 caractères sans espace — voir cardForge.ts) est quand même coupé sur 2 lignes plutôt que de déborder du canvas sur une seule ligne non coupée", () => {
+    const renderer = new ArenaRenderer()
+    const { ctx, fillTexts } = fakeCtx()
+    const longNoSpaceWord = 'A'.repeat(40) // aucun espace nulle part : lastIndexOf(' ', …) renvoie -1
+    renderer.setCommentary(longNoSpaceWord, 1, 0)
+    ;(renderer as any).drawCommentary(ctx, 0)
+    expect(fillTexts).toHaveLength(2) // coupé en 2 lignes, pas 1 seule ligne qui déborde
+    expect(fillTexts.join('')).toBe(longNoSpaceWord) // rien perdu, juste coupé
+  })
+
+  it('un texte long AVEC un espace proche du milieu continue de couper à cet espace (comportement déjà correct, non régressé)', () => {
+    const renderer = new ArenaRenderer()
+    const { ctx, fillTexts } = fakeCtx()
+    const text = "C'EST TERMINÉ !! Kenta L'EMPORTE !! QUEL MATCH !!"
+    renderer.setCommentary(text, 1, 0)
+    ;(renderer as any).drawCommentary(ctx, 0)
+    expect(fillTexts).toHaveLength(2)
+    expect(fillTexts.join(' ')).toBe(text) // le séparateur (l'espace coupé) est bien reconstitué
+  })
+
+  it('un texte court (≤ 34 caractères) reste sur une seule ligne, jamais coupé pour rien', () => {
+    const renderer = new ArenaRenderer()
+    const { ctx, fillTexts } = fakeCtx()
+    const text = 'ROUND 1 !! Le gong retentit !'
+    expect(text.length).toBeLessThanOrEqual(34)
+    renderer.setCommentary(text, 1, 0)
+    ;(renderer as any).drawCommentary(ctx, 0)
+    expect(fillTexts).toEqual([text])
+  })
+})
+
 describe("Résilience : l'accès à `localStorage` LUI-MÊME bloqué (pas juste ses méthodes)", () => {
   // Certains modes de confidentialité stricts (anciens Safari, extensions
   // qui bloquent tout stockage) font planter la LECTURE de la propriété

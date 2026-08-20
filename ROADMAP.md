@@ -3212,11 +3212,133 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       99,52 % branches, inchangée par rapport au balayage précédent
       (les 2 branches restantes déjà documentées comme structurellement
       inatteignables, pas de nouveau trou introduit par ce fix).
+- [x] Audit de code (fichier entier) sur `render/arenaRenderer.ts` (le
+      rendu canvas 9:16 de l'arène, 1122 lignes — le plus gros fichier
+      jamais audité fichier entier cette session, 2026-08-20). Vérifié au
+      passage : `cutLibrary.ts` relu, confirmé trivial (une interface +
+      un stub, rien à auditer). **1 vrai bug corrigé** dans
+      `drawCommentary()`, confirmé par `git stash` A/B : le repli à deux
+      lignes cherchait le DERNIER espace avant le milieu du texte
+      (`text.lastIndexOf(' ', mid)`) pour couper une réplique trop longue
+      — mais si AUCUN espace n'existe avant ce point (`cut === -1`), le
+      garde-fou `cut > 0` échouait silencieusement et `lines` restait
+      `[text]` : la réplique ENTIÈRE, non coupée, partait en une seule
+      ligne large de 18 à 26px, capable de déborder des bords du canvas.
+      Vérifié que ce n'est PAS un cas purement théorique avant de le
+      corriger : le nom d'une carte forgée par le joueur peut atteindre
+      21 caractères SANS AUCUN ESPACE (`cardForge.ts`, regex
+      `[\wà-ÿ' -]{1,20}`, un simple mot-valise sans espace est un choix
+      de nom tout à fait normal), substitué dans des gabarits du
+      commentateur comme `« LA TECHNIQUE SECRÈTE : {S} !! »`. Une analyse
+      plus poussée a montré que le cas exact « aucun espace du tout dans
+      la première moitié » reste rare avec les gabarits FRANÇAIS actuels
+      (le texte autour de `{S}` fournit presque toujours un espace
+      suffisamment tôt) — mais le correctif reste une garantie peu
+      coûteuse contre toute évolution future des gabarits ou des limites
+      de longueur de nom, plutôt qu'une hypothèse à écarter comme
+      inatteignable. Corrigé avec une coupe DURE au même point visé
+      (`mid`) quand aucun espace n'est trouvé, garantissant que le texte
+      tient toujours sur deux lignes au-delà du seuil de 34 caractères.
+      3 nouveaux tests (repli sans espace, coupe normale non régressée,
+      texte court non coupé pour rien) via un faux contexte canvas
+      minimal (`save/restore/fillRect/strokeText/fillText`), reconfirmés
+      par `git stash` A/B. Vérification visuelle supplémentaire via
+      `scripts/shot.mjs` : la bulle de commentaire du match démo continue
+      de s'afficher correctement sur deux lignes. Un second point relevé
+      par l'audit — un commentaire affirmant que « le combattant le plus
+      touché récemment » est dessiné au-dessus, alors que l'ordre de
+      dessin (joueur puis adversaire) est en réalité FIXE, indépendant de
+      tout état d'animation — a été corrigé dans le commentaire pour
+      refléter le comportement réel plutôt que ré-implémenté : un vrai
+      ordre dynamique introduirait un changement de comportement visuel
+      dont l'impact réel semble marginal (la séparation horizontale au
+      repos excède largement l'allonge d'une frappe), et le risque d'une
+      règle mal spécifiée dépassait la valeur incertaine du correctif —
+      documenté plutôt que forcé. Un troisième point (recréation de deux
+      dégradés canvas à CHAQUE frame, ~60 fois/seconde, alors que leurs
+      arrêts de couleur ne dépendent que de constantes) est une pure
+      question de performance, pas de correction — hors du périmètre de
+      cet audit, non traité. 398 tests, suite vérifiée sur 3 exécutions
+      consécutives. `tsc --noEmit` + `npm run build` verts. Couverture de
+      `arenaRenderer.ts` globalement très faible (7 % — un fichier de
+      rendu canvas massif, quasiment jamais testé avant cette session, un
+      chantier à part entière s'il devait être entrepris) mais le code
+      touché par ce fix (`drawCommentary`) est désormais couvert par les
+      3 nouveaux tests.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-20 (routine, suite) : Après avoir clos la famille « cuts/
+  scènes », passage au plus gros morceau jamais audité fichier entier
+  cette session : `render/arenaRenderer.ts` (1122 lignes, le rendu
+  canvas 9:16 de l'arène — silhouettes, HUD, FX, commentateur). `game/
+  cutLibrary.ts`, laissé de côté jusqu'ici, relu au passage : une simple
+  interface + un stub (`EMPTY_CUT_LIBRARY`), rien à auditer. Sur
+  `arenaRenderer.ts`, un audit ciblé a trouvé et corrigé **1 vrai bug**,
+  confirmé par `git stash` A/B, dans `drawCommentary()` (la bulle de
+  texte du commentateur shōnen) : le repli à deux lignes cherchait le
+  DERNIER espace avant le milieu du texte pour couper une réplique trop
+  longue (`text.lastIndexOf(' ', mid)`), mais si AUCUN espace n'existe
+  avant ce point (`lastIndexOf` renvoie `-1`), le garde-fou `cut > 0`
+  échouait silencieusement et la réplique ENTIÈRE partait non coupée sur
+  une seule ligne — capable de déborder des bords du canvas de 540px.
+  Avant de le corriger, vérifié si c'était réellement atteignable plutôt
+  que théorique : le nom d'une carte forgée par le joueur peut atteindre
+  21 caractères SANS AUCUN ESPACE (`cardForge.ts`, la regex d'extraction
+  de nom autorise `[\wà-ÿ' -]{1,20}` — un mot-valise collé, sans espace,
+  est un choix de nom de carte tout ce qu'il y a de normal), substitué
+  dans des gabarits du commentateur comme « LA TECHNIQUE SECRÈTE : {S}
+  !! ». Une analyse plus poussée (calcul précis des positions d'espace
+  pour plusieurs gabarits réels de `commentator.ts`) a montré que le cas
+  exact — aucun espace nulle part dans la première moitié du texte total
+  — reste rare avec les gabarits FRANÇAIS actuels, le texte entourant
+  `{S}` fournissant presque toujours un espace assez tôt pour que la
+  coupe existante fonctionne malgré tout. Corrigé quand même : le
+  correctif est une garantie peu coûteuse contre toute évolution future
+  des gabarits, des limites de longueur de nom, ou simplement contre un
+  cas limite qui n'a pas été anticipé par cette analyse — pas un
+  hypothétique à écarter comme structurellement inatteignable (contraire
+  au cas `sampleRate < 500` de `pitch.ts`, celui-là VRAIMENT inatteignable
+  via le seul appelant réel). Une coupe DURE au même point visé remplace
+  maintenant l'absence de coupe : le texte tient TOUJOURS sur deux lignes
+  au-delà du seuil de 34 caractères, espace disponible ou pas. 3 nouveaux
+  tests écrits contre un faux contexte canvas minimal
+  (`save/restore/fillRect/strokeText/fillText`, un mock plus léger que
+  les `FakeAudioContext`/`FakeCanvas` habituels de ce fichier de tests,
+  suffisant puisque `drawCommentary` n'appelle rien d'autre) : le repli
+  sans espace, la coupe normale déjà correcte (non régressée), et un
+  texte court qui ne doit jamais être coupé pour rien. Vérification
+  visuelle supplémentaire, au-delà des tests unitaires : `scripts/
+  shot.mjs` relancé sur le funnel de démo, la bulle de commentaire
+  affichée dans `arena-2.png` continue de se répartir correctement sur
+  deux lignes. Deux autres pistes soulevées par l'audit initial,
+  délibérément NON corrigées cette fois, pour des raisons différentes de
+  la précédente (ce n'est plus une question d'atteignabilité, mais de
+  RISQUE et de PÉRIMÈTRE) : un commentaire affirmant que « le combattant
+  le plus touché récemment » est dessiné au-dessus — alors que l'ordre de
+  dessin (joueur puis adversaire) est en réalité FIXE, sans lien avec
+  l'état d'animation — a été corrigé dans le COMMENTAIRE, pas dans le
+  comportement : implémenter un vrai ordre dynamique changerait le rendu
+  visuel pour un bénéfice incertain (la séparation horizontale au repos
+  excède déjà largement l'allonge d'une frappe, donc l'occlusion réelle
+  semble marginale), et une règle mal spécifiée (« plus touché » n'a
+  d'ailleurs pas de définition évidente dans le code actuel — pas de
+  timestamp de dernier coup encaissé) aurait été plus risquée que de
+  laisser un choix simple et déjà fonctionnel, correctement documenté
+  cette fois. Et la recréation de deux dégradés canvas à CHAQUE frame
+  (~60 fois par seconde) alors que leurs arrêts de couleur ne dépendent
+  que de constantes fixes : une question de PERFORMANCE, pas de
+  correction — explicitement hors du périmètre d'un audit de correction
+  fonctionnelle, non traité. 398 tests, suite vérifiée sur 3 exécutions
+  consécutives, `tsc --noEmit` et `npm run build` verts. Couverture de
+  `arenaRenderer.ts` : très faible dans l'ensemble (≈7 % — un fichier de
+  rendu canvas massif, quasiment jamais testé avant cette session ; un
+  chantier de couverture à part entière s'il devait être un jour
+  entrepris, hors de portée d'une seule itération), mais le code
+  effectivement touché par ce fix (`drawCommentary`) est désormais
+  couvert par les 3 nouveaux tests.
 - 2026-08-20 (routine, suite) : Dernier fichier de la famille « cuts/
   scènes » à auditer fichier entier : `game/speechTactics.ts`
   (`parseConsigne`), le parseur par mots-clés qui transforme une phrase

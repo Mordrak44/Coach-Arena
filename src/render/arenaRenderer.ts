@@ -279,7 +279,14 @@ export class ArenaRenderer {
     this.drawBackground(ctx, m, now)
     this.drawRing(ctx)
 
-    // Combattants (le plus touché récemment dessiné au-dessus)
+    // Combattants — ordre FIXE (joueur, puis adversaire au-dessus), pas
+    // dynamique par « dernier touché » comme l'affirmait ce commentaire
+    // avant correction (trouvé en audit, 2026-08-20) : les deux appels
+    // ci-dessous ne dépendent d'aucun état d'animation. En pratique, la
+    // séparation horizontale au repos (~0.34 × largeur du ring) excède
+    // largement l'allonge d'une frappe/fente (~90-100 px à l'écran), donc
+    // ce choix reste rarement visible — mais un chevauchement ponctuel
+    // pendant deux attaques simultanées EST possible.
     this.drawFighter(ctx, m.player, now, false)
     this.drawFighter(ctx, m.enemy, now, true)
 
@@ -889,8 +896,20 @@ export class ArenaRenderer {
     const text = this.commentText
     let lines: string[] = [text]
     if (text.length > 34) {
-      const cut = text.lastIndexOf(' ', Math.ceil(text.length / 2) + 6)
-      if (cut > 0) lines = [text.slice(0, cut), text.slice(cut + 1)]
+      const mid = Math.ceil(text.length / 2) + 6
+      const cut = text.lastIndexOf(' ', mid)
+      if (cut > 0) {
+        lines = [text.slice(0, cut), text.slice(cut + 1)]
+      } else {
+        // Aucun espace avant le point de coupe visé — un nom de carte/perso
+        // forgé PAR LE JOUEUR (jusqu'à 21 caractères sans espace, voir
+        // cardForge.ts) substitué tôt dans le gabarit peut occuper toute la
+        // première moitié. Sans repli, `lines` restait `[text]` : la
+        // réplique entière, non coupée, débordait des bords du canvas au
+        // lieu de tenir sur deux lignes (trouvé en audit, 2026-08-20).
+        // Coupe DURE au même point visé plutôt que de laisser filer.
+        lines = [text.slice(0, mid), text.slice(mid)]
+      }
     }
     const y0 = 150
     const h = lines.length * (size + 8) + 14
