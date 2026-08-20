@@ -2775,11 +2775,71 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       (2e réclamation réelle sur `claimReward`, jamais exercée). 370
       tests, suite vérifiée sur 3 exécutions consécutives. `tsc
       --noEmit` + `npm run build` verts.
+- [x] Audit de code (fichier entier) sur `cardForge.ts` (persistance des
+      cartes forgées par prompt, 2026-08-18) — 3e fichier de la même
+      famille de bugs (après `stable.ts`, `progression.ts`), trouvé en
+      continuant le balayage systématique des modules persistés en
+      `localStorage`. **2 vrais bugs corrigés**, confirmés par exécution
+      directe du module contre un stockage fabriqué à la main, puis par
+      `git stash` A/B (les 2 nouveaux tests échouent bien sur le code
+      d'avant-fix) : (1) `loadForgedCards()` ne validait que le TABLEAU
+      stocké, pas ses ÉLÉMENTS — un seul élément corrompu (`[null,
+      "oops", carteValide]`) faisait planter `c.effects` DANS le même
+      try/catch que le `JSON.parse`, donc `catch { return [] }` jetait
+      TOUT le lot, y compris les cartes valides. (2) `saveForgedCard()`
+      ne validait pas que la valeur parsée était bien un tableau avant
+      `.unshift()` — un stockage corrompu de FORME (ex. `{}`) faisait
+      planter l'unshift, capturé par le même try/catch, donc la carte
+      que le joueur VIENT de forger n'était JAMAIS persistée (jouable la
+      session courante via `registerCustomCard`, perdue au rechargement)
+      — silencieux, sans erreur visible. Corrigé avec le même patron que
+      `stable.ts`/`progression.ts` : un helper `isValidForged()` +
+      `.filter()` sur les éléments dans `loadForgedCards()`,
+      `Array.isArray()` avant `.unshift()` dans `saveForgedCard()` —
+      jamais punitif, un élément invalide écarté plutôt que tout le
+      magasin perdu. 2 nouveaux tests. 372 tests, suite vérifiée sur 3
+      exécutions consécutives. `tsc --noEmit` + `npm run build` verts.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-18 (routine) : Après `stable.ts` puis `progression.ts`,
+  continué le balayage systématique de tous les modules `game/`
+  persistés en `localStorage` (`story.ts` et `onboarding.ts` d'abord :
+  déjà correctement durcis, aucun changement) jusqu'à `cardForge.ts`
+  (persistance des cartes forgées par prompt), qui portait la MÊME
+  classe de bug — un 3e fichier sur 5 vérifiés. `loadForgedCards()` et
+  `saveForgedCard()` validaient chacune que le JSON stocké avait le bon
+  CONTENEUR (un tableau), mais aucune n'allait jusqu'à valider chaque
+  ÉLÉMENT/la FORME entière avant de l'utiliser. (1) Dans
+  `loadForgedCards()`, un seul élément corrompu au milieu d'un tableau
+  par ailleurs valide (`[null, "oops", carteValide]`) faisait planter
+  `c.effects` dans la boucle de migration/re-clamp — cette boucle étant
+  DANS le même try/catch que le `JSON.parse`, le `catch { return [] }`
+  jetait tout le lot, y compris les cartes forgées valides : perte
+  totale de la collection pour une seule entrée corrompue. (2) Dans
+  `saveForgedCard()`, un stockage corrompu de FORME (pas un tableau, ex.
+  `{}`) faisait planter `.unshift()`, capturé par le même try/catch —
+  la carte que le joueur venait tout juste de forger (déjà enregistrée
+  en mémoire via `registerCustomCard`, donc jouable cette session)
+  n'était alors JAMAIS écrite en `localStorage` : perdue silencieusement
+  au rechargement, sans aucune erreur visible pour le joueur. Les deux
+  bugs d'abord reproduits par exécution directe du module (scripts
+  jetables dans `scripts/`, supprimés après usage) contre un stockage
+  fabriqué à la main, puis corrigés avec le patron déjà établi sur
+  `stable.ts`/`progression.ts` : un helper `isValidForged()` type-guard
+  + `.filter()` sur les éléments dans `loadForgedCards()`,
+  `Array.isArray()` (au lieu d'une confiance aveugle) avant `.unshift()`
+  dans `saveForgedCard()` — toujours « jamais punitif », une entrée
+  invalide est écartée individuellement plutôt que de faire perdre tout
+  le magasin. 2 nouveaux tests ajoutés dans le bloc dédié existant de
+  `engine.test.ts`, chacun reconfirmé par `git stash` A/B (échouent bien
+  sur le code d'avant-fix, avec exactement les symptômes observés
+  manuellement). Suite complète (372 tests) vérifiée sur 3 exécutions
+  consécutives, `tsc --noEmit` et `npm run build` verts. Couverture de
+  `cardForge.ts` : 96,1 % lignes / 92,7 % branches — suffisant pour ce
+  fix ciblé, pas de chasse à la couverture restante ici.
 - 2026-08-18 (routine) : Immédiatement après `stable.ts`, même passage
   sur `progression.ts` (Lien coach-perso, paliers de récompense, persos
   créés par prompt — également persisté en `localStorage`) : la classe

@@ -3061,6 +3061,29 @@ describe('Persistance de la Forge (cardForge.ts) — saveForgedCard/loadForgedCa
     const r = forgeCard('un cri de guerre puissant')!
     expect(() => saveForgedCard(r.card)).not.toThrow()
   })
+
+  it("bug d'audit (2026-08-18) : un ÉLÉMENT individuel corrompu dans le tableau stocké (le tableau lui-même est valide, PAS un de ses éléments) faisait perdre TOUTES les cartes forgées, y compris les valides — `c.effects` sur un élément `null` plantait DANS le même try/catch que le parsing, donc `catch { return [] }` jetait tout le lot au lieu de filtrer juste l'entrée invalide", async () => {
+    localStorage.setItem(
+      'coach-arena-forged-cards-v1',
+      JSON.stringify([
+        null,
+        'oops',
+        { id: 'forge-good', name: 'Bonne Carte', timing: 'pause', cost: 1, icon: '🔥', desc: 'x', effects: [] },
+      ]),
+    )
+    const { loadForgedCards } = await import('./cardForge')
+    expect(() => loadForgedCards()).not.toThrow()
+    const loaded = loadForgedCards()
+    expect(loaded.map(c => c.id)).toEqual(['forge-good']) // les 2 corrompus écartés, la bonne gardée
+  })
+
+  it("bug d'audit (2026-08-18) : saveForgedCard() sur un stockage corrompu de FORME (pas un tableau) perdait silencieusement la carte que le joueur VIENT de forger — `.unshift()` sur une valeur non-tableau plantait, capturé par le try/catch englobant, donc jamais persistée (jouable cette session via registerCustomCard, perdue au rechargement)", async () => {
+    localStorage.setItem('coach-arena-forged-cards-v1', JSON.stringify({ notAnArray: true }))
+    const { forgeCard, saveForgedCard, loadForgedCards } = await import('./cardForge')
+    const r = forgeCard('un cri de guerre puissant, appelée Rescapée')!
+    expect(() => saveForgedCard(r.card)).not.toThrow()
+    expect(loadForgedCards().map(c => c.id)).toContain(r.card.id) // bien persistée, pas perdue
+  })
 })
 
 describe('ArenaRenderer — prefers-reduced-motion (WCAG 2.3.3, audit accessibilité)', () => {

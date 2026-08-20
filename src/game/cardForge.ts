@@ -223,11 +223,26 @@ const hasStorage = (() => {
   }
 })()
 
+/** Élément de tableau bien formé (validation minimale, pas un schéma complet). */
+function isValidForged(c: unknown): c is CoachCard {
+  return !!c && typeof c === 'object' && typeof (c as CoachCard).id === 'string'
+}
+
 export function saveForgedCard(card: CoachCard): void {
   registerCustomCard(card)
   if (!hasStorage) return
   try {
-    const all: CoachCard[] = JSON.parse(localStorage.getItem(FORGE_KEY) ?? '[]')
+    const parsed: unknown = JSON.parse(localStorage.getItem(FORGE_KEY) ?? '[]')
+    // Sans ce contrôle, un stockage corrompu de FORME (pas un tableau —
+    // ex. `{}`, `42`) faisait planter `.unshift()` PLUS BAS, capturé par ce
+    // même try/catch : la carte que le joueur VIENT de forger (déjà
+    // enregistrée en mémoire ci-dessus, donc jouable cette session) ne
+    // persistait alors JAMAIS — perdue silencieusement au rechargement,
+    // sans qu'aucune erreur ne soit visible (trouvé en audit, 2026-08-18,
+    // même famille que stable.ts/progression.ts). Repartir d'un tableau
+    // vide plutôt que de perdre la carte qu'on est justement en train de
+    // sauvegarder.
+    const all: CoachCard[] = Array.isArray(parsed) ? parsed : []
     all.unshift(card)
     localStorage.setItem(FORGE_KEY, JSON.stringify(all.slice(0, MAX_FORGED)))
   } catch {
@@ -239,7 +254,16 @@ export function saveForgedCard(card: CoachCard): void {
 export function loadForgedCards(): CoachCard[] {
   if (!hasStorage) return []
   try {
-    const all: CoachCard[] = JSON.parse(localStorage.getItem(FORGE_KEY) ?? '[]')
+    const parsed: unknown = JSON.parse(localStorage.getItem(FORGE_KEY) ?? '[]')
+    // Idem `readJson` de progression.ts/stable.ts : valider le CONTENEUR
+    // (un tableau) ne suffit pas — un ÉLÉMENT corrompu (`[null]`) à
+    // l'intérieur d'un tableau par ailleurs valide faisait planter
+    // `c.effects` plus bas, capturé par le même try/catch que le parsing :
+    // TOUTES les cartes forgées, y compris les valides, disparaissaient
+    // d'un coup à cause d'une seule entrée corrompue (trouvé en audit,
+    // 2026-08-18). Filtrée individuellement plutôt que de jeter tout le
+    // lot.
+    const all = (Array.isArray(parsed) ? parsed : []).filter(isValidForged)
     for (const c of all) {
       c.effects = (c.effects ?? []).map(clampEffect)
       c.cost = computeCost(c.effects)
