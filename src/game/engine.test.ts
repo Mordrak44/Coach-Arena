@@ -4277,6 +4277,89 @@ describe('recorder.ts — chemins de succès de stop(), jamais exercés (seuls l
   })
 })
 
+describe("recorder.ts — bug d'audit (2026-08-20) : stop() sur un recorder auto-arrêté par le navigateur (state déjà 'inactive' AVANT l'appel, sans passer par onstop) jetait les chunks déjà flushés", () => {
+  afterEach(() => {
+    delete (globalThis as any).MediaRecorder
+    delete (globalThis as any).window
+  })
+
+  // Un vrai MediaRecorder peut passer 'inactive' TOUT SEUL (flux devenu
+  // inactif — iOS Safari en tâche de fond, permission micro révoquée en
+  // cours de match) : il flushe alors un dernier ondataavailable puis coupe,
+  // SANS que le code applicatif ait appelé .stop() lui-même. Ce fake modélise
+  // exactement ça : `goInactive()` pousse un dernier chunk et bascule l'état,
+  // sans jamais invoquer `onstop` (contrairement à `.stop()` plus bas, qui
+  // reste le chemin normal où l'appelant déclenche l'arrêt).
+  class SelfStoppingRecorder {
+    static isTypeSupported() {
+      return true
+    }
+    state = 'recording'
+    mimeType = 'video/webm'
+    ondataavailable: ((e: { data: { size: number } }) => void) | null = null
+    onstop: (() => void) | null = null
+    start() {}
+    stop() {
+      this.ondataavailable?.({ data: { size: 42 } })
+      this.state = 'inactive'
+      this.onstop?.()
+    }
+    goInactive(chunkSize: number) {
+      this.ondataavailable?.({ data: { size: chunkSize } })
+      this.state = 'inactive'
+    }
+  }
+
+  function fakeCanvasAndMic() {
+    const fakeStream = { addTrack: () => {}, getTracks: () => [], getAudioTracks: () => [] }
+    const fakeCanvas = { captureStream: () => fakeStream } as unknown as HTMLCanvasElement
+    return { fakeCanvas }
+  }
+
+  it("MatchRecorder.stop() récupère les chunks déjà accumulés quand le recorder est trouvé 'inactive' à l'entrée (auto-arrêt), au lieu de renvoyer null en les jetant", async () => {
+    ;(globalThis as any).MediaRecorder = SelfStoppingRecorder
+    const { fakeCanvas } = fakeCanvasAndMic()
+    const mr = new MatchRecorder()
+    expect(mr.start(fakeCanvas, null)).toBe(true)
+    const rec = (mr as any).recorder as SelfStoppingRecorder
+    rec.ondataavailable!({ data: { size: 100 } }) // chunk normal en cours d'enregistrement
+    rec.goInactive(42) // auto-arrêt navigateur : dernier flush, state bascule seul
+    const blob = await mr.stop()
+    expect(blob).not.toBeNull() // avant le fix : null, les 2 chunks perdus
+    expect(blob!.type).toBe('video/webm')
+    expect((mr as any).mixStream).toBeNull() // pistes quand même relâchées
+  })
+
+  it("MatchRecorder.stop() : un second appel après un premier stop() réussi reste inoffensif et renvoie null (filet de sécurité au démontage d'ArenaScreen)", async () => {
+    ;(globalThis as any).MediaRecorder = SelfStoppingRecorder
+    const { fakeCanvas } = fakeCanvasAndMic()
+    const mr = new MatchRecorder()
+    expect(mr.start(fakeCanvas, null)).toBe(true)
+    const rec = (mr as any).recorder as SelfStoppingRecorder
+    rec.ondataavailable!({ data: { size: 100 } })
+    const first = await mr.stop()
+    expect(first).not.toBeNull()
+    const second = await mr.stop() // rec.state est maintenant 'inactive' via le premier stop()
+    expect(second).toBeNull() // chunks déjà vidés par le premier appel : rien à re-renvoyer
+  })
+
+  it("HighlightRecorder.stop() récupère le segment courant auto-arrêté au lieu de retomber sur le segment précédent (qui perdrait la toute fin du match)", async () => {
+    ;(globalThis as any).MediaRecorder = SelfStoppingRecorder
+    ;(globalThis as any).window = { setInterval: () => 0, clearInterval: () => {} }
+    const { HighlightRecorder } = await import('../systems/recorder')
+    const hr = new HighlightRecorder()
+    const { fakeCanvas } = fakeCanvasAndMic()
+    expect(hr.start(fakeCanvas, null)).toBe(true)
+    ;(hr as any).prevBlob = new Blob(['segment précédent — ne doit PAS être choisi ici'], { type: 'video/webm' })
+    ;(hr as any).currentStartedAt = performance.now() - 7000 // segment courant assez long (> 6s)
+    const current = (hr as any).current as SelfStoppingRecorder
+    current.goInactive(42) // auto-arrêt navigateur avant l'appel à stop()
+    const blob = await hr.stop()
+    expect(blob).not.toBeNull()
+    expect(blob).not.toBe((hr as any).prevBlob) // avant le fix : renvoyait prevBlob, perdant la fin du match
+  })
+})
+
 describe("recorder.ts — chunks de taille nulle et repli de type MIME, angles morts de branches jamais exercés", () => {
   afterEach(() => {
     delete (globalThis as any).MediaRecorder

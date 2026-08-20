@@ -53,10 +53,18 @@ export class MatchRecorder {
   start(canvas: HTMLCanvasElement, micStream: MediaStream | null): boolean {
     try {
       const stream = canvas.captureStream(30)
+      // Assigné AVANT la boucle d'ajout des pistes micro, pas après : si
+      // `addTrack`/`clone()` jette au milieu de la boucle, le catch
+      // ci-dessous doit pouvoir stopper la piste vidéo de captureStream()
+      // déjà créée via releaseTracks() — sinon elle continue d'être
+      // sollicitée à 30 fps sans consommateur, la même fuite que releaseTracks
+      // documente pour le chemin d'arrêt normal, mais ici sur le chemin
+      // d'échec du démarrage (trouvé en audit, 2026-08-20 ; HighlightRecorder
+      // ci-dessous fait déjà cette assignation dans le bon ordre).
+      this.mixStream = stream
       if (micStream) {
         for (const track of micStream.getAudioTracks()) stream.addTrack(track.clone())
       }
-      this.mixStream = stream
       const mime = pickMimeType()
       this.chunks = []
       this.recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
@@ -83,15 +91,32 @@ export class MatchRecorder {
   /** Arrête l'enregistrement et retourne le blob vidéo du match. */
   async stop(): Promise<Blob | null> {
     const rec = this.recorder
-    if (!rec || rec.state === 'inactive') {
+    if (!rec) return null
+    if (rec.state === 'inactive') {
+      // `rec` non-null mais déjà 'inactive' a deux origines bien
+      // distinctes qu'il ne faut PAS traiter pareil : (a) un second appel
+      // à stop() (ArenaScreen appelle sys.recorder.stop() à la fin du
+      // match PUIS, sans condition, au démontage — filet de sécurité dont
+      // la valeur de retour n'est jamais utilisée) — ici this.chunks est
+      // déjà vidé plus bas, donc ça retombe sur null, sans dégât ; (b) un
+      // auto-arrêt du navigateur AVANT cet appel (le flux composite devient
+      // inactif — iOS Safari en tâche de fond, permission micro révoquée
+      // en cours de match) — le navigateur fait alors un dernier flush
+      // `ondataavailable` avant de couper, donc this.chunks contient déjà
+      // les données du match, jetées ici sans ce correctif pour un match
+      // presque entièrement capturé (trouvé en audit, 2026-08-20).
       this.releaseTracks()
-      return null
+      const blob = this.chunks.length ? new Blob(this.chunks, { type: rec.mimeType || 'video/webm' }) : null
+      this.chunks = []
+      return blob
     }
     return new Promise(resolve => {
       rec.onstop = () => {
         this.recording = false
         this.releaseTracks()
-        resolve(this.chunks.length ? new Blob(this.chunks, { type: rec.mimeType || 'video/webm' }) : null)
+        const blob = this.chunks.length ? new Blob(this.chunks, { type: rec.mimeType || 'video/webm' }) : null
+        this.chunks = []
+        resolve(blob)
       }
       rec.stop()
     })
@@ -203,19 +228,38 @@ export class HighlightRecorder {
   async stop(): Promise<Blob | null> {
     clearInterval(this.rotateTimer)
     const rec = this.current
-    if (!rec || rec.state === 'inactive') {
+    if (!rec) {
       this.releaseTracks()
       return this.prevBlob
     }
     const currentDur = performance.now() - this.currentStartedAt
+    // Segment courant trop court pour contenir l'action ? Le précédent est plus parlant.
+    const pick = (chunks: Blob[], mimeType: string): Blob | null => {
+      const blob = chunks.length ? new Blob(chunks, { type: mimeType || 'video/webm' }) : null
+      return currentDur < 6000 && this.prevBlob ? this.prevBlob : (blob ?? this.prevBlob)
+    }
+    if (rec.state === 'inactive') {
+      // Même bug que MatchRecorder.stop() (voir son commentaire) : un
+      // second appel (filet de sécurité au démontage, valeur de retour
+      // jamais utilisée) retombe sans dégât sur `this.prevBlob` puisque
+      // `this.currentChunks` est vidé plus bas au premier passage — mais un
+      // VRAI auto-arrêt du segment courant AVANT cet appel laissait ses
+      // chunks déjà flushés dans `this.currentChunks` purement ignorés au
+      // profit du segment PRÉCÉDENT, perdant la toute fin du match — la
+      // partie la plus pertinente pour un highlight de KO (trouvé en audit,
+      // 2026-08-20).
+      this.releaseTracks()
+      const blob = pick(this.currentChunks, rec.mimeType)
+      this.currentChunks = []
+      return blob
+    }
     return new Promise(resolve => {
       const chunks = this.currentChunks
       rec.onstop = () => {
         this.releaseTracks()
-        const blob = chunks.length ? new Blob(chunks, { type: rec.mimeType || 'video/webm' }) : null
-        // Segment courant trop court pour contenir l'action ? Le précédent est plus parlant.
-        if (currentDur < 6000 && this.prevBlob) resolve(this.prevBlob)
-        else resolve(blob ?? this.prevBlob)
+        const blob = pick(chunks, rec.mimeType)
+        this.currentChunks = []
+        resolve(blob)
       }
       rec.stop()
     })

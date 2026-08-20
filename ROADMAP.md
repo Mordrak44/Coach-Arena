@@ -2799,11 +2799,124 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       jamais punitif, un élément invalide écarté plutôt que tout le
       magasin perdu. 2 nouveaux tests. 372 tests, suite vérifiée sur 3
       exécutions consécutives. `tsc --noEmit` + `npm run build` verts.
+- [x] Audit de code (fichier entier) sur `systems/recorder.ts`
+      (`MatchRecorder`/`HighlightRecorder`, capture canvas+micro → clip
+      partageable, 2026-08-20) — nouveau fichier ciblé après la clôture
+      du balayage `localStorage`. **2 vrais bugs corrigés**, confirmés
+      par `git stash` A/B (les 3 nouveaux tests échouent bien sur le
+      code d'avant-fix, avec exactement le symptôme prédit). (1)
+      `MatchRecorder.start()` assignait `this.mixStream` APRÈS la boucle
+      qui clone et ajoute les pistes micro au flux composite — si cette
+      boucle jetait, le catch de secours ne pouvait alors PAS relâcher la
+      piste vidéo `captureStream()` déjà créée (fuite exactement comme
+      celle déjà documentée pour le chemin d'échec du MediaRecorder,
+      mais un cran plus tôt) ; `HighlightRecorder.start()` faisait déjà
+      cette assignation dans le bon ordre, l'asymétrie entre les deux
+      classes soeurs a mis la puce à l'oreille. (2) Le bug principal,
+      dans `MatchRecorder.stop()`/`HighlightRecorder.stop()` : un
+      recorder trouvé `state === 'inactive'` À L'ENTRÉE de `stop()` (pas
+      seulement `!rec`) était traité comme « rien à renvoyer », alors que
+      CETTE situation a deux origines bien distinctes qu'il ne fallait
+      pas confondre — un second appel inoffensif (ArenaScreen appelle
+      `stop()` à la fin du match PUIS, sans condition, au démontage,
+      valeur de retour jamais utilisée) contre un VRAI auto-arrêt du
+      navigateur en cours de match (flux devenu inactif — permission
+      micro révoquée, iOS Safari en tâche de fond, la plateforme cible
+      documentée en tête de fichier) : dans ce second cas, le navigateur
+      flushe un dernier `ondataavailable` avant de couper, donc les
+      chunks sont déjà là — les jeter perdait un match/segment presque
+      entièrement capturé, sans erreur visible pour le joueur. Corrigé en
+      distinguant explicitement `!rec` (jamais démarré) de `state ===
+      'inactive'` (reconstruire le blob depuis les chunks déjà
+      accumulés, PUIS les vider pour qu'un second appel retombe
+      proprement sur null/prevBlob comme avant). Ce même correctif
+      résout aussi, en effet de bord, la course entre `rotate()` (mise à
+      jour asynchrone de `prevBlob` via `onstop`) et un `stop()` appelé
+      juste après une rotation : `stop()` ne dépend plus de `prevBlob`
+      pour le segment qui vient tout juste de s'arrêter, il relit
+      directement ses propres chunks. 3 nouveaux tests (dont un
+      confirmant explicitement que le double-appel réel reste
+      inoffensif). 375 tests, suite vérifiée sur 3 exécutions
+      consécutives. `tsc --noEmit` + `npm run build` verts. Couverture de
+      `recorder.ts` : 98,3 % lignes / 96,5 % branches. Deux pistes de
+      l'audit initial délibérément NON corrigées cette itération, pour
+      rester scopé : la défaillance transitoire du constructeur
+      MediaRecorder pendant `rotate()` (rare, dégrade déjà proprement
+      vers `prevBlob`, non aggravée par ce fix) et la perte possible du
+      geste utilisateur iOS/WebKit entre l'annulation de
+      `navigator.share()` et le repli `a.click()` (limitation de
+      plateforme, pas un bug de logique — nécessiterait un changement
+      d'UX, pas juste un correctif de code).
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-20 (routine) : Le balayage `localStorage` étant clos (5/5
+  modules `game/` vérifiés : `deckBuilder.ts` relu et confirmé déjà sûr
+  — `sanitizeTemplate()` re-dérive chaque valeur depuis `CARD_POOL` et la
+  coerce via `Number()`, aucune confiance aveugle possible dans une
+  entrée stockée), repris la stratégie d'audit de code fichier-par-fichier
+  sur un nouveau fichier jamais couvert : `systems/recorder.ts`
+  (`MatchRecorder`/`HighlightRecorder`). Choisi précisément parce que ses
+  soeurs UI (`ResultsScreen.tsx`, déjà auditée le 2026-08-18) avaient déjà
+  révélé une fuite de blob URL dans ce même domaine (capture
+  vidéo/canvas) — hypothèse qu'un fichier manipulant directement
+  MediaRecorder/MediaStream porterait la même classe de risque, confirmée.
+  **2 vrais bugs trouvés et corrigés.** Le principal : `stop()` (sur les
+  deux classes) traitait un recorder `state === 'inactive'` TROUVÉ À
+  L'ENTRÉE comme équivalent à « jamais démarré » (`!rec`), donc « rien à
+  renvoyer ». Sauf que ce cas a deux origines très différentes : (a) un
+  second appel — ArenaScreen appelle `sys.recorder.stop()` à la fin du
+  match (valeur de retour utilisée pour le clip) PUIS, sans condition,
+  à nouveau au démontage du composant (pur filet de sécurité, valeur
+  jamais utilisée) — traiter ce cas comme un no-op est correct ; (b) un
+  auto-arrêt RÉEL du navigateur avant l'appel (le flux composite devient
+  inactif — permission micro révoquée en cours de match, ou iOS Safari
+  qui suspend les flux getUserMedia en tâche de fond, la plateforme
+  cible que le fichier documente lui-même en tête) — dans ce cas le
+  navigateur flushe un dernier `ondataavailable` avant de couper l'état,
+  donc les chunks du match/segment sont déjà accumulés dans `this.chunks`
+  au moment de l'appel. Confondre les deux jetait silencieusement un
+  match presque entièrement capturé (ou, côté `HighlightRecorder`, le
+  segment le plus pertinent pour le highlight de KO, celui de la toute
+  fin), sans qu'aucune erreur ne soit visible pour le joueur — juste un
+  clip manquant ou un highlight visiblement décalé. Corrigé en séparant
+  explicitement `!rec` de `state === 'inactive'` : dans ce second cas, le
+  blob est reconstruit depuis les chunks déjà présents, puis ceux-ci sont
+  vidés pour qu'un authentique second appel (cas a) retombe proprement
+  sur `null`/`prevBlob`, exactement comme avant. Effet de bord bienvenu :
+  ce correctif supprime aussi la dépendance de `stop()` à la mise à jour
+  ASYNCHRONE de `prevBlob` (faite dans le `onstop` de `rotate()`) pour le
+  segment qui vient tout juste d'être coupé — `stop()` relit désormais
+  directement les propres chunks du recorder trouvé, sans course
+  possible avec cette mise à jour différée. Second bug, plus mineur :
+  `MatchRecorder.start()` assignait `this.mixStream` (utilisé par le
+  nettoyage en cas d'échec) APRÈS la boucle de clonage des pistes micro
+  plutôt qu'avant — une exception au milieu de cette boucle empêchait
+  alors le catch de relâcher la piste vidéo `captureStream()` déjà créée
+  (fuite exactement dans l'esprit de celle déjà documentée pour l'échec
+  du constructeur MediaRecorder, mais un cran plus tôt) ; repéré en
+  remarquant que `HighlightRecorder.start()`, la classe soeur, faisait
+  déjà cette même assignation dans le bon ordre — l'asymétrie entre deux
+  implémentations censées être équivalentes valait la peine d'être
+  creusée. Les 2 bugs de `stop()` d'abord confirmés par lecture croisée
+  avec le seul site d'appel réel (`ArenaScreen.tsx`, pour distinguer
+  précisément quel appel utilise la valeur de retour et lequel non),
+  puis chaque nouveau test reconfirmé par `git stash` A/B (échouent bien
+  sur le code d'avant-fix, avec le symptôme exact prédit). 3 nouveaux
+  tests, dont un qui vérifie explicitement que le double-appel réel
+  (cas a) reste inoffensif — pour ne pas régresser le comportement que
+  le garde-fou existant protégeait légitimement. 375 tests, suite
+  vérifiée sur 3 exécutions consécutives, `tsc --noEmit` et
+  `npm run build` verts. Couverture de `recorder.ts` : 98,3 % lignes /
+  96,5 % branches. Deux pistes soulevées par l'audit initial
+  délibérément laissées de côté cette itération (voir la puce
+  ROADMAP correspondante pour le détail) : une panne transitoire de
+  constructeur MediaRecorder pendant `rotate()` qui dégrade déjà
+  proprement sans ce fix, et une perte possible du geste utilisateur
+  iOS/WebKit dans `shareOrDownload()` — une limitation de plateforme
+  qui demanderait un changement d'UX, pas un simple correctif de code.
 - 2026-08-18 (routine) : Après `stable.ts` puis `progression.ts`,
   continué le balayage systématique de tous les modules `game/`
   persistés en `localStorage` (`story.ts` et `onboarding.ts` d'abord :
