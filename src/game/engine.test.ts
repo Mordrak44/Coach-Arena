@@ -1670,6 +1670,20 @@ describe('création par prompt & réalisateur', () => {
     expect(mid).toBeGreaterThanOrEqual(cheap)
   })
 
+  it("bug d'audit (2026-08-20) : primitivePower(lowHpHypeFull) tient compte de `threshold` — un seuil plus HAUT (déclenchement plus facile) coûte plus cher ; avant le fix, un power FIXE de 2 ignorait totalement ce paramètre pourtant borné par clampEffect", () => {
+    // Les coûts des cartes DU JEU ACTUEL (lastChance threshold=0.15,
+    // lastStand threshold=0.2) restent inchangés par construction — déjà
+    // vérifié par le test « le coût budgétisé reproduit le coût déclaré »
+    // juste au-dessus. Ici, la propriété NOUVELLE : à seuil différent, le
+    // coût doit varier dans le bon sens.
+    const cheap = computeCost([{ kind: 'lowHpHypeFull', threshold: 0.05 }]) // dur à déclencher (minimum clampEffect)
+    const mid = computeCost([{ kind: 'lowHpHypeFull', threshold: 0.15 }]) // référence lastChance
+    const pricey = computeCost([{ kind: 'lowHpHypeFull', threshold: 0.25 }]) // facile à déclencher (maximum clampEffect)
+    expect(pricey).toBeGreaterThanOrEqual(mid)
+    expect(mid).toBeGreaterThanOrEqual(cheap)
+    expect(pricey).toBeGreaterThan(cheap) // pas juste égal aux extrêmes : une vraie variation
+  })
+
   it('buildScenePlans : entrée, moments forts, finale — prompts propres', () => {
     const m = freshMatch()
     m.events.push(
@@ -5771,6 +5785,29 @@ describe('armCounterMul réellement JOUÉ (applyCardEffects) — jusqu\'ici seul
     expect(playCard(m, 'perfectCounter')).toBe(true)
     expect(m.mods.armedCounterMul).toBe(2) // le mul de la carte (cards.ts)
     expect(m.souffle).toBe(SOUFFLE_PER_CORNER - getCard('perfectCounter').cost)
+  })
+
+  it("bug d'audit (2026-08-20) : Contre Parfait (×2) PUIS Contre-Attaque Totale (×1.5) dans la MÊME pause garde le MEILLEUR multiplicateur (×2), pas le dernier joué — une simple assignation faisait gagner ×1,5, affaiblissant silencieusement un contre déjà payé plus cher", () => {
+    const m = freshMatch()
+    m.phase = 'tactics'
+    m.souffle = 10 // assez pour jouer les deux (2+2), le budget normal de coin n'est pas ce qui est testé ici
+    m.hand = ['perfectCounter', 'totalCounter']
+    expect(playCard(m, 'perfectCounter')).toBe(true)
+    expect(m.mods.armedCounterMul).toBe(2)
+    expect(playCard(m, 'totalCounter')).toBe(true) // ×1.5, PLUS FAIBLE — ne doit pas écraser le ×2 déjà armé
+    expect(m.mods.armedCounterMul).toBe(2) // toujours le meilleur des deux
+    expect(m.mods.counterHypeAmount).toBe(20) // le 2e effet de totalCounter, lui, s'applique normalement
+  })
+
+  it("bug d'audit (2026-08-20) : dans l'AUTRE ordre (Contre-Attaque Totale ×1.5 PUIS Contre Parfait ×2), le résultat est le même — le meilleur des deux gagne, peu importe l'ordre de jeu", () => {
+    const m = freshMatch()
+    m.phase = 'tactics'
+    m.souffle = 10
+    m.hand = ['totalCounter', 'perfectCounter']
+    expect(playCard(m, 'totalCounter')).toBe(true)
+    expect(m.mods.armedCounterMul).toBe(1.5)
+    expect(playCard(m, 'perfectCounter')).toBe(true) // ×2, PLUS FORT — doit bien remplacer le ×1.5
+    expect(m.mods.armedCounterMul).toBe(2)
   })
 })
 

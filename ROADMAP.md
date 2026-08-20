@@ -3265,11 +3265,140 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       chantier à part entière s'il devait être entrepris) mais le code
       touché par ce fix (`drawCommentary`) est désormais couvert par les
       3 nouveaux tests.
+- [x] Audit de code (fichier entier) sur `game/cards.ts` (budget de
+      puissance, `clampEffect`, `CARD_POOL`/`SIGNATURE_CARDS`,
+      2026-08-20) — vérifié en profondeur : chaque carte du pool recalculée
+      à la main contre son coût déclaré, chaque borne de `clampEffect`
+      vérifiée contre les valeurs réellement utilisées, chaque `desc`
+      comparée à ses `effects`, tout concordait déjà (également couvert
+      par un test préexistant qui balaie exhaustivement les deux
+      collections). **2 vrais bugs corrigés**, tous deux confirmés par
+      `git stash` A/B, dans deux fichiers différents mais liés par la même
+      mécanique. (1) `primitivePower('lowHpHypeFull')` renvoyait un power
+      FIXE de 2, ignorant totalement son paramètre `threshold` — la MÊME
+      classe de trou déjà trouvée et corrigée pour `hitsTakenHype` (audit
+      du 2026-08-16, dont le commentaire documente explicitement le
+      principe : « le paramètre était borné… mais totalement ignoré du
+      calcul de coût »), restée non appliquée au voisin `lowHpHypeFull`.
+      Un seuil plus HAUT (0.25, le max autorisé par `clampEffect`) se
+      déclenche PLUS SOUVENT qu'un seuil bas (0.05) — donc devrait coûter
+      plus cher — mais coûtait exactement pareil. Corrigé en référençant
+      le coût au seuil le plus haut déjà en jeu (`lastStand`, 0.2) pour ne
+      rien changer aux coûts déclarés des cartes existantes — piège
+      rencontré en cours de route : la formule initiale (`2 *
+      (threshold/0.2)`) faisait flotter légèrement SOUS 1,5 pour
+      `lastChance` (`0.15/0.2 = 0.7499999999999999` en IEEE 754),
+      arrondissant à 1 Souffle au lieu de 2 — repéré immédiatement par le
+      test de cohérence des coûts, corrigé en réécrivant la formule sans
+      division (`threshold * 10`, mathématiquement identique mais
+      numériquement stable). (2) Dans `combat.ts` (`applyCardEffects`) :
+      jouer DEUX cartes qui arment le même mod dans la MÊME pause faisait
+      gagner la DERNIÈRE appliquée par simple assignation, pas la plus
+      forte — contrairement à `damageReductionMul` juste au-dessus dans
+      la même fonction, qui utilise déjà `Math.min` pour garder la
+      réduction la plus favorable. Cas concret vérifié : `Contre Parfait`
+      (armCounterMul ×2, coût 2) PUIS `Contre-Attaque Totale` (×1.5 +
+      counterHype, coût 2) dans la même pause affaiblissait silencieusement
+      le contre déjà payé plus cher — un joueur qui investit 4 Souffle sur
+      deux cartes de contre se retrouve avec un résultat PIRE que s'il
+      n'en avait joué qu'une seule. Corrigé avec `Math.max` sur les 4
+      champs simples et sans ambiguïté (`armedCounterMul`, `armedCheerHype`,
+      `lowHpThreshold`, `counterHypeAmount` — tous des scalaires où
+      « plus haut = toujours meilleur pour le joueur », vérifié contre les
+      bornes de `clampEffect` et les valeurs par défaut de `freshMods()`,
+      toutes à 0, donc `Math.max` reste correct au premier armement comme
+      au ré-armement). Délibérément NON étendu à `armAttackFrenzy` (paire
+      mul+duration) ni `hitsTakenHype` (triplet target+amount+remise à
+      zéro du compteur) : leur notion de « meilleur » n'est pas un simple
+      scalaire, et une règle mal spécifiée pour les combiner risquerait de
+      créer un panachage plus généreux qu'aucune des deux cartes jouées
+      séparément — hors du périmètre d'un correctif étroit et sûr. 3
+      nouveaux tests (coût variable selon `threshold`, meilleur mul gardé
+      dans les deux ordres de jeu). 401 tests, suite vérifiée sur 3
+      exécutions consécutives. `tsc --noEmit` + `npm run build` verts.
+      Couverture de `cards.ts`/`combat.ts` : 100 % lignes/statements/
+      fonctions, 97-99 % branches (écarts pré-existants, non liés à ce
+      fix — un repli `?? null` pour les persos custom dans `cards.ts`, et
+      les 2 branches de `combat.ts` déjà documentées comme structurellement
+      inatteignables lors du balayage de couverture antérieur).
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-20 (routine, suite) : Après le rendu canvas, retour au cœur du
+  gameplay : `game/cards.ts` (budget de puissance des cartes,
+  `clampEffect`, les deux collections `CARD_POOL`/`SIGNATURE_CARDS`), le
+  plus gros fichier restant jamais audité fichier entier. Passage
+  systématique : chaque carte recalculée à la main contre son coût
+  déclaré, chaque borne de `clampEffect` vérifiée contre les valeurs
+  réellement utilisées par une carte du jeu, chaque `desc` comparée à ses
+  `effects` — rien à y redire, un test préexistant balaie d'ailleurs déjà
+  les deux collections exhaustivement sur ce premier point. **2 vrais
+  bugs trouvés et corrigés**, confirmés par `git stash` A/B, dans deux
+  fichiers liés par la même mécanique de fond (le budget de Souffle des
+  cartes doit rester ÉQUITABLE, y compris pour de futures cartes forgées
+  par prompt — la raison d'être documentée de tout ce système de budget).
+  (1) `primitivePower('lowHpHypeFull')` renvoyait un power FIXE de 2,
+  ignorant complètement son paramètre `threshold` — EXACTEMENT la même
+  classe de trou qu'un commentaire du fichier lui-même documente avoir
+  déjà trouvée et corrigée pour `hitsTakenHype` le 2026-08-16 (« le
+  paramètre était borné… mais totalement ignoré du calcul de coût »),
+  restée non traitée pour son voisin `lowHpHypeFull`. Un seuil PLUS HAUT
+  (jusqu'à 0.25, la borne haute de `clampEffect`) se déclenche PLUS
+  SOUVENT en match qu'un seuil bas (0.05) — donc devrait logiquement
+  coûter plus cher — mais coûtait rigoureusement pareil, quel que soit le
+  seuil. Corrigé en référençant le calcul au seuil le plus haut déjà en
+  jeu (`lastStand`, 0.2) pour ne rien changer aux coûts déclarés des
+  cartes du pool actuel (`lastChance` à 0.15, `lastStand` à 0.2, tous
+  deux revérifiés inchangés). Un piège de précision flottante est apparu
+  en cours de route, repéré immédiatement par le test de cohérence des
+  coûts (qui compare CHAQUE carte à son coût déclaré) plutôt que par une
+  inspection manuelle : la première version de la formule
+  (`2 * (threshold / 0.2)`) faisait flotter très légèrement SOUS 1,5 pour
+  `lastChance` — `0.15 / 0.2` vaut `0.7499999999999999` en IEEE 754, pas
+  exactement `0.75` — faisant arrondir son coût à 1 Souffle au lieu de 2.
+  Corrigé en réécrivant la formule sans division (`threshold * 10`,
+  mathématiquement identique mais numériquement stable), confirmé par le
+  même test qui repassait au vert. (2) Dans `combat.ts`
+  (`applyCardEffects`) : jouer DEUX cartes qui arment le MÊME mod dans la
+  MÊME pause faisait gagner la dernière carte jouée par simple
+  assignation, jamais la plus forte des deux — contrairement à
+  `damageReductionMul`, juste au-dessus dans cette même fonction, qui
+  utilise déjà `Math.min` depuis toujours pour garder la réduction de
+  dégâts la plus favorable au joueur, peu importe l'ordre de jeu. Cas
+  concret vérifié par un nouveau test : `Contre Parfait` (armCounterMul
+  ×2, coût 2 Souffle) joué PUIS `Contre-Attaque Totale` (×1.5 +
+  counterHype, coût 2 Souffle) dans la même pause affaiblissait
+  silencieusement le contre déjà armé plus fort — un joueur qui investit
+  4 Souffle (le budget d'une pause entière et plus) sur DEUX cartes de
+  contre se retrouvait avec un résultat PIRE que s'il n'en avait joué
+  qu'une seule, l'exact inverse de ce que « dépenser plus » devrait
+  produire dans un jeu de cartes. Corrigé avec `Math.max` sur les 4
+  champs simples et sans ambiguïté possible (`armedCounterMul`,
+  `armedCheerHype`, `lowHpThreshold`, `counterHypeAmount`) — tous des
+  scalaires isolés où « plus haut = toujours meilleur pour le joueur »,
+  vérifié contre les bornes de `clampEffect` (toutes strictement
+  positives) et les valeurs par défaut de `freshMods()` (toutes à 0), donc
+  `Math.max` reste correct aussi bien au premier armement qu'au
+  ré-armement. Délibérément NON étendu à `armAttackFrenzy` (une PAIRE
+  mul+duration) ni à `hitsTakenHype` (un TRIPLET target+amount+remise à
+  zéro du compteur de progression) : leur notion de « meilleur » n'est
+  plus un simple scalaire à comparer — combiner le meilleur mul d'une
+  carte avec la meilleure durée d'une autre créerait un panachage plus
+  généreux qu'AUCUNE des deux cartes jouées séparément, un vrai risque
+  d'exploit plutôt qu'une correction. Laissé de côté pour rester dans le
+  périmètre d'un correctif étroit et sûr, pas ignoré par oubli. 3
+  nouveaux tests (coût qui varie dans le bon sens selon `threshold`,
+  meilleur multiplicateur gardé quel que soit l'ordre de jeu des deux
+  cartes), chacun reconfirmé par `git stash` A/B. 401 tests, suite
+  vérifiée sur 3 exécutions consécutives, `tsc --noEmit` et
+  `npm run build` verts. Couverture de `cards.ts`/`combat.ts` : 100 % sur
+  lignes/statements/fonctions, 97-99 % branches — écarts intégralement
+  pré-existants et sans lien avec ce fix (un repli `?? null` pour les
+  persos custom dans `cards.ts`, et les 2 branches de `combat.ts` déjà
+  documentées comme structurellement inatteignables lors du balayage de
+  couverture antérieur de ce même fichier).
 - 2026-08-20 (routine, suite) : Après avoir clos la famille « cuts/
   scènes », passage au plus gros morceau jamais audité fichier entier
   cette session : `render/arenaRenderer.ts` (1122 lignes, le rendu

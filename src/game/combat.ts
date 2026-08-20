@@ -284,23 +284,33 @@ function applyCardEffects(m: MatchState, effects: EffectPrimitive[], side: 'play
         mods.immuneConfusion = true
         break
       case 'armCounterMul':
-        mods.armedCounterMul = e.mul
+        // Math.max, pas une simple assignation : une carte ET une consigne
+        // parlée (budgets INDÉPENDANTS — la consigne est gratuite, voir
+        // speechTactics.ts) peuvent toutes deux armer ce multiplicateur
+        // dans la MÊME pause. Une assignation faisait gagner la DERNIÈRE
+        // appliquée, pas la plus forte : jouer `perfectCounter` (×2) PUIS
+        // parler « piège » (×1,4) affaiblissait silencieusement le contre
+        // déjà payé plus cher, au lieu de garder le meilleur des deux —
+        // même famille que `damageReductionMul` juste au-dessus, qui,
+        // lui, prenait déjà soin de garder la plus forte valeur (trouvé
+        // en audit, 2026-08-20).
+        mods.armedCounterMul = Math.max(mods.armedCounterMul, e.mul)
         break
       case 'armCheerHype':
-        mods.armedCheerHype = e.amount
+        mods.armedCheerHype = Math.max(mods.armedCheerHype, e.amount)
         break
       case 'armAttackFrenzy':
         mods.armedFrenzyMul = e.mul
         mods.armedFrenzyDuration = e.duration
         break
       case 'lowHpHypeFull':
-        mods.lowHpThreshold = e.threshold
+        mods.lowHpThreshold = Math.max(mods.lowHpThreshold, e.threshold)
         break
       case 'provoke':
         mods.provokedUntil = -1 // prend effet au démarrage du round suivant
         break
       case 'counterHype':
-        mods.counterHypeAmount = e.amount
+        mods.counterHypeAmount = Math.max(mods.counterHypeAmount, e.amount)
         break
       case 'hitsTakenHype':
         mods.hitsTakenTarget = e.hits

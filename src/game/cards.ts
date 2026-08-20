@@ -27,7 +27,21 @@ export function primitivePower(e: EffectPrimitive): number {
     case 'armAttackFrenzy':
       return 1 + (e.mul - 1) * 2 * (e.duration / 5) // ×1.5 / 5 s → 2
     case 'lowHpHypeFull':
-      return 2
+      // Seuil plus HAUT = déclenchement plus FACILE (le perso tombe sous
+      // ce seuil plus souvent en match) = plus cher. Référencé à 0.2
+      // (`lastStand`, le seuil le plus haut déjà en jeu) pour ne rien
+      // changer aux coûts déjà déclarés (`lastChance` threshold=0.15 →
+      // cost 2, `lastStand` threshold=0.2 → cost 2, tous deux vérifiés
+      // inchangés par ce calcul) ; jusqu'ici le paramètre était borné
+      // (0.05..0.25, voir clampEffect) mais totalement ignoré du calcul
+      // de coût — la MÊME classe de trou déjà trouvée et corrigée pour
+      // `hitsTakenHype` juste au-dessus (trouvé en audit, 2026-08-20).
+      // `threshold * 10`, pas `2 * (threshold / 0.2)` : mathématiquement
+      // identique, mais la division flottait légèrement sous 1,5 pour
+      // threshold=0.15 (0.15/0.2 = 0.7499999999999999 en IEEE 754),
+      // faisant arrondir `lastChance` à 1 Souffle au lieu de 2 — repéré
+      // par le test qui compare chaque coût calculé au coût déclaré.
+      return e.threshold * 10
     case 'provoke':
       return e.duration / 5
     case 'counterHype':
