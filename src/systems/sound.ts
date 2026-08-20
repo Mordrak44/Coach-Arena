@@ -20,15 +20,41 @@ export class SoundSystem {
    */
   start() {
     if (this.ctx) return
+    // Contexte gardé en variable LOCALE avant `this.ctx` : si une étape
+    // ULTÉRIEURE de cette construction jette (createGain/connect/
+    // startCrowd), le catch ci-dessous doit pouvoir fermer ce contexte
+    // déjà créé avec succès — sans ça, il restait ouvert indéfiniment,
+    // orphelin (aucun `stop()` suivant ne pouvait le voir, `this.ctx`
+    // n'ayant jamais été renseigné), consommant une des places limitées
+    // d'AudioContext concurrents du navigateur à chaque tentative de
+    // démarrage échouée (trouvé en audit, 2026-08-20).
+    let ctx: AudioContext | null = null
     try {
-      this.ctx = new AudioContext()
-      this.master = this.ctx.createGain()
-      this.master.gain.value = 0.7
-      this.master.connect(this.ctx.destination)
+      ctx = new AudioContext()
+      this.ctx = ctx
+      this.master = ctx.createGain()
+      // Respecte une préférence de coupure déjà posée (`setMuted()` appelé
+      // avant ce `start()`, ou survivant à un stop()/start() sur la même
+      // instance) plutôt que d'écraser inconditionnellement à 0.7 — sans
+      // ça, `muted` pouvait lire `true` alors que l'audio revenait
+      // audible au prochain démarrage (trouvé en audit, 2026-08-20).
+      this.master.gain.value = this.muted ? 0 : 0.7
+      this.master.connect(ctx.destination)
       this.startCrowd()
-      void this.ctx.resume()
+      // `.catch()` explicite : sans lui, un `stop()` arrivant avant que
+      // cette promesse ne se résolve (StrictMode : start → cleanup(stop)
+      // → start en succession immédiate sur la même instance, comme déjà
+      // trouvé pour VoiceCoach/FaceCoach) ferme le contexte pendant que
+      // `resume()` est encore en vol — la promesse rejette alors
+      // (`Cannot resume a closed AudioContext`), jamais interceptée :
+      // une exception non gérée à chaque montage StrictMode en dev
+      // (trouvé en audit, 2026-08-20).
+      void ctx.resume().catch(() => {})
     } catch {
       this.ctx = null
+      this.master = null
+      this.crowdGain = null
+      ctx?.close().catch(() => {})
     }
   }
 
@@ -38,7 +64,9 @@ export class SoundSystem {
    * touche) — sans coût si le contexte tourne déjà.
    */
   resume(): void {
-    if (this.ctx?.state === 'suspended') void this.ctx.resume()
+    // Même garde-fou que start() : ce contexte peut se fermer (stop())
+    // pendant que cette promesse est en vol.
+    if (this.ctx?.state === 'suspended') void this.ctx.resume().catch(() => {})
   }
 
   setMuted(m: boolean) {

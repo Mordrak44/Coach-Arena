@@ -2938,11 +2938,106 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       tests, suite vérifiée sur de nombreuses exécutions consécutives.
       `tsc --noEmit` + `npm run build` verts. Couverture de `facecam.ts` :
       100 % sur les 4 métriques.
+- [x] Audit de code (fichier entier) sur `systems/sound.ts` (bande-son
+      synthétisée WebAudio, 2026-08-20) — 4e fichier d'affilée de la
+      famille « API navigateur bas niveau », après `recorder.ts`,
+      `voice.ts`, `facecam.ts`. Contrairement aux trois précédents,
+      `start()`/`stop()` ici sont entièrement SYNCHRONES (aucun `await`
+      entre le garde-fou et la mutation d'état) : le bug « zombie via
+      StrictMode » de la famille ne s'applique donc PAS tel quel — mais
+      l'audit a quand même trouvé **3 vrais bugs**, tous confirmés par
+      `git stash` A/B (les 4 nouveaux tests échouent bien sur le code
+      d'avant-fix, dont deux qui font apparaître un VRAI rejet de
+      promesse non intercepté pendant l'exécution du test, pas juste une
+      assertion qui échoue). (1) `void this.ctx.resume()` (dans `start()`
+      ET dans le `resume()` public) n'avait pas de `.catch()`, contrairement
+      au `close()` de `stop()` juste à côté qui, lui, en a un — si un
+      `stop()` ferme le contexte pendant qu'un `resume()` est encore en
+      vol (StrictMode : start → cleanup(stop) → start immédiats sur la
+      même instance, `sysRef.current.sound` y survivant comme les trois
+      précédents), la promesse rejette (« Cannot resume a closed
+      AudioContext ») et rien ne l'intercepte : une exception non gérée à
+      chaque montage StrictMode en dev. (2) `start()` écrasait
+      inconditionnellement le gain du master à 0.7, ignorant `this.muted`
+      déjà posé — un `setMuted(true)` avant le tout premier `start()`, ou
+      survivant à un `stop()`/`start()` sur la même instance (`stop()` ne
+      touche jamais `muted`), se retrouvait audible à plein volume alors
+      que `muted` lisait `true`. (3) Le `catch` de `start()` ne faisait
+      que `this.ctx = null` sans fermer le contexte déjà créé avec succès
+      si une étape ULTÉRIEURE (createGain/connect/startCrowd) échouait —
+      un `AudioContext` orphelin restait ouvert indéfiniment, jamais vu
+      par aucun `stop()` suivant (`this.ctx` n'a jamais été renseigné),
+      consommant une des places limitées d'AudioContext concurrents du
+      navigateur à chaque tentative de démarrage échouée. Corrigé : (1)
+      `.catch(() => {})` ajouté aux deux appels à `resume()` ; (2) le
+      gain initial du master respecte désormais `this.muted` ; (3) le
+      contexte est gardé en variable locale AVANT `this.ctx`, fermé
+      explicitement dans le `catch` si la construction échoue après sa
+      création. 4 nouveaux tests. 385 tests, suite vérifiée sur 3
+      exécutions consécutives (aucun rejet non géré cette fois). `tsc
+      --noEmit` + `npm run build` verts. Couverture de `sound.ts` : 100 %
+      lignes/branches/statements, 96 % fonctions (le seul manque : le
+      corps vide d'un `.catch(() => {})` défensif jamais exercé côté
+      rejet réel — même motif déjà accepté ailleurs dans ce fichier,
+      pas forcé).
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-20 (routine, suite) : Le journal de la veille qualifiait
+  `facecam.ts` de « dernier fichier » de la famille « API navigateur bas
+  niveau » — trop tôt : `systems/sound.ts` (bande-son WebAudio
+  synthétisée) restait non audité, et le vérifier valait le coup malgré
+  l'hypothèse que son `start()`/`stop()` entièrement SYNCHRONE (aucun
+  `await`, contrairement à `recorder.ts`/`voice.ts`/`facecam.ts`)
+  l'exempterait du bug « zombie StrictMode » trouvé sur les trois
+  précédents. L'hypothèse était juste — ce bug précis ne s'applique pas
+  ici — mais l'audit a quand même trouvé **3 vrais bugs différents**,
+  tous confirmés par `git stash` A/B, et deux d'entre eux de façon
+  particulièrement nette : les tests reproduisant le rejet de promesse
+  provoquaient un VRAI « Unhandled Rejection » capté par vitest pendant
+  l'exécution sur le code d'avant-fix, pas juste une assertion en échec.
+  (1) `void this.ctx.resume()`, dans `start()` ET dans le `resume()`
+  public, n'avait pas de `.catch()` — alors que le `close()` de `stop()`
+  juste à côté, lui, en a un depuis toujours. Si un `stop()` ferme le
+  contexte pendant qu'un `resume()` est encore en vol (StrictMode : start
+  → cleanup(stop) → start immédiats sur la même instance,
+  `sysRef.current.sound` y survivant comme les trois fichiers
+  précédents), la promesse rejette (« Cannot resume a closed
+  AudioContext ») sans que rien ne l'intercepte — une exception non
+  gérée à chaque montage StrictMode en dev, jamais remarquée jusqu'ici
+  faute d'avoir jamais cherché. (2) `start()` écrasait inconditionnellement
+  le gain du master à 0.7, ignorant `this.muted` déjà posé : un
+  `setMuted(true)` appelé avant le tout premier `start()` (ou survivant à
+  un `stop()`/`start()` sur la même instance — `stop()` ne touche jamais
+  `muted`) se retrouvait audible à plein volume alors que le flag disait
+  le contraire, une désynchronisation entre l'état affiché et le son
+  réellement produit. (3) Le `catch` de `start()` se contentait de
+  `this.ctx = null` sans jamais fermer le contexte déjà créé avec succès
+  si une étape ULTÉRIEURE (createGain/connect/startCrowd) échouait — un
+  `AudioContext` orphelin restait ouvert indéfiniment, invisible pour
+  tout `stop()` suivant (`this.ctx` n'avait jamais été renseigné),
+  consommant une des places limitées d'AudioContext concurrents du
+  navigateur à chaque tentative de démarrage ratée. Corrigé sans toucher
+  à la structure synchrone du fichier : `.catch(() => {})` ajouté aux
+  deux `resume()` (cohérent avec le `close()` voisin qui l'avait déjà) ;
+  le gain initial du master respecte maintenant `this.muted` au lieu de
+  l'écraser ; le contexte fraîchement créé est gardé en variable LOCALE
+  avant d'être assigné à `this.ctx`, permettant au `catch` de le fermer
+  explicitement si la suite de la construction échoue. 4 nouveaux tests,
+  réutilisant le `FakeAudioContext` déjà établi dans ce fichier de tests.
+  385 tests, suite vérifiée sur 3 exécutions consécutives (zéro rejet non
+  géré, contrairement au code d'avant-fix). `tsc --noEmit` et
+  `npm run build` verts. Couverture de `sound.ts` : 100 % sur
+  lignes/branches/statements, 96 % fonctions — le seul manque étant le
+  corps vide d'un `.catch(() => {})` défensif jamais exercé côté rejet
+  réel (même motif déjà présent et accepté ailleurs dans ce fichier
+  avant cet audit), pas forcé par un test artificiel. Avec ce fichier,
+  la famille « API navigateur bas niveau » de `systems/` est maintenant
+  vraiment couverte au complet (`recorder.ts`, `voice.ts`, `facecam.ts`,
+  `sound.ts`) — restent `pitch.ts` et `media.ts`, plus petits, à vérifier
+  pour clore le dossier pour de bon.
 - 2026-08-20 (routine, suite) : Après `recorder.ts` puis `voice.ts`,
   troisième et dernier fichier de la famille « API navigateur bas niveau »
   audité d'affilée : `systems/facecam.ts` (énergie de mouvement par

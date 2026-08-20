@@ -4340,6 +4340,62 @@ describe('SoundSystem — branches jamais exercées : start() idempotent, resume
     ss.setCrowdHype(0.5001) // cible quasi identique : diff bien sous 0,005
     expect(crowdGain.gain.calls.length).toBe(callsAfterFirst) // aucune rampe supplémentaire programmée
   })
+
+  it("bug d'audit (2026-08-20) : start() ignorait `muted` déjà posé et écrasait toujours le gain à 0.7 — un setMuted(true) avant le tout premier start() se retrouvait audible", () => {
+    ;(globalThis as any).AudioContext = FakeAudioContext
+    const ss = new SoundSystem()
+    ss.setMuted(true) // avant tout start() : master est encore null, seul le flag est posé
+    ss.start()
+    const master = (ss as any).master as FakeGainNode
+    expect(master.gain.value).toBe(0) // pas 0.7 : la préférence de coupure doit être respectée dès la création
+  })
+
+  it("bug d'audit (2026-08-20) : un stop()/start() sur la même instance (StrictMode) ne réactive plus l'audio si `muted` était resté à true — stop() ne touche jamais ce flag", () => {
+    ;(globalThis as any).AudioContext = FakeAudioContext
+    const ss = new SoundSystem()
+    ss.start()
+    ss.setMuted(true)
+    ss.stop()
+    ss.start()
+    const master = (ss as any).master as FakeGainNode
+    expect(master.gain.value).toBe(0)
+  })
+
+  it("bug d'audit (2026-08-20) : start() ne laisse plus un AudioContext orphelin ouvert si une étape ULTÉRIEURE à sa création échoue (ex. startCrowd) — il est refermé, pas juste abandonné", () => {
+    let closeCalls = 0
+    class FailingStartCrowdCtx extends FakeAudioContext {
+      createBufferSource(): any {
+        throw new Error('createBufferSource a échoué (startCrowd)')
+      }
+      close() {
+        closeCalls++
+        return Promise.resolve()
+      }
+    }
+    ;(globalThis as any).AudioContext = FailingStartCrowdCtx
+    const ss = new SoundSystem()
+    expect(() => ss.start()).not.toThrow()
+    expect((ss as any).ctx).toBeNull()
+    expect((ss as any).master).toBeNull()
+    expect(closeCalls).toBe(1) // le contexte partiellement construit est bien fermé, pas laissé ouvert
+  })
+
+  it("bug d'audit (2026-08-20) : resume() qui rejette (ex. contexte déjà fermé par un stop() arrivé entre-temps — StrictMode : start → cleanup(stop) → start immédiats) est intercepté, pas laissé comme rejet de promesse non géré", async () => {
+    class RejectingResumeCtx extends FakeAudioContext {
+      resume() {
+        this.resumeCalls++
+        return Promise.reject(new Error('Cannot resume a closed AudioContext'))
+      }
+    }
+    ;(globalThis as any).AudioContext = RejectingResumeCtx
+    const ss = new SoundSystem()
+    expect(() => ss.start()).not.toThrow() // le resume() interne de start() rejette déjà
+    await new Promise(r => setTimeout(r, 0)) // laisse le .catch() interne absorber ce rejet
+    const ctx = (ss as any).ctx as RejectingResumeCtx
+    ctx.state = 'suspended'
+    expect(() => ss.resume()).not.toThrow() // même garde-fou sur le resume() PUBLIC
+    await new Promise(r => setTimeout(r, 0))
+  })
 })
 
 describe('recorder.ts — chemins de succès de stop(), jamais exercés (seuls les chemins d\'échec l\'étaient)', () => {
