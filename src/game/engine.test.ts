@@ -1529,6 +1529,60 @@ describe('LiveCutPlayer (lecteur en direct — respecte la règle « instant dé
     expect(player.current()?.cut.kind).toBe('attack-solo')
   })
 
+  it("bug d'audit (2026-08-20) : un SEUL crit (4 cuts totalisant 3,2 s, RÉELLEMENT au-delà du budget de 2,5 s à lui seul) ne se fait plus sabrer son plan-titre — le test ci-dessus (non-crit, 2,4 s cumulées) reste SOUS le budget et n'exerçait donc jamais la vraie course : le trim par durée sabrait déjà le premier cut d'un event fraîchement ingéré dès que la somme de SES PROPRES cuts dépassait le budget, sans le moindre retard réel", async () => {
+    const { LiveCutPlayer } = await import('./liveCutPlayer')
+    const kinds: string[] = []
+    // Durée du CLIP volontairement neutre (n'entre PAS dans le calcul du
+    // budget, qui somme cut.duration — les cibles réelles de cutsForEvent) :
+    // seule compte la durée du CUT lui-même, 1.2+0.3+0.9+0.8=3.2s pour un crit.
+    const fakeLibrary = {
+      getClip: (kind: string) => {
+        kinds.push(kind)
+        return { url: `fake://${kind}`, duration: 100 }
+      },
+    }
+    const m = freshMatch()
+    const player = new LiveCutPlayer(ROSTER[0], ROSTER[1], fakeLibrary)
+    m.t = 1
+    m.events.push({ kind: 'hit', t: 1, target: 'enemy', dmg: 5, crit: true, onoma: 'DOKAN!!' })
+    player.update(m)
+    // Les 4 cuts du crit ont bien été demandés (attack-solo + impact-flash
+    // + hit-reaction + crowd, ce dernier propre aux crits)...
+    expect(kinds).toEqual(['attack-solo', 'impact-flash', 'hit-reaction', 'crowd'])
+    // ...et malgré que leur somme (3,2 s) dépasse le budget (2,5 s) à elle
+    // seule, le plan-titre (attack-solo) reste joué en premier : rien
+    // n'était en retard, cet event vient tout juste d'arriver.
+    expect(player.current()?.cut.kind).toBe('attack-solo')
+  })
+
+  it("le garde-fou par durée trimme quand même du VRAI retard (cuts déjà en file depuis un appel PRÉCÉDENT, jamais consommés) sans jamais mordre sur le lot fraîchement ingéré à cet appel — vérifie que `removable` protège les cuts frais sans désactiver le garde-fou pour de vrai retard", async () => {
+    const { LiveCutPlayer } = await import('./liveCutPlayer')
+    const fakeLibrary = { getClip: (kind: string) => ({ url: `fake://${kind}`, duration: 100 }) }
+    const m = freshMatch()
+    const player = new LiveCutPlayer(ROSTER[0], ROSTER[1], fakeLibrary)
+    m.t = 1
+    // 1er appel : un crit (onoma DOKAN!!) produit 4 cuts (3,2 s). attack-solo
+    // devient actif tout de suite, les 3 autres restent en file — rien
+    // n'est consommé entre les deux appels (durée du clip très longue),
+    // donc au 2e appel ces 3-là sont du VRAI retard, pas du frais.
+    m.events.push({ kind: 'hit', t: 1, target: 'enemy', dmg: 5, crit: true, onoma: 'DOKAN!!' })
+    player.update(m)
+    expect(player.current()?.cut.kind).toBe('attack-solo')
+    // 2e appel, MÊME instant (m.t inchangé) : un 2e crit (onoma BAM!!, pour
+    // distinguer ses cuts de ceux du 1er event au-delà du simple `kind`,
+    // identique pour les deux) ingéré tandis que les cuts du 1er traînent
+    // toujours en file, non consommés.
+    m.events.push({ kind: 'hit', t: 1, target: 'enemy', dmg: 5, crit: true, onoma: 'BAM!!' })
+    player.update(m)
+    const overlays = (player as any).queue.map((q: any) => q.cut.overlay)
+    // Le retard RÉEL (impact-flash du 1er event, overlay=DOKAN!!) a bien
+    // été sabré par le garde-fou…
+    expect(overlays).not.toContain('DOKAN!!')
+    // …mais AUCUN des cuts fraîchement ingérés (2e event, overlay=BAM!!)
+    // n'a été touché : impact-flash(BAM!!) est toujours en file entière.
+    expect(overlays).toContain('BAM!!')
+  })
+
   it("comble le SILENCE (file vide, round en cours) avec un idle-loop — pas un événement", async () => {
     const { LiveCutPlayer } = await import('./liveCutPlayer')
     const seen: string[] = []

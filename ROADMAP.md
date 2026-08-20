@@ -3412,11 +3412,148 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       les 2 écarts restants déjà documentés comme structurellement
       inatteignables lors du balayage antérieur (2026-08-16/18), sans
       lien avec ce fix.
+- [x] Audit de code (fichier entier) sur `game/liveCutPlayer.ts`
+      (`LiveCutPlayer`, le lecteur de cuts EN DIRECT, 2026-08-20) — n'avait
+      eu qu'une vérification ciblée d'une hypothèse (monotonie de `m.t`,
+      écartée) lors de l'audit de `cutPlanner.ts`, jamais un audit de
+      logique complet comme ses fichiers voisins `cutPlanner.ts` et
+      `sceneQueue.ts`, tous deux porteurs de vrais bugs cette semaine.
+      **1 vrai bug corrigé**, confirmé par `git stash` A/B — la même
+      classe de bug que celle DÉJÀ corrigée une première fois dans ce
+      MÊME fichier (2026-08-16 : un garde-fou par NOMBRE d'entrées,
+      `MAX_QUEUE=1`, sabrait une séquence multi-cuts fraîche dès sa
+      naissance, remplacé par un garde-fou par budget de DURÉE,
+      `MAX_QUEUE_LAG_S=2.5`), qui a RESURGI via ce nouveau mécanisme : le
+      garde-fou par durée sabrait déjà le PREMIER cut (le plan-titre,
+      `attack-solo`/`special-cast`/`ulti-cast`) d'un événement fraîchement
+      ingéré dès que la somme de SES PROPRES cuts dépassait le budget à
+      elle seule — un crit `hit` (1,2+0,3+0,9+0,8 = 3,2 s), un `special`
+      (3,3 s) ou un `ulti` (5,2 s), les trois types d'événements les plus
+      spectaculaires et les mieux notés par `eventScore()` — exactement
+      ce que le commentaire du garde-fou prétend empêcher (« sans jamais
+      sabrer une séquence fraîche d'un seul event »), SANS le moindre
+      retard réel accumulé. Le test de régression existant
+      (`engine.test.ts`, 2026-08-16) ne couvrait qu'un `hit` NON critique
+      (2,4 s, tout juste SOUS le budget de 2,5 s) — un cas limite qui
+      n'exerçait jamais la vraie course, laissant les cas crit/spécial/
+      Ulti silencieusement cassés. Corrigé en comptant `freshCount` (les
+      cuts tout juste poussés PENDANT cet appel `update()`) et en bornant
+      le nombre de cuts que le garde-fou peut retirer à
+      `queue.length - freshCount` (les cuts PRÉEXISTANTS, potentiellement
+      périmés) — jamais au-delà, préservant intégralement tout lot
+      fraîchement ingéré même si sa propre somme dépasse le budget. 2
+      nouveaux tests : un crit isolé (vérifie que le plan-titre survit
+      malgré 3,2 s > 2,5 s à lui seul), et un scénario à deux appels
+      `update()` successifs (un VRAI retard d'un 1er event, jamais
+      consommé, PUIS un 2e event fraîchement ingéré) qui vérifie que le
+      garde-fou continue de sabrer le retard AUTHENTIQUE tout en
+      protégeant intégralement le lot frais — ce 2e test a aussi fermé le
+      dernier trou de couverture LIGNE du fichier (le corps de la boucle
+      de trim, jamais exercé par aucun test existant puisque tous ne
+      poussaient qu'un seul event par appel). 3 autres pistes soulevées
+      par l'audit initial délibérément NON corrigées, toutes actuellement
+      DORMANTES (`EMPTY_CUT_LIBRARY` fait que `current()` reste toujours
+      `null` en prod aujourd'hui, contrairement au bug ci-dessus qui,
+      lui, affecte la file interne même bibliothèque vide) et sans
+      précédent établi dans un fichier voisin pour en justifier
+      l'urgence : `ActiveCut.until` calculé depuis la durée CIBLE du
+      `Cut` plutôt que la durée RÉELLE du `CutClip` (pourrait diverger le
+      jour où de vrais clips existent), la dé-duplication par URL seule
+      côté `ArenaScreen.tsx` (deux cuts neutres consécutifs partageant la
+      même URL ne redéclencheraient pas le remount du `<video>`), et une
+      réallocation par frame de l'idle-loop même quand rien ne change
+      (pure question de performance, hors périmètre). 408 tests, suite
+      vérifiée sur 3 exécutions consécutives. `tsc --noEmit` +
+      `npm run build` verts. Couverture de `liveCutPlayer.ts` : 100 % sur
+      lignes/statements/fonctions, 95,23 % branches (l'écart restant,
+      la branche `if (clip)` fausse du repli idle-loop, préexistant et
+      sans lien avec ce fix).
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-20 (routine, suite) : Après `sceneDirector.ts`, dernier fichier
+  de la famille « cuts vidéo » à recevoir un audit de LOGIQUE complet :
+  `game/liveCutPlayer.ts` (`LiveCutPlayer`), le lecteur de cuts EN DIRECT
+  qui décide quoi afficher par-dessus le canvas pendant le match. N'avait
+  eu jusqu'ici qu'une vérification PONCTUELLE d'une seule hypothèse
+  (est-ce que `m.t` peut se réinitialiser entre rounds et figer un cut
+  actif pour de bon ? — testé et écarté lors de l'audit de
+  `cutPlanner.ts`, deux jours plus tôt), jamais le même passage complet
+  fichier entier que ses deux voisins directs `cutPlanner.ts` et
+  `sceneQueue.ts`, qui avaient chacun révélé de vrais bugs cette même
+  semaine. **1 vrai bug trouvé et corrigé**, confirmé par `git stash`
+  A/B — et particulièrement intéressant parce que c'est la RÉCIDIVE d'un
+  bug DÉJÀ corrigé une première fois dans ce MÊME fichier, via un
+  mécanisme différent. Contexte : le 2026-08-16, un garde-fou anti-retard
+  par NOMBRE d'entrées (`MAX_QUEUE=1`) avait été remplacé par un
+  garde-fou par BUDGET DE DURÉE (`MAX_QUEUE_LAG_S=2.5`, secondes de cuts
+  en attente) — précisément parce que le premier sabrait une séquence
+  multi-cuts fraîche (un `hit` produit `attack-solo`+`impact-flash`+
+  `hit-reaction` d'un coup) dès sa naissance, sans le moindre retard réel.
+  Ce nouvel audit a trouvé que le REMPLAÇANT reproduisait exactement le
+  même symptôme, par une voie différente : la boucle de purge sabrait
+  déjà le PREMIER cut (le plan-titre — `attack-solo`, `special-cast`, ou
+  `ulti-cast`, systématiquement en tête de chaque séquence produite par
+  `cutsForEvent()`) d'un événement fraîchement ingéré dès que la somme de
+  SES PROPRES cuts, à elle seule, dépassait le budget de 2,5 s — un crit
+  `hit` (1,2+0,3+0,9+0,8 = 3,2 s), un `special` (3,3 s), un `ulti`
+  (5,2 s) : précisément les trois types d'événements les plus
+  spectaculaires du jeu, les mieux notés par `eventScore()`, donc les
+  plus susceptibles d'être choisis comme moments forts — perdaient tous
+  systématiquement leur plan d'ouverture dès leur toute première
+  apparition, sans qu'aucun retard réel ne se soit jamais accumulé.
+  Exactement ce que le commentaire du garde-fou affirme vouloir empêcher
+  (« sans jamais sabrer une séquence fraîche d'un seul event »), toujours
+  faux pour ces trois cas précis. Le test de régression existant depuis
+  le premier fix ne couvrait qu'un `hit` NON critique (2,4 s cumulées,
+  tout juste SOUS le budget de 2,5 s) — un cas limite qui, par
+  construction, n'exerçait JAMAIS la vraie course entre somme et budget,
+  laissant les trois cas les plus graves silencieusement cassés derrière
+  un test vert. Corrigé en comptant `freshCount` (le nombre de cuts tout
+  juste poussés PENDANT cet appel `update()` précis) et en bornant le
+  nombre de cuts que la boucle de purge peut retirer à
+  `queue.length - freshCount` — c'est-à-dire uniquement les cuts
+  PRÉEXISTANTS, potentiellement périmés, jamais le lot qui vient d'arriver
+  cette même frame, même si la somme de CE lot dépasse le budget à elle
+  seule. 2 nouveaux tests écrits : un crit isolé (vérifie que le
+  plan-titre survit malgré ses 3,2 s propres, au-delà du budget) et,
+  plus subtil, un scénario à DEUX appels `update()` successifs — un
+  premier événement dont les cuts restent sciemment non consommés (durée
+  de clip très longue), puis un second événement fraîchement ingéré au
+  2e appel — qui vérifie que le garde-fou continue bel et bien de purger
+  le retard AUTHENTIQUE du premier événement tout en protégeant
+  intégralement le second, fraîchement arrivé ; ce 2e test a aussi fermé
+  le dernier trou de couverture LIGNE du fichier (le corps même de la
+  boucle de purge, jamais exercé par aucun test existant jusqu'ici,
+  puisque tous ne poussaient qu'un seul événement par appel `update()`).
+  Trois autres pistes soulevées par l'audit initial délibérément NON
+  corrigées cette fois : `ActiveCut.until` calculé depuis la durée CIBLE
+  du `Cut` plutôt que la durée RÉELLE du `CutClip` retourné par la
+  bibliothèque (pourrait diverger le jour où de vrais clips vidéo
+  existent, avec une durée d'export légèrement différente de la durée
+  planifiée) ; côté `ArenaScreen.tsx`, une dé-duplication par URL SEULE
+  qui ne redéclencherait pas le remount du `<video>` si deux cuts neutres
+  consécutifs (tous les `crowd`/`impact-flash` sont des templates neutres
+  partagés, sans swap de perso, par construction dans `cutPlanner.ts`)
+  partagent la même URL malgré des instants différents ; et une
+  réallocation d'objets à chaque frame dans la branche idle-loop même
+  quand rien ne peut changer (pure question de performance sur le chemin
+  chaud de la boucle de jeu, hors périmètre d'un audit de correction).
+  Les trois sont actuellement DORMANTES — `EMPTY_CUT_LIBRARY` fait que
+  `current()` reste toujours `null` en production aujourd'hui, contrairement
+  au bug corrigé ci-dessus qui, lui, affecte la file INTERNE du lecteur
+  même bibliothèque vide (`this.queue`, jamais exposée directement, mais
+  bien réelle) — et aucune des trois n'a de précédent établi dans un
+  fichier voisin pour en justifier la correction immédiate malgré cette
+  dormance, contrairement au bug principal qui, lui, est la récidive
+  DIRECTE d'un problème déjà résolu une fois dans ce même fichier. 408
+  tests, suite vérifiée sur 3 exécutions consécutives, `tsc --noEmit` et
+  `npm run build` verts. Couverture de `liveCutPlayer.ts` : 100 % sur
+  lignes/statements/fonctions (montée depuis 92,59 % lignes), 95,23 %
+  branches — l'écart restant, la branche `if (clip)` fausse du repli
+  idle-loop, préexistant et sans lien avec ce fix.
 - 2026-08-20 (routine, suite) : Après `characters.ts`, poursuite du
   balayage du dossier `game/` avec `sceneDirector.ts` (`buildScenePlans`,
   le Réalisateur qui écrit les prompts vidéo Kling du récap post-match) —

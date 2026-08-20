@@ -62,20 +62,40 @@ export class LiveCutPlayer {
 
   /** À appeler à chaque tick avec l'état de match courant. */
   update(m: MatchState): void {
+    let freshCount = 0
     for (const cut of this.sequencer.ingest(m)) {
       const clip = this.library.getClip(cut.kind, cut.chars)
-      if (clip) this.queue.push({ cut, clip })
+      if (clip) {
+        this.queue.push({ cut, clip })
+        freshCount++
+      }
       // Pas de clip prêt : silence — aucune trace, le vectoriel comble l'instant.
     }
     // Garde-fou : jamais de retard qui s'accumule au-delà d'un budget de
     // DURÉE — on saute les plus vieux jusqu'à repasser sous le budget,
     // sans jamais sabrer une séquence fraîche d'un seul event (voir
-    // MAX_QUEUE_LAG_S).
+    // MAX_QUEUE_LAG_S). `removable` borne le nombre de cuts PRÉEXISTANTS
+    // (potentiellement périmés) qu'on peut encore retirer, sans jamais
+    // mordre sur le lot tout juste ingéré CETTE frame (`freshCount`) —
+    // sans cette borne, la boucle sabrait déjà le PREMIER cut d'un event
+    // fraîchement ingéré dès que la somme de SES PROPRES cuts dépassait
+    // le budget à elle seule (un crit 'hit' : 1,2+0,3+0,9+0,8 = 3,2 s >
+    // 2,5 s ; un 'special' : 3,3 s ; un 'ulti' : 5,2 s — voir
+    // cutsForEvent() dans cutPlanner.ts) : exactement ce que ce garde-fou
+    // prétend empêcher selon son propre commentaire, un crit/spécial/
+    // Ulti perdant systématiquement son plan-titre (attack-solo/
+    // special-cast/ulti-cast) dès sa toute première apparition, SANS le
+    // moindre retard réel accumulé (trouvé en audit, 2026-08-20 — la
+    // même famille de bug que le garde-fou par LONGUEUR déjà remplacé le
+    // 2026-08-16, resurgie via ce nouveau garde-fou par durée).
+    let removable = this.queue.length - freshCount
     while (
+      removable > 0 &&
       this.queue.length > 1 &&
       this.queue.reduce((sum, q) => sum + q.cut.duration, 0) > MAX_QUEUE_LAG_S
     ) {
       this.queue.shift()
+      removable--
     }
 
     if (this.active && m.t >= this.active.until) this.active = null
