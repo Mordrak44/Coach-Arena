@@ -244,6 +244,30 @@ export class CutSequencer {
         this.active[e.side] = e.name
         continue
       }
+      // `roundEnd`/`matchEnd` n'ont PAS de branche dans cutsForEvent()
+      // (switch par défaut → []) : `planCuts()`, le montage HORS LIGNE du
+      // même flux d'événements, les traite en cas spéciaux (ko-down,
+      // victory-pose+crowd) AVANT de retomber sur cutsForEvent — ce
+      // lecteur EN DIRECT, lui, les envoyait tout droit à cutsForEvent et
+      // perdait silencieusement ces deux CutKind. Sans dégât observable
+      // aujourd'hui (EMPTY_CUT_LIBRARY renvoie toujours null), mais le
+      // jour où une vraie bibliothèque de clips existe, un KO ou une pose
+      // de victoire ne s'affiche JAMAIS en direct alors que le récap
+      // d'après-match, lui, les montre bien — une divergence entre les
+      // deux consommateurs du même flux (trouvé en audit, 2026-08-20).
+      if (e.kind === 'roundEnd') {
+        const loser = this.active[e.winner === 'player' ? 'enemy' : 'player']
+        out.push({ kind: 'ko-down', chars: [loser], t: e.t, duration: 2 })
+        continue
+      }
+      if (e.kind === 'matchEnd') {
+        const winner = this.active[e.winner]
+        out.push(
+          { kind: 'victory-pose', chars: [winner], t: e.t, duration: 2.5 },
+          { kind: 'crowd', chars: [], t: e.t, duration: 1.2 },
+        )
+        continue
+      }
       out.push(...cutsForEvent(e, side => this.active[side]))
     }
     return out

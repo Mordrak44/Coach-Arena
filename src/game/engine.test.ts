@@ -1373,6 +1373,38 @@ describe('CutSequencer (lecture de cuts EN DIRECT, pas a posteriori)', () => {
     expect(cut.kind).toBe('idle-loop')
     expect(cut.chars).toEqual(['Nyx', ROSTER[1].name])
   })
+
+  it("bug d'audit (2026-08-20) : roundEnd produit un cut 'ko-down' du PERDANT — jusqu'ici ingest() n'avait aucune branche pour cet événement (retombait sur cutsForEvent(), qui renvoie [] par défaut), contrairement à planCuts() (le montage HORS LIGNE du même flux) qui, lui, le traite en cas spécial", async () => {
+    const { CutSequencer } = await import('./cutPlanner')
+    const m = freshMatch()
+    const seq = new CutSequencer(ROSTER[0], ROSTER[1])
+    m.events.push({ kind: 'roundEnd', t: 5, winner: 'player' }) // player gagne → enemy (ROSTER[1]) est le perdant filmé
+    const cuts = seq.ingest(m)
+    expect(cuts).toEqual([{ kind: 'ko-down', chars: [ROSTER[1].name], t: 5, duration: 2 }])
+  })
+
+  it("bug d'audit (2026-08-20) : matchEnd produit 'victory-pose' (vainqueur) + 'crowd' — même angle mort que roundEnd, jamais traité par ingest() avant ce fix", async () => {
+    const { CutSequencer } = await import('./cutPlanner')
+    const m = freshMatch()
+    const seq = new CutSequencer(ROSTER[0], ROSTER[1])
+    m.events.push({ kind: 'matchEnd', t: 42, winner: 'enemy' })
+    const cuts = seq.ingest(m)
+    expect(cuts).toEqual([
+      { kind: 'victory-pose', chars: [ROSTER[1].name], t: 42, duration: 2.5 },
+      { kind: 'crowd', chars: [], t: 42, duration: 1.2 },
+    ])
+  })
+
+  it("bug d'audit (2026-08-20) : roundEnd/matchEnd après une relève filment bien le NOUVEAU perso (cohérent avec le comportement déjà correct de cutsForEvent pour les autres kinds)", async () => {
+    const { CutSequencer } = await import('./cutPlanner')
+    const m = freshMatch()
+    const seq = new CutSequencer(ROSTER[0], ROSTER[1])
+    m.events.push({ kind: 'switch', t: 1, side: 'enemy', name: 'Nyx' })
+    seq.ingest(m)
+    m.events.push({ kind: 'roundEnd', t: 5, winner: 'player' }) // enemy (relevé en Nyx) perd
+    const cuts = seq.ingest(m)
+    expect(cuts).toEqual([{ kind: 'ko-down', chars: ['Nyx'], t: 5, duration: 2 }])
+  })
 })
 
 describe('LiveCutPlayer (lecteur en direct — respecte la règle « instant déjà résolu »)', () => {

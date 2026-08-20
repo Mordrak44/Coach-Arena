@@ -3088,11 +3088,103 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       touche `ArenaScreen.tsx`) vérifiés sur 3 exécutions consécutives,
       `tsc --noEmit` + `npm run build` verts, funnel visuel standard
       (`scripts/shot.mjs`) rejoué sans régression.
+- [x] Audit de code (fichier entier) sur `game/cutPlanner.ts`
+      (`CutSequencer`, séquenceur de cuts EN DIRECT, 2026-08-20) —
+      démarré via `liveCutPlayer.ts` (relu intégralement, confirmé sain :
+      `m.t` est bien monotone, jamais réinitialisé entre rounds, donc pas
+      de cut fantôme figé sur un `until` d'un round précédent comme
+      d'abord suspecté). **1 vrai bug corrigé** dans `CutSequencer
+      .ingest()`, qui consomme le MÊME flux d'événements que `planCuts()`
+      (le montage HORS LIGNE, pour le récap post-match) mais divergeait
+      silencieusement de lui : `planCuts()` traite `roundEnd`/`matchEnd`
+      en cas SPÉCIAUX (pousse `ko-down` puis `victory-pose`+`crowd`) AVANT
+      de retomber sur `cutsForEvent()` — `ingest()`, lui, n'avait de cas
+      spécial que pour `'switch'` et envoyait tout le reste (y compris
+      `roundEnd`/`matchEnd`) directement à `cutsForEvent()`, dont le
+      `switch` par défaut renvoie `[]` pour tout kind non listé. Sans
+      dégât OBSERVABLE aujourd'hui (`EMPTY_CUT_LIBRARY` renvoie toujours
+      `null`, donc `LiveCutPlayer.update()` n'affiche jamais rien de toute
+      façon), mais le jour où une vraie bibliothèque de clips existe : un
+      KO en direct ne montrerait JAMAIS le ralenti d'effondrement, et une
+      victoire ne montrerait JAMAIS la pose de célébration — alors que le
+      récap d'après-match, lui, les affiche bien pour ces MÊMES
+      événements. Une divergence de logique entre les deux consommateurs
+      du même flux, le genre de bug qui ne se découvre qu'au moment où
+      quelqu'un branche enfin la bibliothèque réelle, loin de l'endroit
+      où l'erreur a été introduite. Corrigé en donnant à `ingest()`
+      exactement les mêmes cas spéciaux `roundEnd`/`matchEnd` que
+      `planCuts()` (mêmes `CutKind`, mêmes durées), mais lus depuis
+      `this.active` (l'état de relèves suivi par le séquenceur EN DIRECT)
+      plutôt que la fermeture locale de `planCuts()` — testé et confirmé
+      qu'un `roundEnd`/`matchEnd` survenant APRÈS une relève filme bien le
+      NOUVEAU perso, cohérent avec le comportement déjà correct des
+      autres `CutKind`. 3 nouveaux tests, reconfirmés par `git stash` A/B
+      (échouent bien sur le code d'avant-fix : `[]` au lieu des cuts
+      attendus). 390 tests, suite vérifiée sur 3 exécutions consécutives.
+      `tsc --noEmit` + `npm run build` verts. Couverture de
+      `cutPlanner.ts` : 100 % lignes/statements/fonctions, 97,95 %
+      branches.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-20 (routine, suite) : Après deux journées à traquer des bugs de
+  cycle de vie (React StrictMode, AudioContext/MediaStream), retour à un
+  angle plus proche du précédent style d'audit « fichier entier » sur du
+  code purement logique : `game/liveCutPlayer.ts` (le lecteur de cuts EN
+  DIRECT, actuellement inerte puisque `EMPTY_CUT_LIBRARY` ne renvoie
+  jamais de clip — TEMPLATES_SPEC.md documente que le vrai câblage viendra
+  plus tard). Relu intégralement, une hypothèse de bug testée et écartée :
+  `m.t` (l'horloge de match) semblait pouvoir se réinitialiser entre
+  rounds, ce qui aurait figé un cut `active` sur un `until` d'un round
+  précédent pour de bon — vérifié directement dans `combat.ts`
+  (`m.t += dt`, jamais réassigné ni remis à 0 dans `startNextRound`) :
+  faux, `m.t` est bien un chronomètre de MATCH monotone, pas de round.
+  `liveCutPlayer.ts` lui-même confirmé sain. En creusant sa dépendance
+  `CutSequencer` (`game/cutPlanner.ts`, jamais audité fichier entier
+  jusqu'ici), **1 vrai bug trouvé et corrigé** : ce fichier contient DEUX
+  consommateurs indépendants du même flux d'événements de combat —
+  `planCuts()` (montage HORS LIGNE pour le récap post-match) et
+  `CutSequencer.ingest()` (lecture EN DIRECT, pendant le match) — censés
+  produire la même grammaire de cuts pour les mêmes événements. Ils
+  divergeaient sur exactement deux `CombatEvent.kind` : `roundEnd` et
+  `matchEnd`. `planCuts()` les traite en cas spéciaux explicites (`ko-down`
+  pour le perdant du round, `victory-pose`+`crowd` pour le vainqueur du
+  match) AVANT de retomber sur la grammaire partagée `cutsForEvent()` ;
+  `CutSequencer.ingest()`, lui, n'avait de branche spéciale que pour
+  `'switch'` (la relève d'un perso) — tout le reste, `roundEnd`/`matchEnd`
+  inclus, partait directement vers `cutsForEvent()`, dont le `switch`
+  par défaut renvoie `[]` pour tout kind qu'il ne connaît pas
+  explicitement (seuls `hit`/`dodged`/`blocked`/`countered`/`special`/
+  `ulti` y sont câblés). Aujourd'hui, ce bug est invisible : la
+  bibliothèque de clips étant vide, `LiveCutPlayer.update()` n'affiche
+  jamais rien, cuts manquants ou pas. Mais le jour où une vraie
+  bibliothèque de templates existera (le travail « mécanique » que le
+  fichier documente lui-même comme restant à faire), le KO d'un round et
+  la pose de victoire de fin de match — deux moments filmés parmi les
+  plus évidents d'un combat — ne s'afficheraient JAMAIS en direct, alors
+  que le récap généré juste après, à partir du MÊME flux d'événements,
+  les montrerait très bien. Exactement le genre de divergence
+  silencieuse entre deux implémentations censées être équivalentes qui
+  ne se découvre qu'au moment où quelqu'un branche enfin la pièce
+  manquante — loin, dans le temps et le contexte, de l'endroit où
+  l'omission a été introduite. Corrigé en donnant à `ingest()` les mêmes
+  deux cas spéciaux que `planCuts()`, mêmes `CutKind` et mêmes durées,
+  mais lus depuis `this.active` (l'état de relèves que le séquenceur EN
+  DIRECT suit lui-même au fil du match) plutôt que depuis la fermeture
+  locale propre à `planCuts()`. Vérifié en particulier qu'un
+  `roundEnd`/`matchEnd` survenant APRÈS une relève de perso filme bien le
+  NOUVEAU combattant, pas l'ancien — cohérent avec ce que
+  `cutsForEvent()` fait déjà correctement pour tous les autres types
+  d'événements. 3 nouveaux tests dans le bloc `CutSequencer` existant,
+  chacun reconfirmé par `git stash` A/B (échouent bien sur le code
+  d'avant-fix : `[]` au lieu des cuts `ko-down`/`victory-pose`+`crowd`
+  attendus). 390 tests, suite vérifiée sur 3 exécutions consécutives,
+  `tsc --noEmit` et `npm run build` verts. Couverture de `cutPlanner.ts` :
+  100 % lignes/statements/fonctions, 97,95 % branches (l'écart restant,
+  un `?? 0` de première insertion dans `templateShoppingList`, préexistant
+  et sans lien avec ce fix).
 - 2026-08-20 (routine, suite) : La famille « API navigateur bas niveau »
   de `systems/` étant close, changé d'angle : `ui/ReadyScreen.tsx` (le
   Vestiaire), un COMPOSANT React cette fois plutôt qu'un système en
