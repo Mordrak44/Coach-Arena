@@ -3321,11 +3321,113 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       fix — un repli `?? null` pour les persos custom dans `cards.ts`, et
       les 2 branches de `combat.ts` déjà documentées comme structurellement
       inatteignables lors du balayage de couverture antérieur).
+- [x] Audit de code (fichier entier) sur `game/characters.ts` (roster,
+      sélection d'adversaire, création par prompt, 2026-08-20). **2 vrais
+      bugs corrigés**, tous deux confirmés par `git stash` A/B, tous deux
+      d'abord vérifiés par simulation avant correction (discipline
+      « confirmer avant de corriger » appliquée ici à un biais
+      statistique plutôt qu'à un crash). (1) `pickOpponentTeam` mélangeait
+      le pool via `sort(() => Math.random() - 0.5)` — un anti-pattern JS
+      connu (le comparateur viole le contrat de cohérence attendu par
+      `sort`), confirmé BIAISÉ EN PRATIQUE par simulation (200 000
+      tirages sur un pool de 4) : certains persos sortaient jusqu'à 3×
+      plus souvent que d'autres (27 846 à 72 062 occurrences au lieu de
+      ~50 000 chacun attendu), alors qu'un vrai mélange Fisher-Yates
+      (`shuffle()`, déjà présent dans `cards.ts` pour le deck) donnait
+      une distribution quasi parfaitement uniforme sur la même
+      simulation. Le banc adverse du mode Rapide favorisait donc
+      systématiquement certains persos du roster plutôt que de tirer
+      chacun à chances égales. Corrigé en réutilisant `shuffle()` de
+      `cards.ts` (import direct, aucun risque de cycle — `cards.ts`
+      n'importe que `types.ts`) au lieu de réinventer un mélange maison.
+      (2) `pickOpponent` (adversaire PRINCIPAL) n'avait aucun garde-fou
+      si l'exclusion vide tout le roster — `pool[Math.floor(Math.random()
+      * 0)]` renvoie `undefined`, jamais un `Character` malgré le type de
+      retour, plantant au premier accès (`enemy.name`/`.stats`/`.color`)
+      dans `ReadyScreen`/`ArenaScreen`. Non atteignable AUJOURD'HUI (6
+      persos au roster, au plus 3 exclus via l'UI actuelle — plafond
+      d'équipe à 2), mais `pickOpponentTeam`, sa fonction sœur juste en
+      dessous, dégrade DÉJÀ proprement dans ce même cas (renvoie moins
+      d'adversaires plutôt que de planter) — un précédent direct dans ce
+      même fichier, où `pickOpponent` a d'ailleurs déjà eu deux audits de
+      retard sur `pickOpponentTeam` par le passé (2026-08-16 puis
+      2026-08-18, tous deux documentés dans les commentaires du fichier).
+      Corrigé par cohérence avec ce précédent : retombe sur le roster
+      COMPLET (un match en miroir reste un bien moindre mal qu'un crash
+      au lancement) plutôt que sur `undefined` si le pool filtré est
+      vide. 2 nouveaux tests (distribution du tirage vérifiée sur 4000
+      essais avec tolérance ±35 % — calibrée par simulation pour échouer
+      de façon fiable sur l'ancien code (50/50 essais) et passer de façon
+      fiable sur le nouveau (200/200 essais) ; repli sur roster complet
+      quand tout est exclu). 403 tests, suite vérifiée sur 3 exécutions
+      consécutives (le test probabiliste inclus, aucune instabilité).
+      `tsc --noEmit` + `npm run build` verts. Couverture de
+      `characters.ts` : 100 % sur les 4 métriques.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-20 (routine, suite) : Après `cards.ts`, poursuite du balayage du dossier
+  `game/` avec `characters.ts` (le roster, la sélection d'adversaire du
+  mode Rapide, la création de perso par prompt). **2 vrais bugs
+  trouvés et corrigés**, tous deux d'abord confirmés par SIMULATION avant
+  toute correction — une variante de la discipline « confirmer avant de
+  corriger » habituelle de cette session, appliquée cette fois à un biais
+  STATISTIQUE plutôt qu'à un crash ou une valeur incorrecte ponctuelle,
+  puisqu'un bug de tirage aléatoire ne se voit pas à l'œil sur un seul
+  appel. (1) `pickOpponentTeam` (le banc adverse du mode Rapide)
+  mélangeait son pool via `sort(() => Math.random() - 0.5)` — un
+  anti-pattern JavaScript bien documenté (le comparateur d'un tri doit
+  être cohérent d'un appel à l'autre ; un comparateur aléatoire viole ce
+  contrat, et le tri par insertion utilisé en interne par les moteurs JS
+  sur les petits tableaux amplifie encore le biais qui en résulte).
+  Vérifié empiriquement avant de toucher au code : un script Node jetable
+  a fait tourner ce mélange 200 000 fois sur un pool de 4 éléments et
+  compté combien de fois chacun sortait en première position — la
+  distribution attendue est ~50 000 chacun (25 %), la distribution
+  RÉELLE allait de 27 846 à 72 062 occurrences, un écart de près de 3× —
+  comparé à la MÊME simulation avec un vrai mélange Fisher-Yates
+  (`shuffle()`, déjà présent et déjà utilisé pour le deck de cartes dans
+  `cards.ts`), qui donnait une distribution quasi parfaitement uniforme
+  (49 719 à 50 258). Le banc adverse du mode Rapide favorisait donc
+  SYSTÉMATIQUEMENT certains persos du roster au détriment d'autres,
+  invisible à l'œil nu match après match mais bien réel sur la durée.
+  Corrigé en réutilisant directement `shuffle()` de `cards.ts` plutôt que
+  de réinventer un mélange maison — un import propre, sans risque de
+  cycle (`cards.ts` n'importe lui-même que des types). (2) `pickOpponent`
+  (l'adversaire PRINCIPAL, pas le banc) n'avait AUCUN garde-fou si
+  l'ensemble d'exclusion vidait tout le roster filtré : `pool[Math.floor
+  (Math.random() * 0)]` renvoie `undefined` en JavaScript, jamais un
+  `Character` malgré ce que le type de retour de la fonction promet —
+  une désynchronisation entre signature TypeScript et comportement réel
+  qui aurait fait planter `ReadyScreen`/`ArenaScreen` au tout premier
+  accès à une propriété de l'adversaire (`enemy.name`, `.stats`,
+  `.color`). NON atteignable aujourd'hui avec les paramètres actuels (6
+  persos au roster, plafond d'équipe à 2 dans l'UI, donc au plus 3 ids
+  exclus) — mais le fichier a un précédent DIRECT et documenté sur EXACTEMENT
+  cette fonction : `pickOpponent` a déjà eu DEUX audits de retard sur sa
+  fonction sœur `pickOpponentTeam` par le passé (2026-08-16 puis
+  2026-08-18, chaque fois pour un fix analogue jamais répercuté d'une
+  fonction à l'autre), et `pickOpponentTeam`, elle, dégrade DÉJÀ
+  proprement dans ce même cas de pool vidé (elle renvoie simplement moins
+  d'adversaires que demandé plutôt que de planter). Étant donné ce
+  précédent répété — DEUX fois déjà, ce n'est plus une coïncidence mais
+  un vrai risque structurel que ces deux fonctions divergent sans que
+  personne ne s'en aperçoive — corriger `pickOpponent` par cohérence
+  avec sa sœur a semblé justifié malgré la non-atteignabilité actuelle :
+  retombe sur le roster COMPLET (un match en miroir reste un bien moindre
+  mal qu'un crash au lancement du match) plutôt que sur `undefined`
+  quand le pool filtré est vide. 2 nouveaux tests : un test de
+  distribution (4000 tirages, tolérance ±35 % autour de l'uniforme,
+  calibrée par simulation pour échouer de façon FIABLE sur l'ancien code
+  — 50/50 essais simulés — et passer de façon FIABLE sur le nouveau —
+  200/200 essais simulés — pas un seuil choisi au hasard), et un test du
+  repli sur roster complet quand tout est exclu. Chacun reconfirmé par
+  `git stash` A/B. 403 tests, suite vérifiée sur 3 exécutions
+  consécutives, y compris le test probabiliste — aucune instabilité
+  observée. `tsc --noEmit` et `npm run build` verts. Couverture de
+  `characters.ts` : 100 % sur les 4 métriques.
 - 2026-08-20 (routine, suite) : Après le rendu canvas, retour au cœur du
   gameplay : `game/cards.ts` (budget de puissance des cartes,
   `clampEffect`, les deux collections `CARD_POOL`/`SIGNATURE_CARDS`), le

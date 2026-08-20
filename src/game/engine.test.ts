@@ -3046,6 +3046,27 @@ describe('pickOpponentTeam (characters.ts) — banc adverse du mode Rapide', () 
     const team = pickOpponentTeam(allButOne, 5) // demande 5, il n'en reste qu'1 possible
     expect(team.length).toBe(1)
   })
+
+  it("bug d'audit (2026-08-20) : chaque perso du pool a des chances ÉGALES d'être tiré — `sort(() => Math.random() - 0.5)` (remplacé par shuffle() de cards.ts) biaisait la distribution, pas juste en théorie : vérifié par simulation, certains persos sortaient jusqu'à 3× plus souvent que d'autres", async () => {
+    const { pickOpponentTeam } = await import('./characters')
+    const excluded = ROSTER.slice(4).map(c => c.id) // exclut tout sauf les 4 premiers
+    const pool = ROSTER.slice(0, 4).map(c => c.id)
+    const counts: Record<string, number> = Object.fromEntries(pool.map(id => [id, 0]))
+    const trials = 4000
+    for (let i = 0; i < trials; i++) {
+      const [picked] = pickOpponentTeam(excluded, 1)
+      counts[picked.id]++
+    }
+    // Distribution uniforme attendue : ~1000 chacun sur 4000 tirages.
+    // Tolérance large (±35 %) pour rester un test de RÉGRESSION anti-biais
+    // flagrant (l'ancien sort(() => Math.random()-0.5) produisait des
+    // écarts bien plus grands que ça sur un pool de cette taille), pas un
+    // test statistique strict qui flaquerait de façon aléatoire.
+    for (const id of pool) {
+      expect(counts[id]).toBeGreaterThan(trials / pool.length / 1.35)
+      expect(counts[id]).toBeLessThan((trials / pool.length) * 1.35)
+    }
+  })
 })
 
 describe('pickOpponent (characters.ts) — adversaire du mode Rapide, jamais testé directement', () => {
@@ -3062,6 +3083,15 @@ describe('pickOpponent (characters.ts) — adversaire du mode Rapide, jamais tes
     for (let i = 0; i < 200; i++) {
       expect(excluded).not.toContain(pickOpponent(excluded).id)
     }
+  })
+
+  it("bug d'audit (2026-08-20) : si l'exclusion vide TOUT le roster (non atteignable aujourd'hui via l'UI actuelle, mais aucun garde-fou avant ce fix), retombe sur le roster complet plutôt que de renvoyer `undefined` — pickOpponentTeam, lui, dégradait déjà proprement dans ce cas", async () => {
+    const { pickOpponent } = await import('./characters')
+    const everyone = ROSTER.map(c => c.id)
+    expect(() => pickOpponent(everyone)).not.toThrow()
+    const opponent = pickOpponent(everyone)
+    expect(opponent).toBeDefined()
+    expect(ROSTER.map(c => c.id)).toContain(opponent.id) // repli sur le roster complet, pas planté
   })
 })
 
