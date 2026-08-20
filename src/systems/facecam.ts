@@ -19,6 +19,7 @@ export class FaceCoach {
   private ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null
   private prev: Uint8ClampedArray | null = null
   private timer = 0
+  private generation = 0
 
   constructor() {
     this.video = document.createElement('video')
@@ -32,8 +33,20 @@ export class FaceCoach {
   }
 
   async start(stream: MediaStream): Promise<void> {
+    const gen = ++this.generation
     this.video.srcObject = stream
     await this.video.play().catch(() => {})
+    // Un stop() (ou un nouveau start()) peut être arrivé PENDANT cet await —
+    // reproductible en StrictMode : `ArenaScreen` appelle `sys.face.start()`
+    // sans l'attendre dans un effet qui subit le double-montage synchrone de
+    // React (mount → cleanup(stop) → mount), sur la MÊME instance
+    // (`sysRef.current` y survit). Sans ce garde-fou, la résolution TARDIVE
+    // de ce play() écrasait `this.timer` avec un nouvel intervalle,
+    // orphelinant l'ancien — jamais nettoyé par aucun stop() suivant, qui ne
+    // touche que le `this.timer` COURANT : une boucle `sample()` tournait
+    // indéfiniment en arrière-plan (trouvé en audit, 2026-08-20 — même bug
+    // déjà trouvé et corrigé pour VoiceCoach dans voice.ts).
+    if (gen !== this.generation) return
     this.state.active = true
     this.timer = window.setInterval(() => this.sample(), 180)
   }
@@ -58,15 +71,18 @@ export class FaceCoach {
   }
 
   stop() {
+    this.generation++ // périme tout start() en cours d'attache (voir start())
     clearInterval(this.timer)
     this.state.active = false
     this.state.energy = 0
     this.video.srcObject = null
     // Sans ça, un futur start() sur cette même instance comparerait sa
     // première frame au dernier souvenir de l'ANCIENNE session, donnant
-    // une énergie de mouvement faussée (trouvé en audit, 2026-08-16 —
-    // non atteignable aujourd'hui, ArenaScreen recrée toujours une
-    // instance fraîche, mais le contrat start/stop doit rester correct).
+    // une énergie de mouvement faussée (trouvé en audit, 2026-08-16). Un
+    // vrai nouveau match recrée toujours une instance fraîche via
+    // ArenaScreen — mais un start/stop/start SUR LA MÊME instance arrive
+    // bel et bien en StrictMode (voir le commentaire de start() ci-dessus,
+    // 2026-08-20), donc ce reset n'est pas que théorique.
     this.prev = null
   }
 }

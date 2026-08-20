@@ -2897,11 +2897,114 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       nouveaux tests. 380 tests, suite vérifiée sur 3 exécutions
       consécutives. `tsc --noEmit` + `npm run build` verts. Couverture de
       `voice.ts` : 100 % sur les 4 métriques.
+- [x] Audit de code (fichier entier) sur `systems/facecam.ts` (énergie de
+      mouvement par diff d'images webcam, 2026-08-20) — 3e fichier
+      d'affilée de la famille « API navigateur bas niveau », suite
+      directe de `recorder.ts` puis `voice.ts`. **1 vrai bug corrigé**,
+      exactement la même classe de bug déjà trouvée et corrigée pour
+      `VoiceCoach` : `start()` attend `video.play()` avant d'armer l'état
+      (`state.active = true` + `window.setInterval(...)`), sans aucun
+      garde-fou contre un `stop()` (ou un nouveau `start()`) arrivant
+      PENDANT cet await. Reproductible concrètement de la même façon
+      qu'avec `voice.ts` : `ArenaScreen` appelle `sys.face.start(stream)`
+      sans l'attendre (fire-and-forget) dans le même effet qui subit le
+      double-montage synchrone de React 18 StrictMode (mount → cleanup →
+      mount, sur la MÊME instance `sysRef.current.face`). Un
+      start/stop/start en succession immédiate laissait DEUX appels à
+      `video.play()` en attente ; quand les deux résolvaient (dans
+      n'importe quel ordre), chacun réassignait `this.timer` — le second à
+      résoudre écrasait le premier, orphelinant son `setInterval` (jamais
+      nettoyé par aucun `stop()` suivant, qui ne touche que le
+      `this.timer` COURANT) : une boucle `sample()` tournait indéfiniment
+      en arrière-plan, gardant la caméra/le canvas/l'ancienne frame vivants
+      pour la durée de l'onglet. Corrigé avec un compteur de génération
+      (`this.generation`, incrémenté à chaque `start()` ET `stop()`) :
+      chaque `start()` capture sa propre génération avant l'await, et
+      vérifie qu'elle est toujours la génération COURANTE une fois l'await
+      résolu — sinon il abandonne sans toucher à l'état ni créer
+      d'intervalle. Un commentaire préexistant (2026-08-16) affirmait
+      qu'un start/stop/start sur la même instance était « non atteignable
+      aujourd'hui, ArenaScreen recrée toujours une instance fraîche » —
+      corrigé pour refléter que si un VRAI nouveau match recrée bien une
+      instance fraîche, un start/stop/start sur la MÊME instance arrive
+      bel et bien en StrictMode. 1 nouveau test simulant précisément cette
+      course (deux `video.play()` contrôlés manuellement, résolus dans un
+      ordre choisi), reconfirmé par `git stash` A/B (échoue bien sur le
+      code d'avant-fix : 2 intervalles au lieu d'1). Un second point
+      soulevé par l'audit (un `ctx` null si `getContext('2d')` échoue
+      désactiverait silencieusement l'échantillonnage) délibérément NON
+      corrigé : c'est de la dégradation gracieuse cohérente avec le reste
+      du fichier (et de `voice.ts`), pas un bug — rien à corriger. 381
+      tests, suite vérifiée sur de nombreuses exécutions consécutives.
+      `tsc --noEmit` + `npm run build` verts. Couverture de `facecam.ts` :
+      100 % sur les 4 métriques.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-20 (routine, suite) : Après `recorder.ts` puis `voice.ts`,
+  troisième et dernier fichier de la famille « API navigateur bas niveau »
+  audité d'affilée : `systems/facecam.ts` (énergie de mouvement par
+  différence d'images webcam). Choisi pour la même raison que les deux
+  précédents — jamais couvert par un audit fichier entier — et
+  l'hypothèse s'est encore confirmée : **1 vrai bug corrigé**, exactement
+  la MÊME classe de bug que celle trouvée sur `VoiceCoach` la veille
+  (start/stop/start en StrictMode sur la même instance, zombie créé par
+  la résolution tardive d'un await). `FaceCoach.start()` attendait
+  `video.play()` avant d'armer l'état et de créer son intervalle
+  d'échantillonnage, sans aucune vérification qu'un `stop()` (ou un
+  nouveau `start()`) n'était pas arrivé PENDANT cette attente. Comme pour
+  `voice.ts`, c'est concrètement atteignable : `ArenaScreen` appelle
+  `sys.face.start(stream)` sans l'attendre (fire-and-forget), dans le
+  même effet à deps `[]` qui subit le double-montage synchrone de React
+  18 StrictMode — et `sysRef.current.face` y survit intact, donc le
+  start/stop/start atterrit bien sur la MÊME instance de `FaceCoach`. Les
+  deux appels à `video.play()` laissés en attente résolvaient chacun leur
+  tour et réassignaient `this.timer` avec un nouvel intervalle — le
+  second à résoudre écrasait le premier, l'orphelinant pour de bon
+  (`stop()` ne nettoie jamais que le `this.timer` COURANT). Résultat :
+  une boucle `sample()` tournant indéfiniment en arrière-plan,
+  gardant la webcam/le canvas vivants pour la durée de l'onglet — pas
+  aussi visible qu'un doublon de commande vocale, mais la même fuite de
+  ressource dans l'esprit. Corrigé avec le même principe que `voice.ts`,
+  adapté à l'absence d'objet-instance jetable ici (contrairement à
+  `SpeechRecognition`, un seul `HTMLVideoElement` est réutilisé entre
+  sessions) : un compteur de génération incrémenté à chaque `start()` ET
+  `stop()`, capturé localement avant l'await, revérifié après — toute
+  résolution tardive d'une génération périmée abandonne sans toucher à
+  l'état ni créer d'intervalle. Petit à-côté révélateur en creusant : un
+  commentaire du 2026-08-16 affirmait qu'un start/stop/start sur la même
+  instance était « non atteignable aujourd'hui, ArenaScreen recrée
+  toujours une instance fraîche » — vrai pour un VRAI nouveau match (qui
+  crée bel et bien une nouvelle instance), mais faux pour le cas
+  StrictMode qui vient d'être trouvé sur la MÊME instance ; corrigé pour
+  ne plus induire en erreur le prochain audit. Un second point soulevé
+  par l'audit (un `ctx` `null` si `getContext('2d')` échoue désactiverait
+  silencieusement l'échantillonnage, sans le signaler) délibérément NON
+  traité comme un bug : c'est de la dégradation gracieuse, cohérente avec
+  le reste du fichier et avec `voice.ts` (qui fait pareil pour
+  `AudioContext`) — pas une régression à corriger. 1 nouveau test qui
+  simule précisément la course (deux `video.play()` contrôlés
+  manuellement via des promesses résolues à la main, dans un ordre
+  choisi), reconfirmé par `git stash` A/B (échoue bien sur le code
+  d'avant-fix : 2 intervalles créés au lieu d'1 seul). La suite complète
+  a été relancée un nombre inhabituel de fois (plus de 30 exécutions au
+  total) après qu'UNE seule exécution ait échoué une fois de façon
+  isolée ; l'analyse du contrôle de flux du nouveau test (aucun `await`
+  entre les appels synchrones à `play()`, ordre de résolution
+  entièrement piloté à la main) n'a trouvé aucune course possible côté
+  test, et les ~30 relances suivantes sont toutes passées — traité comme
+  un aléa d'environnement (charge du bac à sable), pas comme un test
+  fragile, mais noté ici par transparence plutôt que balayé sous le
+  tapis. 381 tests, `tsc --noEmit` et `npm run build` verts. Couverture
+  de `facecam.ts` : 100 % sur les 4 métriques — clôturé sans reste, comme
+  `voice.ts` la veille. Ce fichier clôt la famille « API navigateur bas
+  niveau » identifiée : les trois fichiers (`recorder.ts`, `voice.ts`,
+  `facecam.ts`) partageaient tous la même vulnérabilité structurelle
+  (état muté après un await non gardé), un signal que d'éventuels futurs
+  fichiers de cette famille (aucun autre identifié pour l'instant dans
+  `systems/`) mériteront le même réflexe de vérification en priorité.
 - 2026-08-20 (routine, suite) : Immédiatement après `recorder.ts`, même
   stratégie appliquée à `systems/voice.ts` (reco vocale Web Speech API +
   volume/pitch) — fichier soeur dans la même famille « API navigateur bas

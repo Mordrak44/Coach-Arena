@@ -3964,6 +3964,51 @@ describe('FaceCoach (systems/facecam.ts) — énergie de mouvement par diff d\'i
     await expect(fc.start({} as any)).resolves.toBeUndefined()
     expect(fc.state.active).toBe(true) // le flux continue malgré le rejet de play()
   })
+
+  it("bug d'audit (2026-08-20) : StrictMode — start() suivi immédiatement d'un stop() PUIS d'un nouveau start() sur la MÊME instance, avant que le premier video.play() ne se résolve, ne doit laisser vivre qu'UN SEUL intervalle (avant le fix : le 1er, résolu en dernier, écrasait this.timer et orphelinait le 2nd — jamais nettoyable)", async () => {
+    setup(new Uint8ClampedArray(FRAME_LEN).fill(0))
+    let resolvePlay1: (() => void) | null = null
+    let resolvePlay2: (() => void) | null = null
+    let playCalls = 0
+    const fakeVideo = {
+      muted: false,
+      playsInline: false,
+      srcObject: null as unknown,
+      readyState: 2,
+      play: () =>
+        new Promise<void>(resolve => {
+          playCalls++
+          if (playCalls === 1) resolvePlay1 = resolve
+          else resolvePlay2 = resolve
+        }),
+    }
+    const fakeCanvas = { getContext: () => ({ drawImage: () => {}, getImageData: () => ({ data: new Uint8ClampedArray(FRAME_LEN) }) }) }
+    ;(globalThis as any).document = { createElement: (tag: string) => (tag === 'video' ? fakeVideo : fakeCanvas) }
+    const intervalIds: number[] = []
+    let nextId = 1
+    ;(globalThis as any).window = {
+      setInterval: () => {
+        const id = nextId++
+        intervalIds.push(id)
+        return id
+      },
+    }
+
+    const { FaceCoach } = await import('../systems/facecam')
+    const fc = new FaceCoach()
+
+    const start1 = fc.start({} as any) // 1er montage StrictMode : play() n°1 en attente
+    fc.stop() // cleanup StrictMode immédiat : generation périmé, mais play() n°1 pas encore résolu
+    const start2 = fc.start({} as any) // 2e montage StrictMode, immédiat : play() n°2 en attente
+
+    resolvePlay2!() // le 2e play() se résout D'ABORD (ordre réaliste, pas garanti)
+    await start2
+    resolvePlay1!() // le 1er play(), périmé, se résout ENSUITE — ne doit plus rien faire
+    await start1
+
+    expect(intervalIds).toHaveLength(1) // un seul setInterval a survécu à la résolution tardive
+    expect(fc.state.active).toBe(true)
+  })
 })
 
 describe('SoundSystem (systems/sound.ts) — bande-son synthétisée, jamais testée', () => {
