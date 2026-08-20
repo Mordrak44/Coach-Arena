@@ -3124,11 +3124,132 @@ Ordre de priorité réel vers le premier euro (canal web d'abord).
       `tsc --noEmit` + `npm run build` verts. Couverture de
       `cutPlanner.ts` : 100 % lignes/statements/fonctions, 97,95 %
       branches.
+- [x] Audit de code (fichier entier) sur `game/sceneQueue.ts`
+      (`SceneJobQueue`, file de génération asynchrone des scènes, la
+      passerelle vers un futur pipeline vidéo Kling, 2026-08-20) — dans
+      la continuité de `cutPlanner.ts` la veille (même famille « scènes/
+      montage »). Vérifié d'abord que la classe de bug StrictMode des
+      audits précédents ne s'y applique PAS : `ResultsScreen.tsx` crée
+      une INSTANCE FRAÎCHE de `SceneJobQueue` à CHAQUE invocation de son
+      effet (`const queue = new SceneJobQueue(...)`), contrairement à
+      `sysRef.current` d'`ArenaScreen` — `start()` ne peut donc jamais
+      être appelé deux fois sur la même instance, même sous le double-
+      montage StrictMode. **4 vrais bugs corrigés**, tous confirmés par
+      `git stash` A/B (les 4 nouveaux tests échouent bien sur le code
+      d'avant-fix, dont un qui reproduit littéralement le crash prédit —
+      `queue.start()` jette pour de vrai sur le code d'avant-fix). (1) Le
+      minuteur de timeout de CHAQUE job n'était nettoyé QUE par
+      `cancel()` — jamais dès que le job se réglait lui-même (gagnant OU
+      perdant la course) : avec `STUB_SCENE_SUBMITTER` (le seul submitter
+      qui existe aujourd'hui), chaque job gagne la course en une
+      microtâche, mais son minuteur de ~20 s continuait de tourner pour
+      rien à CHAQUE montage de `ResultsScreen` — un déchet systématique,
+      pas juste théorique. (2) `job.status = url ? 'ready' : 'failed'`
+      utilisait une troncature de vérité au lieu de comparer à `null` —
+      contredisant le contrat documenté de `SceneSubmitter.submit()`
+      (« SEUL `null` signale un échec ») : un futur submitter réel qui
+      résoudrait avec une chaîne vide (`''`, un URL de clip vide mais
+      valide en théorie) verrait son job classé à tort en échec. (3)
+      `.then(f1).catch(f2)` — si `onUpdate` (fourni par l'APPELANT,
+      `ResultsScreen` aujourd'hui, mais pas garanti pur) jetait à
+      l'intérieur de `f1` APRÈS avoir déjà posé `job.status = 'ready'`,
+      le `.catch()` séparé l'interceptait à tort et écrasait le job en
+      `'failed'` tout en laissant son `clipUrl` valide en place — un état
+      interne incohérent republié via un second appel à `onUpdate`.
+      Corrigé en passant à la forme à deux arguments `.then(f1, f2)`
+      (`f2` ne réagit alors QU'à un échec de la course elle-même), avec un
+      `.catch(() => {})` final pour absorber sans dégât un jet
+      échappé d'`onUpdate` plutôt que de laisser filer un rejet de Promise
+      non intercepté (même discipline que le fix `sound.ts` de la veille).
+      (4) Un jet SYNCHRONE de `this.submitter.submit(job.plan)` (pas une
+      Promise rejetée — un futur submitter réel pourrait valider son
+      `plan` avant même de renvoyer une Promise) s'échappait de la
+      construction du tableau passé à `Promise.race` et interrompait
+      TOUTE la boucle `for` de `start()` : chaque job SUIVANT dans la file
+      restait bloqué en `'pending'` pour toujours, jamais soumis ni
+      notifié — corrigé en enveloppant l'appel dans
+      `Promise.resolve().then(() => this.submitter.submit(job.plan))`,
+      qui transforme systématiquement un jet synchrone en rejet de Promise
+      normal. 4 nouveaux tests dans le bloc `SceneJobQueue` existant. 394
+      tests, suite vérifiée sur 3 exécutions consécutives (aucun rejet non
+      géré). `tsc --noEmit` + `npm run build` verts. Couverture de
+      `sceneQueue.ts` : 100 % sur les 4 métriques.
 - [ ] Multijoueur coach vs coach
 - [ ] Classements, saisons, événements
 
 ## Journal
 
+- 2026-08-20 (routine, suite) : Après `cutPlanner.ts` la veille, suite
+  logique dans la même famille « scènes/montage » : `game/sceneQueue.ts`
+  (`SceneJobQueue`), la file qui pilote la génération asynchrone des
+  scènes vers un futur pipeline vidéo (Kling, pas encore branché — voir
+  ROADMAP). Première étape, systématique depuis les bugs StrictMode des
+  jours précédents : vérifier si CE fichier partage la même vulnérabilité
+  que `recorder.ts`/`voice.ts`/`facecam.ts`/`sound.ts`/`ArenaScreen.tsx`.
+  Réponse claire cette fois : NON — `ResultsScreen.tsx` crée une instance
+  TOUTE NEUVE de `SceneJobQueue` à chaque invocation de son effet
+  (`const queue = new SceneJobQueue(...)`), contrairement au singleton
+  `sysRef.current` persistant d'`ArenaScreen` ; `start()` ne peut donc
+  JAMAIS être appelé deux fois sur la même instance, StrictMode ou pas —
+  cette classe de bug écartée avec certitude avant même de lire le reste
+  du fichier, plutôt que supposée. L'audit du RESTE du fichier (un job
+  queue asynchrone classique : `Promise.race` entre un submitter et un
+  timeout, par job) a quand même trouvé **4 vrais bugs**, tous confirmés
+  par `git stash` A/B — dont un qui reproduit littéralement le crash
+  prédit sur le code d'avant-fix (`queue.start()` jette pour de vrai,
+  pas juste une assertion qui échoue). (1) Le minuteur de timeout de
+  CHAQUE job n'était nettoyé QUE par `cancel()` — jamais dès que ce job
+  se réglait lui-même, gagnant ou perdant sa propre course : avec
+  `STUB_SCENE_SUBMITTER` (le seul submitter qui existe aujourd'hui, une
+  fonction async minimale), chaque job gagne sa course en une
+  microtâche, mais son minuteur de ~20 secondes continuait de tourner
+  pour rien — un déchet SYSTÉMATIQUE à chaque montage de `ResultsScreen`,
+  pas un cas limite rare. (2) `job.status = url ? 'ready' : 'failed'`
+  utilisait une troncature de vérité (`url ? ... : ...`) au lieu de
+  comparer explicitement à `null` — contredisant le contrat documenté
+  juste au-dessus dans l'interface elle-même (« Résout l'URL du clip
+  généré, OU NULL si la génération échoue ») : un futur submitter réel
+  qui résoudrait avec une chaîne vide (`''`, un URL de clip vide mais
+  valide en théorie, pas un échec) verrait son job classé à tort en
+  échec, contredisant le contrat que le code lui-même documente. (3) Le
+  bug le plus subtil : `.then(f1).catch(f2)` — si `onUpdate` (un
+  callback fourni par l'APPELANT, `ResultsScreen` aujourd'hui, mais
+  l'interface ne garantit rien sur sa pureté) jetait à l'intérieur de
+  `f1` APRÈS avoir déjà posé `job.status = 'ready'` avec un `clipUrl`
+  valide, le `.catch()` chaîné séparément l'interceptait À TORT (un
+  `.catch()` après un `.then()` réagit à TOUT ce qui jette dans la
+  chaîne, pas seulement à un rejet de la Promise ORIGINALE) et écrasait
+  le job en `'failed'` tout en laissant son `clipUrl` valide en place —
+  un état interne incohérent, republié via un second appel à `onUpdate`.
+  Corrigé en passant à la forme à DEUX ARGUMENTS de `.then(f1, f2)`, où
+  `f2` ne réagit QU'à un échec de la course elle-même, jamais à une
+  erreur venant de `f1` — avec un `.catch(() => {})` final pour absorber
+  proprement un jet échappé d'`onUpdate` sans le laisser filer en rejet
+  de Promise non intercepté (même discipline que le fix `sound.ts` de
+  deux jours plus tôt, où exactement ce genre de rejet avait été
+  confirmé en observant un vrai « Unhandled Rejection » pendant les
+  tests). (4) Le bug le plus sérieux, structurellement : un jet
+  SYNCHRONE de `this.submitter.submit(job.plan)` — pas une Promise
+  rejetée, un VRAI `throw` avant même de renvoyer quoi que ce soit — 
+  s'échappait de la construction du tableau littéral passé à
+  `Promise.race([...])` et interrompait TOUTE la boucle `for` de
+  `start()` : chaque job SUIVANT dans la file restait bloqué en
+  `'pending'` pour toujours, jamais soumis, jamais notifié, sans la
+  moindre erreur visible. Inatteignable avec `STUB_SCENE_SUBMITTER`
+  (une fonction `async` ne peut structurellement jamais jeter de façon
+  synchrone), mais un futur submitter réel qui validerait son `plan`
+  AVANT de lancer un appel réseau (une pratique de programmation tout à
+  fait normale) tomberait dedans au premier plan invalide — un piège
+  posé pour l'implémentation qui n'existe pas encore, avant même qu'elle
+  soit écrite. Corrigé en enveloppant l'appel dans
+  `Promise.resolve().then(() => this.submitter.submit(job.plan))`, qui
+  transforme systématiquement tout jet synchrone en rejet de Promise
+  normal, traité comme n'importe quel autre échec de soumission. 4
+  nouveaux tests ajoutés au bloc `SceneJobQueue` déjà bien fourni de la
+  suite. 394 tests, suite vérifiée sur 3 exécutions consécutives (aucun
+  rejet de Promise non géré, contrairement à un des runs intermédiaires
+  pendant l'écriture du fix n°3). `tsc --noEmit` et `npm run build`
+  verts. Couverture de `sceneQueue.ts` : 100 % sur les 4 métriques.
 - 2026-08-20 (routine, suite) : Après deux journées à traquer des bugs de
   cycle de vie (React StrictMode, AudioContext/MediaStream), retour à un
   angle plus proche du précédent style d'audit « fichier entier » sur du

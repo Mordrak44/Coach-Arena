@@ -1934,6 +1934,68 @@ describe('SceneJobQueue (file de génération asynchrone des scènes)', () => {
     expect(updates).toEqual([]) // jamais notifié : annulé avant le rejet
     expect(queue.jobs()[0].status).toBe('pending') // pas basculé à 'failed' non plus
   })
+
+  it("bug d'audit (2026-08-20) : un job résolu par le submitter (avant le timeout) annule bien SON PROPRE minuteur — jusqu'ici seul cancel() les nettoyait, chacun continuait de tourner ~timeoutMs pour rien après coup", async () => {
+    const { SceneJobQueue } = await import('./sceneQueue')
+    const clearSpy = vi.spyOn(globalThis, 'clearTimeout')
+    const queue = new SceneJobQueue([plan('a')], {
+      submitter: { submit: async p => `fake://clip/${p.id}` },
+      timeoutMs: 5000,
+    })
+    queue.start()
+    await new Promise(r => setTimeout(r, 10))
+    expect(queue.jobs()[0].status).toBe('ready')
+    expect(clearSpy).toHaveBeenCalledWith((queue as any).timers[0])
+    clearSpy.mockRestore()
+  })
+
+  it("bug d'audit (2026-08-20) : un submitter qui résout avec une chaîne VIDE ('', pas null) compte comme un SUCCÈS — `url ? ... : ...` la classait à tort en échec, contredisant le contrat documenté « seul null signale un échec »", async () => {
+    const { SceneJobQueue } = await import('./sceneQueue')
+    const queue = new SceneJobQueue([plan('a')], {
+      submitter: { submit: async () => '' },
+    })
+    queue.start()
+    await new Promise(r => setTimeout(r, 10))
+    const [job] = queue.jobs()
+    expect(job.status).toBe('ready')
+    expect(job.clipUrl).toBe('')
+  })
+
+  it("bug d'audit (2026-08-20) : un onUpdate qui JETTE sur un succès ne doit pas faire retomber le job à 'failed' — le `.catch()` chaîné après `.then()` interceptait à tort les erreurs du `.then()` lui-même, pas seulement celles de la course", async () => {
+    const { SceneJobQueue } = await import('./sceneQueue')
+    let calls = 0
+    const queue = new SceneJobQueue([plan('a')], {
+      submitter: { submit: async () => 'fake://clip/a' },
+      onUpdate: () => {
+        calls++
+        if (calls === 1) throw new Error('onUpdate en a décidé autrement')
+      },
+    })
+    queue.start()
+    await new Promise(r => setTimeout(r, 10))
+    // Le job doit rester 'ready' (posé AVANT l'appel jetant à onUpdate),
+    // pas retomber à 'failed' à cause d'un .catch() qui aurait intercepté
+    // le jet d'onUpdate au lieu d'un vrai échec de la course elle-même.
+    expect(queue.jobs()[0].status).toBe('ready')
+    expect(queue.jobs()[0].clipUrl).toBe('fake://clip/a')
+  })
+
+  it("bug d'audit (2026-08-20) : un submitter qui JETTE DE FAÇON SYNCHRONE (pas une Promise rejetée) sur le PREMIER job ne doit pas interrompre la soumission des jobs SUIVANTS de la même file", async () => {
+    const { SceneJobQueue } = await import('./sceneQueue')
+    const queue = new SceneJobQueue([plan('boom'), plan('ok')], {
+      submitter: {
+        submit: p => {
+          if (p.id === 'boom') throw new Error('validation synchrone ratée')
+          return Promise.resolve(`fake://clip/${p.id}`)
+        },
+      },
+    })
+    expect(() => queue.start()).not.toThrow()
+    await new Promise(r => setTimeout(r, 10))
+    const jobs = queue.jobs()
+    expect(jobs.find(j => j.plan.id === 'boom')?.status).toBe('failed') // le job fautif échoue proprement...
+    expect(jobs.find(j => j.plan.id === 'ok')?.status).toBe('ready') // ...sans bloquer celui d'après
+  })
 })
 
 // L'environnement de test (Node, pas jsdom) n'a pas de localStorage — les

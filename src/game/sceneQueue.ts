@@ -62,25 +62,68 @@ export class SceneJobQueue {
   /** Lance tous les jobs en parallèle — à appeler une fois. */
   start(): void {
     for (const job of this.jobsList) {
+      // Minuteur individuel retenu pour pouvoir l'annuler dans cancel()
+      // (sinon il continue de tourner, et de retenir la closure, même une
+      // fois l'appelant démonté — trouvé en audit, 2026-08-16) ET dès que
+      // CE job précis se résout, gagnant ou perdant la course (sinon il
+      // continue de tourner inutilement jusqu'à `timeoutMs`, ~20 s, même
+      // pour un job déjà réglé par le submitter — trouvé en audit,
+      // 2026-08-20 : avec STUB_SCENE_SUBMITTER, systématique à CHAQUE
+      // montage de ResultsScreen).
+      let timerId!: ReturnType<typeof setTimeout>
       const timeout = new Promise<null>(resolve => {
-        // Minuteur retenu pour pouvoir l'annuler dans cancel() — sinon
-        // il continue de tourner (et de retenir la closure) même une
-        // fois le job déjà résolu par le submitter, ou l'appelant démonté
-        // (trouvé en audit, 2026-08-16).
-        this.timers.push(setTimeout(() => resolve(null), this.timeoutMs))
+        timerId = setTimeout(() => resolve(null), this.timeoutMs)
+        this.timers.push(timerId)
       })
-      Promise.race([this.submitter.submit(job.plan), timeout])
-        .then(url => {
+      // `Promise.resolve().then(...)` plutôt qu'un appel direct à
+      // `this.submitter.submit(job.plan)` : un futur submitter RÉEL (le
+      // pipeline Kling, voir ROADMAP — STUB_SCENE_SUBMITTER est le seul
+      // qui existe aujourd'hui, une fonction async qui ne peut PAS jeter
+      // de façon synchrone) pourrait valider son `plan` avant même de
+      // renvoyer une Promise ; un jet SYNCHRONE à cet endroit s'échapperait
+      // de la construction du tableau passé à Promise.race et
+      // interromprait TOUTE la boucle for — chaque job SUIVANT resterait
+      // bloqué en 'pending' pour toujours, jamais soumis ni notifié
+      // (trouvé en audit, 2026-08-20). Ici, tout jet synchrone devient un
+      // rejet de Promise normal, traité comme n'importe quel autre échec.
+      const submitted = Promise.resolve().then(() => this.submitter.submit(job.plan))
+      Promise.race([submitted, timeout]).then(
+        url => {
+          clearTimeout(timerId)
           if (this.cancelled) return
-          job.status = url ? 'ready' : 'failed'
+          // `url !== null`, pas une simple troncature de vérité (`url ?
+          // ... : ...`) : le contrat documenté de `SceneSubmitter.submit()`
+          // dit bien que SEUL `null` signale un échec — une chaîne vide
+          // (`''`, un URL de clip vide mais valide en théorie) était à
+          // tort classée en échec par la troncature (trouvé en audit,
+          // 2026-08-20).
+          job.status = url !== null ? 'ready' : 'failed'
           job.clipUrl = url
           this.onUpdate?.(this.jobs())
-        })
-        .catch(() => {
+        },
+        // 2e callback de `.then()`, PAS un `.catch()` chaîné séparément :
+        // un `.catch()` après `.then()` intercepterait AUSSI une erreur
+        // jetée par le premier callback lui-même (ex. `onUpdate` qui
+        // jette) — écrasant alors un job déjà correctement passé à
+        // 'ready' en 'failed', tout en laissant son `clipUrl` valide en
+        // place, un état interne incohérent republié via un second appel
+        // à `onUpdate` (trouvé en audit, 2026-08-20). La forme à deux
+        // arguments ne réagit qu'à un ÉCHEC de la course elle-même.
+        () => {
+          clearTimeout(timerId)
           if (this.cancelled) return
           job.status = 'failed'
           this.onUpdate?.(this.jobs())
-        })
+        },
+      ).catch(() => {
+        // Filet final : `onUpdate` est fourni par l'APPELANT (pas garanti
+        // pur/sans exception) — s'il jette dans l'un des deux callbacks
+        // ci-dessus, ce `.catch()` absorbe l'exception plutôt que de la
+        // laisser filer en rejet de Promise non intercepté. Il ne rejoue
+        // AUCUNE logique de la file : l'état du job a déjà été posé
+        // correctement avant que `onUpdate` ne jette (trouvé en audit,
+        // 2026-08-20).
+      })
     }
   }
 
